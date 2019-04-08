@@ -6,14 +6,16 @@ from peewee import *
 
 psql_db = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
+
 class BaseModel(Model):
     class Meta:
-        database = psql_db # This model uses the "people.db" database.
+        database = psql_db
+
 
 class User(BaseModel):
-    userid = AutoField(db_column='USER_ID', primary_key=True)
-    username = TextField(db_column='USER_NAME')
-    userpassword = TextField(db_column='USER_PASSWORD')
+    UserId = AutoField(db_column='USER_ID', primary_key=True)
+    UserName = TextField(db_column='USER_NAME')
+    UserPassword = TextField(db_column='USER_PASSWORD')
 
     class Meta:
         table_name = 'user'

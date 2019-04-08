@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     'users',
     'document',
     'subgraph',
@@ -83,7 +84,7 @@ DATABASES = {
         # 'ENGINE': 'django.db.backends.sqlite3',
         # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'demo',
+        'NAME': 'Metaknew',
         'USER': 'postgres',
         'PASSWORD': '123456',
         'HOST': 'localhost',
@@ -92,7 +93,7 @@ DATABASES = {
 }
 
 
-conn = psycopg2.connect(database="demo", user="postgres", password="123456", host="localhost", port="5432")
+conn = psycopg2.connect(database="Metaknew", user="postgres", password="123456", host="localhost", port="5432")
 
 
 # Password validation
@@ -117,7 +118,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
-LANGUAGE_CODE = 'zh_Hans' # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
+# LANGUAGE_CODE = 'zh_Hans' # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
 
 TIME_ZONE = 'UTC'
 

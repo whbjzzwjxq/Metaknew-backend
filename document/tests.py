@@ -42,9 +42,3 @@ def select_document_relate(uuid):
         list = doc.uuid_list
         print(list)
 
-
-if __name__ == '__main__':
-    # add_resource("d3abf128-015c-4f42-898d-82e6f9fbac50", "http://guge.com")
-    # add_resource("979968a9-3432-4bfd-a4f8-cbe0bbc9d25f", "2345678")
-    # update_resource("2", "d3abf128-015c-4f42-898d-82e6f9fbac50", "http://guge.com")
-    add_document("924d061c-5517-11e9-9703-04d3b0eb8835", "27657", "45677专题领域3", "3567675描述描述描3", "3673567567http://url33333333", "36767789北京市海淀区")
