@@ -4,6 +4,7 @@ from django.db import models
 
 
 class BaseNode(models.Model):
+    # 在postgresql里储存的属性
     uuid = models.UUIDField(db_column='UUID', primary_key=True)
     Description = models.TextField(db_column='DESCRIPTION')
     Imp = models.IntegerField(db_column='IMP')
@@ -12,7 +13,7 @@ class BaseNode(models.Model):
     ClaLevel = models.IntegerField(db_column='CLA')
     ImportMethod = models.CharField(db_column='IMPORT', max_length=30)
     UserId = models.IntegerField(db_column='USER_ID')
-
+    # 在neo4j里储存的属性
     class Meta:
         db_table = 'BASE_NODE'
 
@@ -21,3 +22,6 @@ class Person(BaseNode):
     PeriodStart = models.DateField(db_column='PERIOD_START')
     PeriodEnd = models.DateField(db_column='PERIOD_END')
     BirthPlace = models.CharField(db_column='BIRTHPLACE', max_length=30)
+
+    class Meta:
+        db_table = 'PERSON'

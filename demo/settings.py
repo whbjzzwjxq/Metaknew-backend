@@ -86,14 +86,14 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'Metaknew',
         'USER': 'postgres',
-        'PASSWORD': '123456',
-        'HOST': 'localhost',
+        'PASSWORD': 'test123456',
+        'HOST': '39.96.10.154',
         'PORT': '5432',
     }
 }
 
 
-conn = psycopg2.connect(database="Metaknew", user="postgres", password="123456", host="localhost", port="5432")
+conn = psycopg2.connect(database="Metaknew", user="postgres", password="test123456", host="39.96.10.154", port="5432")
 
 
 # Password validation

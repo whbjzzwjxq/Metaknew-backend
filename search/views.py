@@ -1,29 +1,29 @@
 from django.shortcuts import render
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 
-graph = Graph(
-    'bolt://39.96.10.154:7687', username= 'neo4j', password='12345678'
-)
-tx = graph.begin
-node_matcher = NodeMatcher(graph)
-relationship_matcher = RelationshipMatcher(graph)
+
+class NeoSet:
+    graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
+    tx = graph.begin
+    Nmatcher = NodeMatcher(graph)
+    Rmatcher = RelationshipMatcher(graph)
 
 
 # uuid搜索
 def search_by_id(uuid):
-    result = node_matcher.match(uuid=uuid).first()
+    result = NeoSet.Nmatcher.match(uuid=uuid).first()
     return result
 
 
 # 关键词搜索
 def search_by_name(name):
-    result = node_matcher.match(uuid=name).first()
+    result = NeoSet.Nmatcher.match(uuid=name).first()
     return result
 
 
 # labels as args,key-value as kwargs
 def search_by_dict(*args, **kwargs):
-    result = node_matcher.match(args, kwargs)
+    result = NeoSet.Nmatcher.match(args, kwargs)
     return result
 
 
