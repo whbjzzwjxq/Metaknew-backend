@@ -1,21 +1,21 @@
-from peewee import *
+from django.contrib.postgres.fields import *
 from py2neo import *
+from django.db import models
 
-post_gre_sql = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
+class BaseNode(models.Model):
+    uuid = models.UUIDField(db_column='UUID').primary_key
+    Description = models.CharField(db_column='DESCRIPTION')
+    Imp = models.IntegerField(db_column='IMP')
+    Hot = models.IntegerField(db_column='HOT')
+    StrLevel = models.FloatField(db_column='STR')
+    ClaLevel = models.IntegerField(db_column='CLA')
+    ImportMethod = models.CharField(db_column='IMPORT')
+    UserId = models.IntegerField(db_column='')
 
-class BaseModel(Model):
     class Meta:
-        database = post_gre_sql  # This model uses the "people.db" database.
-# Create your models here.
+        db_table = 'BASE_NODE'
 
 
-class BaseNode(BaseModel):
-    uuid = UUIDField(db_column='UUID')
-    Description = CharField(db_column='DESCRIPTION')
-    Imp = IntegerField(db_column='IMP')
-    Hot = IntegerField(db_column='HOT')
-    StrLevel = DoubleField(db_column='STR')
-    ClaLevel = IntegerField(db_column='CLA')
-    ImportMethod = CharField(db_column='IMPORT')
-    UserId = IntegerField(db_column='')
+class DocNode(models.Model):
+    uuid = models.UUIDField(db_column='UUID').primary_key
