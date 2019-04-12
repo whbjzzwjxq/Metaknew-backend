@@ -21,5 +21,6 @@ import document.urls as url
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('document/', include('document.urls'))
+    path('document/', include('document.urls')),
+    path('user/', include('users.urls'))
 ]

@@ -98,8 +98,9 @@ def add_document_relate(request):
 
 # 依据uuid查询相关专题的title列表    疑问：title是否唯一？每个相关专题的详细信息是否可以通过title查找
 def select_document_relate_title(request):
-    uuid = request.POST.get("uuid")
+    uuid = request.POST["uuid"]
     print(uuid)
+    print(request.body)
     document = document_info.selectById(uuid)
     title_list = []
     for doc in document:
@@ -125,27 +126,56 @@ def add_resource(request):
 def select_resource(request):
     uuid = request.POST["uuid"]
     res = resource.selectById(uuid)
+    urllist = []
+    for i in res:
+        url = i.file
+        list = url.split(',')
+        for j in list:
+            urllist.append(j)
     # return render(request, 'resource.html', {'res': res})
-    return HttpResponse(str(res), content_type='application/json')
+    return HttpResponse(json.dumps(urllist), content_type='application/json')
 
 
-# 根据uuid删除资源信息
+# 根据uuid删除资源信息(用于删除专题时，需删除和其有关的全部资源信息)
 def delete_resource(request):
     uuid = request.POST["uuid"]
     res = resource.deleteById(uuid)
     return render(request, 'resource.html', {'res': res})
 
 
+# 删除资源信息（用于删除某一个专题下的某个资源）      未测
+def delete_resource_one(request):
+    uuid = request.POST["uuid"]
+    url = request.POST["file"]
+    filedata = {}
+    res = resource.selectById(uuid)
+    urls1 = []
+    urls2 = []
+    urls3 = ''
+    urls1.append(url)
+    for i in res:
+        file = i.file
+        filedata['id'] = i.id
+        urls2.append(file)
+    for i in urls2:
+        if i not in urls1:
+            if urls3 == '':
+                urls3 = i
+            else:
+                urls3 = urls3 + ',' + i
+    filedata['uuid'] = uuid
+    filedata['file'] = urls3
+    resource.updateById(filedata)
+
+
 # 更新专题资源
 def update_resource(request):
-    filedata = {}
-    filedata['id'] = request.POST["id"]
-    filedata['uuid'] = request.POST["uuid"]
+    filedata = {'id': request.POST["id"], 'uuid': request.POST["uuid"]}
     file = request.POST["file"]
     res = resource.selectById(request.POST['uuid'])
     for re in res:
         urls = re.file
-        if(urls != None):
+        if urls is not None:
             urls = urls + "," + file
         else:
             urls = file

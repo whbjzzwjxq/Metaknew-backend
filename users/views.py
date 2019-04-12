@@ -18,7 +18,7 @@ def delete_user(request):
 '''
 
 
-# 修改用户资料
+# 修改用户资料     未测
 def update_user(request):
     filedata={}
     filedata['userid'] = request.POST.get('userid', None)
@@ -31,34 +31,38 @@ def update_user(request):
 
 # 登录
 def login(request):
-    if request.method == 'GET':
-        return render(request, 'demo/login.html')
-    else:
-        # 初始化返回信息
-        respData = {'status': '0', 'ret': '登录失败，输入信息有误!!!'}
+    # if request.method == 'GET':
+    #     return render(request, 'demo/login.html')
+    # else:
+    #     # 初始化返回信息
+    #     respData = {'status': '0', 'ret': '登录失败，输入信息有误!!!'}
 
-        # 预定义一个最终返回的Response对象(可以动态地为其配置内容,要想勒令客户端做事情必须要有一个Response对象)
-        resp = HttpResponse()
+    # 预定义一个最终返回的Response对象(可以动态地为其配置内容,要想勒令客户端做事情必须要有一个Response对象)
+    resp = HttpResponse()
 
-        # 获取用户输入的用户名、密码、验证码
-        email = request.POST.get('email', None)
-        password = request.POST.get('password', None)
+    # 获取用户输入的用户名、密码、验证码
+    email = request.POST.get('useremail', None)
+    password = request.POST.get('userpw', None)
+    respData = {}
+    # 查询邮箱为email的用户
+    userss = userInfo.selectByEmail(email)
+    if not userss:
+        respData = {'status': '0', 'ret': '用户不存在!!!'}
 
-        # 查询邮箱为email的用户
-        user = userInfo.selectByEmail(email)
-        if not user:
-            respData = {'status': '0', 'ret': '用户不存在!!!'}
-
+    for i in userss:
         # 检查密码、验证码是否匹配
-        if password == user.userpassword:
+        if password == i.userpassword:
             try:
                 respData = {'status': '1', 'ret': 'login success!'}
             except BaseException as e:
                 print(e)
                 pass
                 respData = {'status': '0', 'ret': '登录失败，输入信息有误!!!'}
+        else:
+            respData = {'status': '0', 'ret': '登录失败，密码不正确!!!'}
     resp.content = json.dumps(respData)
-    return resp
+    # return resp
+    return HttpResponse(resp, content_type="application/json")
 
 
 # 注册
@@ -70,7 +74,7 @@ def register(request):
         # 获取用户输入的用户名、密码、邮箱
         filedata = {}
         filedata['username']= request.POST.get('username', None)
-        filedata[' userpw'] = request.POST.get('userpw', None)
+        filedata['userpw'] = request.POST.get('userpw', None)
         filedata['useremail'] = request.POST.get('useremail', None)
         filedata['usertime'] = dt.datetime.now()
 
