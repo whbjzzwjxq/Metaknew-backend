@@ -7,12 +7,12 @@ from peewee import *
 
 # Create your models here.
 
-psql_db = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
+post_gre_sql_db = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
 
 class BaseModel(Model):
     class Meta:
-        database = psql_db  # This model uses the "people.db" database.
+        database = post_gre_sql_db  # This model uses the "people.db" database.
 
 
 # 专题
@@ -29,7 +29,6 @@ class Document(BaseModel):
     hard_level = DoubleField(db_column='HARD_LEVEL', default=0)  # 难易度
     area = CharField(db_column='AREA')  # 领域
     size = IntegerField(db_column='SIZE', default=0)  # 节点数量
-    uuid_list = TextField(db_column='UUID_LIST')  # 相关专题
 
     class Meta:
         table_name = 'document'
@@ -42,7 +41,9 @@ class Comment(BaseModel):
     userid = IntegerField(db_column='USER_ID')  # 用户id
     time = DateTimeField(db_column='TIME')  # 评论时间
     content = CharField(db_column='CONTENT')  # 评论内容
-    star = DoubleField(db_column='STAR')  # 评论星级
+    imp = DoubleField(db_column='IMP')  # 评论重要度
+    hard_level = DoubleField(db_column='HARD_LEVEL')  # 评论难易度
+    useful = BooleanField(db_column='USEFUL')  # 是否有用
 
     class Meta:
         table_name = 'comment'

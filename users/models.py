@@ -6,9 +6,11 @@ from peewee import *
 
 psql_db = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
+
 class BaseModel(Model):
     class Meta:
-        database = psql_db # This model uses the "people.db" database.
+        database = psql_db
+
 
 class User(BaseModel):
     userid = AutoField(db_column='USER_ID', primary_key=True)
