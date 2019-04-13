@@ -1,4 +1,5 @@
-*.xml
 *.pyc
-*.iml
+.idea\
 *\migrations
+*.iml
+*.xml

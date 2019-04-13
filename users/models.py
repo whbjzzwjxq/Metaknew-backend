@@ -13,9 +13,11 @@ class BaseModel(Model):
 
 
 class User(BaseModel):
-    UserId = AutoField(db_column='USER_ID', primary_key=True)
-    UserName = TextField(db_column='USER_NAME')
-    UserPassword = TextField(db_column='USER_PASSWORD')
+    userid = AutoField(db_column='USER_ID', primary_key=True)
+    username = TextField(db_column='USER_NAME')
+    userpassword = TextField(db_column='USER_PASSWORD')
+    useremail = TextField(db_column='USER_EMAIL')
+    dateTime = DateTimeField(db_column='USER_TIME')
 
     class Meta:
         table_name = 'user'
