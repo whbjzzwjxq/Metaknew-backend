@@ -1,3 +1,4 @@
+# -*-coding=utf-8 -*-
 """
 Django settings for demo project.
 
@@ -138,7 +139,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
-LANGUAGE_CODE = 'zh_Hans' # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
+# LANGUAGE_CODE = 'zh_Hans' # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
 
 TIME_ZONE = 'UTC'
 
