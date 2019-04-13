@@ -10,7 +10,7 @@ class NeoSet:
 
 
 # uuid搜索
-def search_by_id(uuid):
+def search_by_uuid(uuid):
     result = NeoSet.Nmatcher.match(uuid=uuid).first()
     return result
 
