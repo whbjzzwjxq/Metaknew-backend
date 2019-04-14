@@ -6,64 +6,76 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 import uuid
+import os
+from demo.tools import getHttpResponse
 from playhouse.shortcuts import model_to_dict, dict_to_model
 
 # Create your views here.
 @csrf_exempt
-# 根据专题id得到评论
+# 根据专题id得到用户及评论信息
 def get_comments(request):
-    comment_id = request.POST['id']
+    comment_id = json.loads(request.body)['data']['uuid']
+    print(comment_id)
     comments = comment.selectById(comment_id)
-    #return render(request, 'comment.html', {'comments': comments})
-    #model_to_dict(comments)
-    return HttpResponse(json.dump(comments), content_type="application/json")
+    res = []
+    for com in comments:
+        com.uuid = str(com.uuid)
+        com.time = str(com.time)
+        res.append(dict(model_to_dict(com,backrefs=True).items()+model_to_dict(com.user, backrefs=True).items()))
+    return HttpResponse(json.dumps(res), content_type="application/json")
 
 # 添加评论
+@csrf_exempt
 def add_comment(request):
-    if request.POST['content'] == 'null':
-        return render(request,'comment.html',{})
-    filedata = {}
-    filedata['uuid'] = request.POST['uuid']
-    filedata['userid'] = request.POST['userid']
-    filedata['time'] = dt.datetime.now()
-    filedata['content'] = request.POST.get('content')
-    filedata['star'] = request.POST['star']
-    comm = comment.add(filedata)
+    params = json.loads(request.body)['data']
+    if params['content'] == '':
+        return HttpResponse(getHttpResponse('0','添加失败',''),content_type='application/json')
 
+    params['time'] = dt.datetime.now()
+    comm = comment.add(params)
+    comm.time = str(comm.time)
     #return render(request,'comment.html',{'comment:':comm})
-    return HttpResponse(json.dumps(comm), content_type="application/json")
+    return HttpResponse(getHttpResponse('1','添加成功',model_to_dict(comm,backrefs=True)), content_type="application/json")
 
 # 根据commentID 更新评论
+@csrf_exempt
 def update_comment(request):
-    if request.POST['id'] == 'null':
-        return render(request,'comment.html',{})
+    params = json.loads(request.body)['data']
+    if params['id'] == '':
+        return HttpResponse(getHttpResponse('0','更新失败',''), content_type='application/json')
 
-    if request.POST['content'] == 'null':
-        return render(request,'comment.html',{})
+    if params['content'] == '':
+        return HttpResponse(getHttpResponse('0','更新失败',''), content_type='application/json')
 
-    id = request.POST['id']
+    id = params['id']
+    ''''
     filedata = {}
     filedata['uuid'] = request.POST['uuid']
     filedata['userid'] = request.POST['userid']
     filedata['time'] = dt.datetime.now()
     filedata['content'] = request.POST['content']
-    filedata['star'] = request.POST['star']
-    res = comment.updateById(id,filedata)
-
-    return render(request,'comment.html',{'res':res})
+    '''
+    params['time'] = dt.datetime.now()
+    comm = comment.updateById(id,params)
+    print(comm)
+    return HttpResponse(getHttpResponse(comm,'更新成功',''), content_type="application/json")
 
 # 根据commentId删除评论
+@csrf_exempt
 def delete_comment(request):
-    if request.POST['id'] == 'null':
-        return render(request,'comment.html',{})
-    id = request.POST['id']
-    res = comment.deleteById(id)
+    params = json.loads(request.body)['data']
+    if params['id'] == '':
+        return HttpResponse(getHttpResponse('0','删除失败',''), content_type='application/json')
 
-    return render(request,'comment.html',{'res':res})
+    id = params['id']
+    res = comment.deleteById(id)
+    return HttpResponse(getHttpResponse(res,'删除成功',''), content_type="application/json")
 
 #根据专题id得到专题info
+@csrf_exempt
 def get_doc_info(request):
-    doc_id = request.POST['id']
+    params = json.loads(request.body)['data']
+    doc_id = params['id']
     docs = document_info.selectById(doc_id)
     # return render(request, 'comment.html', {'comments': comments})
     # model_to_dict(comments)
@@ -87,7 +99,7 @@ def add_document_relate(request):
     for doc in document_now:
         list = doc.uuid_list
         # print(list)
-        if (list != None):
+        if list is not None:
             list_new = list + "," + str(filedata['uuid'])
         else:
             list_new = str(filedata['uuid'])
@@ -98,28 +110,55 @@ def add_document_relate(request):
 
 # 依据uuid查询相关专题的title列表    疑问：title是否唯一？每个相关专题的详细信息是否可以通过title查找
 def select_document_relate_title(request):
-    uuid = request.POST["uuid"]
+    uuid = request.POST.get("uuid")
     print(uuid)
     print(request.body)
     document = document_info.selectById(uuid)
-    title_list = []
+    title_list = {}
     for doc in document:
         uuids = doc.uuid_list
         list = uuids.split(',')
+        res = []
+        print(list)
         for i in list:
             document_relate = document_info.selectById(i)
             for doc_relate in document_relate:
-                title_list.append(doc_relate.title)
-    # return render(request, 'document.html', {'title_list': title_list})
-    return HttpResponse(json.dumps(title_list), content_type="application/json")
-
+                title_list['title'] = doc_relate.title
+                title_list['des'] = doc_relate.description
+                title_list['url'] = doc_relate.url
+                res.append(title_list)
+                # return render(request, 'document.html', {'title_list': title_list})
+    return HttpResponse(json.dumps(res), content_type="application/json")
 
 
 # 添加专题资源
 def add_resource(request):
-    filedata = {'uuid': uuid.uuid1(), 'file': request.POST["file"]}
-    res = resource.add(filedata)
-    return render(request, 'add_resource.html', {'res': res})
+    filedata = {}
+    resp = HttpResponse()
+    uuid1 = request.POST["uuid"]
+    url = request.POST["file"]
+    # res = resource.add(filedata)
+    print(url)
+    res = resource.selectById(uuid1)
+    if not res:
+        # l = set()
+        # l.add(url)
+        l = [url]
+        filedata["uuid"] = uuid1
+        filedata["file"] = l
+        print(filedata["file"])
+        resource.add(filedata)
+        respData = {'status': '1', 'ret': '添加成功!!!'}
+    else:
+        for i in res:
+            urls = i.file
+            urls = urls.append(url)
+            filedata["uuid"] = uuid1
+            filedata["file"] = urls
+            resource.updateById(filedata)
+            respData = {'status': '2', 'ret': '资源更新成功!!!'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
 
 
 # 根据专题uuid查询资源信息
@@ -183,3 +222,15 @@ def update_resource(request):
     filedata['file'] = urls
     res = resource.updateById(filedata)
     return render(request, 'resource.html', {'res': res})
+
+
+def upload_file(request):
+    if request.method == "POST":    # 请求方法为POST时，进行处理
+        myFile =request.FILES.get("myfile", None)    # 获取上传的文件，如果没有文件，则默认为None
+        if not myFile:
+            return HttpResponse("no files for upload!")
+        destination = open(os.path.join("E:\\upload", myFile.name), 'wb+')    # 打开特定的文件进行二进制的写操作
+        for chunk in myFile.chunks():      # 分块写入文件
+            destination.write(chunk)
+        destination.close()
+        return HttpResponse("upload over!")

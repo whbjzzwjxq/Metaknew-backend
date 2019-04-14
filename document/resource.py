@@ -1,23 +1,15 @@
 # -*-coding=utf-8 -*-
-from django.shortcuts import render
 from document.models import Resource
 import uuid as id
+import numpy as np
 
 
 def add(filedata={}):
     uuid = filedata['uuid'] if 'uuid' in filedata else id.uuid1()
     url = filedata['file'] if 'file' in filedata else ''
-    resource = Resource.create(uuid=uuid, file=url)
-    return resource
-    # resource = Resource.select().where(Resource.uuid == uuid)
-    # for re in resource:
-    #     if re == "null":
-    #         resource = Resource.create(uuid=uuid, file=url)
-    #         return render(request, 'add_resource.html', {'resource': resource})
-    #     else:
-    #         urls = re.file
-    #         urls = urls + url
-    #         Resource.update({Resource.file: urls}).where(Resource.uuid == uuid).execute()
+    print(url)
+    resource = Resource.create(uuid=uuid, file=np.array(url))  # 数组怎么存储!!!!!!!!!!!!!!!
+    print(resource)
 
 
 def selectById(uuid):
@@ -38,3 +30,5 @@ def updateById(filedata = {}):
     file = filedata['file'] if 'file' in filedata else ''
     res = Resource.update({Resource.uuid: uuid, Resource.file: file}).where(Resource.id == id).execute()
     return res
+
+

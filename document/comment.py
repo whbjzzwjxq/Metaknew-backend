@@ -1,5 +1,6 @@
 # -*-coding=utf-8 -*-
 from document.models import Comment
+from users.models import User
 import datetime as dt
 
 def add(filedata={}):
@@ -14,9 +15,10 @@ def add(filedata={}):
     return comment
 
 # id 表示专题id
-def selectById(id):
-    assert id
-    comments = Comment.select().where(Comment.uuid == id)
+# 根据专题id得到用户及评论信息
+def selectById(uuid):
+    assert uuid
+    comments = Comment.select(Comment,User).join(User,on=(User.userid == Comment.userid)).where(Comment.uuid == uuid)
     return comments
 
 # ID 表示评论id
@@ -24,7 +26,7 @@ def updateById(id,filedata={}):
     assert id
     update_field = {}
     for filename in filedata:
-        update_field['Comment.'+filename] = filedata[filename]
+        update_field[filename] = filedata[filename]
     res = Comment.update(update_field).where(Comment.id == id).execute()
 
     return res

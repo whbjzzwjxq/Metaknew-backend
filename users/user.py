@@ -1,3 +1,4 @@
+# -*-coding=utf-8 -*-
 from users.models import User
 import datetime as dt
 

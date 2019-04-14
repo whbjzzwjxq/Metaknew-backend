@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 import os
 import psycopg2
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -49,7 +50,7 @@ CORS_ALLOW_METHODS = (
     'VIEW',
 )
 
-CORS_ALLOW_HEADERS = ('*')
+CORS_ALLOW_HEADERS = '*'
 
 # Application definition
 
@@ -60,9 +61,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     'users',
     'document',
-    'corsheaders',
+    'subgraph',
+    'search',
+    'newcontent'
 ]
 
 MIDDLEWARE = [
@@ -104,8 +108,8 @@ DATABASES = {
     'default': {
         # 'ENGINE': 'django.db.backends.sqlite3',
         # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'demo',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'demomaster',
         'USER': 'postgres',
         'PASSWORD': '123456',
         'HOST': 'localhost',
@@ -113,9 +117,7 @@ DATABASES = {
     }
 }
 
-
-conn = psycopg2.connect(database="demo", user="postgres", password="123456", host="localhost", port="5432")
-
+conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
@@ -139,21 +141,19 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
-# LANGUAGE_CODE = 'zh_Hans' # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
+LANGUAGE_CODE = 'zh-Hans'  # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
+# LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Shanghai'
 
 USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-
-
-VISIT_PATH = {}

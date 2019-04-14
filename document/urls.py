@@ -26,5 +26,9 @@ urlpatterns = [
     url('resource/add', views.add_resource),
     url('resource/select', views.select_resource),
     url('resource/delete', views.delete_resource),
-    url('resource/update', views.update_resource)
+    url('resource/update', views.update_resource),
+    url('resource/uplocal', views.upload_file),
+    url('comment/update', views.update_comment),
+    url('comment/del', views.delete_comment),
+    url('doc/get', views.get_doc_info),
 ]
