@@ -1,30 +1,25 @@
 from django.test import TestCase
-
+import re
+from subgraph.models import BaseNode, Person
 # Create your tests here.
 
 
-class BaseNode:
-    def __init__(self):
-        self.TEST = 3
+def get_dict(node):
+    keylist = []
+    for key in dir(node):
+        if not re.match(r'__.*__', key):
+            keylist.append(key)
+    return keylist
 
 
-class Person(BaseNode):
-    def __init__(self):
-        super().__init__()
-        self.PeriodStart = 2
-        self.PeriodEnd = 1
-        self.BirthPlace = 1
-        print(self.__dict__)
-
+PrimaryLabel = 'Person'
 
 init = {
     'Person': Person,
     'BaseNode': BaseNode
 }
 
-a = init['Person']()
+a = init[PrimaryLabel]()
 
-# a = 'Person'
-# b = type(a, (), {})
-# c = Person('Person')
-# print(c.PeriodStart)
+
+
