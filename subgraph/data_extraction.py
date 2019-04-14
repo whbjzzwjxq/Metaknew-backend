@@ -1,8 +1,9 @@
-from translate import connect
+from subgraph.translate import connect
 import pandas as pd
 import re
 
 zhPattern = re.compile(u'[\u4e00-\u9fa5]+')
+
 
 def dataframe2dict(data):
     '''
@@ -20,7 +21,7 @@ def dataframe2dict(data):
         node["Name_es"], node["Name_zh"] = name_translation(data.iloc[row,2])
         node["Architect_es"], node["Architect_zh"] = architect_translation(data.iloc[row,3])
         node["Nation"] = data.iloc[row,4]
-        node["Location"] = data.iloc[row,5] if str(data.iloc[row,5]) != 'nan' else None 
+        node["Location"] = data.iloc[row,5] if str(data.iloc[row,5]) != 'nan' else None
         node["Address"] = data.iloc[row,6]  if str(data.iloc[row,6]) != 'nan' else None
         node["Type"] = data.iloc[row,7]     if str(data.iloc[row,7]) != 'nan' else None
         node["Remarks"] = data.iloc[row,8]  if str(data.iloc[row,8]) != 'nan' else None
@@ -36,7 +37,7 @@ def name_translation(name):
     Return:
        (String) es_name, zh_name
     '''
-    
+
     if '（' in name or '(' in name:
         name_es = re.split('\(+|（+',name)[-1][:-1]
         name_zh = re.split('\(+|（+',name)[-2]
@@ -81,7 +82,7 @@ def architect_translation(architect):
         if "" in architect_es:
             architect_es.remove("")
 
-    if architect_zh:    
+    if architect_zh:
         architect_zh = re.split('，|,',architect_zh)
 
     return architect_es, architect_zh
