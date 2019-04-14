@@ -16,7 +16,7 @@ def get_comments(request):
     comments = comment.selectById(comment_id)
     #return render(request, 'comment.html', {'comments': comments})
     #model_to_dict(comments)
-    return HttpResponse(json.dump(comments), content_type="application/json")
+    return HttpResponse(json.dumps(comments), content_type="application/json")
 
 # 添加评论
 def add_comment(request):
