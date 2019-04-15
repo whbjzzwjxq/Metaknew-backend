@@ -5,6 +5,9 @@ from search.views import NeoSet,search_by_name
 from py2neo.data import Node, Relationship
 import re, json
 from django.http import HttpResponse
+import pandas as pd
+from subgraph.data_extraction import dataframe2dict
+
 # Neo4j用到的key
 Neo4jKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area']
 # 这是已经处理好的数据，这里只存储
@@ -51,4 +54,16 @@ def add(request):
         req = json.loads(request.body)
         create_node(req)
     return HttpResponse('200')
+
+def uploadExcel(request):
+
+    excelFile = request.FILES['excelFile']
+    a = pd.read_excel(excelFile)
+    nodeList = dataframe2dict(a)
+    print("add {} nodes ".format( len(nodeList) ))
+    
+    
+    return HttpResponse("upload nodes ok")
+
+
 

@@ -34,11 +34,11 @@ def connect(query,en2zh=True):
 
     data = {}
     if en2zh:
-        data['from'] = 'EN'
+        # data['from'] = 'EN'  源语言自动检测
         data['to'] = 'zh-CHS'
     else:
         data['to'] = 'EN'
-        data['from'] = 'zh-CHS'
+        # data['from'] = 'zh-CHS'
     data['signType'] = 'v3'
     curtime = str(int(time.time()))
     data['curtime'] = curtime
@@ -54,14 +54,16 @@ def connect(query,en2zh=True):
 
     if "web" in json.loads(bytes.decode(response.content)).keys():
         #优先使用网络释义
-        return json.loads(bytes.decode(response.content))["web"][0]["value"][0]
+        result = json.loads(bytes.decode(response.content))
+        return result["l"] ,result["web"][0]["value"][0]
     else:
         try:
-            return json.loads(bytes.decode(response.content))["translation"][0]
+            result = json.loads(bytes.decode(response.content))
+            return result["l"] ,result["translation"][0]
         except:
-            # print(q)
             print(bytes.decode(response.content))
+            return None, None
 
 
 if __name__ == '__main__':
-    connect()
+    connect("")
