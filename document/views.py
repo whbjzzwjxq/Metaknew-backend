@@ -29,6 +29,7 @@ def get_comments(request):
         res.append(dict(model_to_dict(com).items()+model_to_dict(com.user).items()))
     return HttpResponse(json.dumps(res), content_type="application/json")
 
+
 # 添加评论
 @csrf_exempt
 def add_comment(request):
