@@ -4,7 +4,7 @@ from py2neo import Graph, NodeMatcher, RelationshipMatcher
 
 class NeoSet:
     graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
-    tx = graph.begin
+    tx = graph.begin()
     Nmatcher = NodeMatcher(graph)
     Rmatcher = RelationshipMatcher(graph)
 
@@ -17,7 +17,7 @@ def search_by_uuid(uuid):
 
 # 关键词搜索
 def search_by_name(name):
-    result = NeoSet.Nmatcher.match(uuid=name).first()
+    result = NeoSet.Nmatcher.match(Name=name).first()
     return result
 
 

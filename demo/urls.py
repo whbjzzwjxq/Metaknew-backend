@@ -15,10 +15,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-
+from subgraph import views
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
     path('document/', include('document.urls')),
-    path('user/', include('users.urls'))
+    path('user/', include('users.urls')),
+    path('test/', views.add),
+    path('uploadExcel', views.uploadExcel)
 ]
