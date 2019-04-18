@@ -1,15 +1,17 @@
 # -*-coding=utf-8 -*-
-from users.models import User
+from users import models
 import datetime as dt
 
 
 # 新建用户
 def add(filedata={}):
+    """
     username = filedata['username'] if 'username' in filedata else ''
     userpw = filedata['userpw'] if 'userpw' in filedata else ''
     useremail = filedata['useremail'] if 'useremail' in filedata else ''
     usertime = filedata['usertime'] if 'usertime' in filedata else dt.datetime.now()
-    user = User.create(username=username, userpassword=userpw, dateTime=usertime, useremail=useremail)
+    """
+    user = models.User.objects.create(**filedata)
     return user
 
 
@@ -17,7 +19,7 @@ def add(filedata={}):
 def selectByEmail(email):
     assert email
     # user = User.get(User.useremail == email)
-    user = User.select().where(User.useremail == email)
+    user = models.User.objects.filter(useremail=email)
     return user
 
 
@@ -27,6 +29,6 @@ def updateById(filedata):
     username = filedata['username'] if 'username' in filedata else ''
     useremail = filedata['useremail'] if 'useremail' in filedata else ''
     userpw = filedata['userpw'] if 'userpw' in filedata else ''
-    user = User.update({User.username: username, User.useremail: useremail, User.userpassword: userpw}).where(User.userid == userid).execute()
+    user = models.User.objects.filter(userid=userid).update(username=username, useremail=useremail, userpw=userpw)
     return user
 

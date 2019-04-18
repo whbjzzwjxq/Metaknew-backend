@@ -15,9 +15,10 @@ Including another URLconf
 """
 from django.conf.urls import url
 
-from . import views
+from users import views
 
 urlpatterns = [
     url('login', views.login),
     url('register', views.register),
+    url('update', views.update_user),
 ]

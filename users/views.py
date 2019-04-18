@@ -20,13 +20,16 @@ def delete_user(request):
 
 # 修改用户资料     未测
 def update_user(request):
+    resp = HttpResponse()
     filedata={}
     filedata['userid'] = request.POST.get('userid', None)
     filedata['username'] = request.POST.get('username', None)
     filedata['useremail'] = request.POST.get('useremail', None)
     filedata['userpw'] = request.POST.get('userpw', None)
     user = userInfo.updateById(filedata)
-    return render(request, 'userInfo.html', {'user': user})
+    respData = {'status': '1', 'ret': '资料修改成功！！'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
 
 
 # 登录
@@ -53,7 +56,7 @@ def login(request):
         # 检查密码、验证码是否匹配
         if password == i.userpassword:
             try:
-                respData = {'status': '1', 'ret': 'login success!'}
+                respData = {'status': '1', 'ret': '登录成功!'}
             except BaseException as e:
                 print(e)
                 pass
@@ -76,12 +79,12 @@ def register(request):
         filedata['username']= request.POST.get('username', None)
         filedata['userpw'] = request.POST.get('userpw', None)
         filedata['useremail'] = request.POST.get('useremail', None)
-        filedata['usertime'] = dt.datetime.now()
+        filedata['datetime'] = dt.datetime.now()
 
         # 把数据写进数据库
         try:
             userInfo.add(filedata)
-            return JsonResponse({'status': 1, 'ret': 'register success!'})
+            return JsonResponse({'status': 1, 'ret': '注册成功!'})
         except BaseException as e:
             print(e)
             pass

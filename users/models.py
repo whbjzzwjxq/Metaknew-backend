@@ -1,23 +1,15 @@
 from __future__ import unicode_literals
 
-from peewee import *
-
+from django.db import models
 # Create your models here.
 
-psql_db = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
-
-class BaseModel(Model):
-    class Meta:
-        database = psql_db
-
-
-class User(BaseModel):
-    userid = AutoField(db_column='USER_ID', primary_key=True)
-    username = TextField(db_column='USER_NAME')
-    userpassword = TextField(db_column='USER_PASSWORD')
-    useremail = TextField(db_column='USER_EMAIL')
-    dateTime = DateTimeField(db_column='USER_TIME')
+class User(models.Model):
+    userid = models.AutoField(db_column='USER_ID', primary_key=True)
+    username = models.TextField(db_column='USER_NAME')
+    userpw = models.TextField(db_column='USER_PASSWORD')
+    useremail = models.TextField(db_column='USER_EMAIL')
+    datetime = models.DateTimeField(db_column='USER_TIME')
 
     class Meta:
-        table_name = 'user'
+        db_table = 'user'

@@ -27,6 +27,7 @@ def login(email, password):
     # return render(request,'add_user.html',{'user':user})
 
 
+
 if __name__ == '__main__':
     i = login('1234@163.com', '1234567890')
     print(i)
