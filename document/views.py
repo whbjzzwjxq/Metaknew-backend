@@ -168,18 +168,6 @@ def select_resource(request):
     return HttpResponse(json.dumps(urls), content_type='application/json')
 
 
-# # 根据uuid删除资源信息(用于删除专题时，需删除和其有关的全部资源信息)
-# def delete_resource(request):
-#     uuid = request.POST["uuid"]
-#     res = resource.deleteById(uuid)
-#     return render(request, 'resource.html', {'res': res})
-
-
-# 删除资源信息（用于删除某一个专题下的某个资源）      未测
-def delete_resource(request):
-    param = json.loads(request.body)['data']
-
-
 # 上传文件        已测试---4.18-----ZXN
 def upload_file(request):
     resp = HttpResponse()
@@ -239,7 +227,6 @@ def download_file(request):
             response['Content-Type'] = 'application/octet-stream; charset=unicode'
             response['Content-Disposition'] = 'attachment;filename="{0}"'.format(escape_uri_path(fileName))  # escape_uri_path()解决中文名文件(from django.utils.encoding import escape_uri_path)
             return response
-        # return HttpResponse(resp, content_type="application/json")
 
 
 # 删除文件             已测试---4.18-----ZXN

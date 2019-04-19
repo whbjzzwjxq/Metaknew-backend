@@ -21,6 +21,7 @@ urlpatterns = [
     # path('admin/', admin.site.urls),
     path('document/', include('document.urls')),
     path('user/', include('users.urls')),
+    path('note/', include('note.urls')),
     path('test/', views.add),
     path('uploadExcel', views.uploadExcel)
 ]

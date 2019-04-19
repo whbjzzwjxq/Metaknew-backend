@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'subgraph',
     'search',
     'newcontent',
+    'note',
 ]
 
 SITE_ID = 1
@@ -144,12 +145,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
-<<<<<<< HEAD
+
 LANGUAGE_CODE = 'zh-Hans'  # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
 # LANGUAGE_CODE = 'en-us'
-=======
-LANGUAGE_CODE = 'zh-Hans' # 数据库可视化页面转化为中文：zh_Hans, zh_Hant
->>>>>>> f4446ce2b18511102af72afd0c6d3e634e697209
+
 
 TIME_ZONE = 'UTC'
 
@@ -164,9 +163,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-<<<<<<< HEAD
-=======
 
-
-VISIT_PATH = {}
->>>>>>> f4446ce2b18511102af72afd0c6d3e634e697209
