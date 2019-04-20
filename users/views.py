@@ -5,7 +5,9 @@ from users.models import User
 from users import user as userInfo
 import json
 from django.http import JsonResponse
-import datetime as dt
+from django.contrib.auth.hashers import make_password,check_password
+# import datetime as dt
+from django.utils import timezone
 # Create your views here.
 
 '''
@@ -34,27 +36,18 @@ def update_user(request):
 
 # 登录
 def login(request):
-    # if request.method == 'GET':
-    #     return render(request, 'demo/login.html')
-    # else:
-    #     # 初始化返回信息
-    #     respData = {'status': '0', 'ret': '登录失败，输入信息有误!!!'}
-
-    # 预定义一个最终返回的Response对象(可以动态地为其配置内容,要想勒令客户端做事情必须要有一个Response对象)
     resp = HttpResponse()
-
-    # 获取用户输入的用户名、密码、验证码
-    email = request.POST.get('useremail', None)
-    password = request.POST.get('userpw', None)
-    respData = {}
-    # 查询邮箱为email的用户
-    userss = userInfo.selectByEmail(email)
-    if not userss:
+    # 获取用户输入的手机号、密码
+    param = json.loads(request.body)['data']
+    phone = param['user_phone']
+    password = param['user_pw']
+    # 查询邮箱为phone的用户
+    users = userInfo.selectByPhone(phone)
+    if not users:
         respData = {'status': '0', 'ret': '用户不存在!!!'}
-
-    for i in userss:
-        # 检查密码、验证码是否匹配
-        if password == i.userpassword:
+    for i in users:
+        # 检查密码是否匹配
+        if check_password(password, i.user_pw):
             try:
                 respData = {'status': '1', 'ret': '登录成功!'}
             except BaseException as e:
@@ -64,28 +57,32 @@ def login(request):
         else:
             respData = {'status': '0', 'ret': '登录失败，密码不正确!!!'}
     resp.content = json.dumps(respData)
-    # return resp
     return HttpResponse(resp, content_type="application/json")
 
 
 # 注册
 def register(request):
-
-    if request.method == 'GET':
-        return render(request, 'SitesApp/register.html')
-    else:
-        # 获取用户输入的用户名、密码、邮箱
-        filedata = {}
-        filedata['username']= request.POST.get('username', None)
-        filedata['userpw'] = request.POST.get('userpw', None)
-        filedata['useremail'] = request.POST.get('useremail', None)
-        filedata['datetime'] = dt.datetime.now()
-
-        # 把数据写进数据库
-        try:
-            userInfo.add(filedata)
-            return JsonResponse({'status': 1, 'ret': '注册成功!'})
-        except BaseException as e:
-            print(e)
-            pass
-    return JsonResponse({'status': 0, 'ret': '输入信息有误!'})
+    """
+    	"data":{
+		"username":
+		"user_pw":
+		"user_email":
+		"user_phone":
+	}
+    :param request:
+    :return:
+    """
+    resp = HttpResponse()
+    param = json.loads(request.body)['data']
+    param['user_pw'] = make_password(param['user_pw'])  # 密码加密
+    param['datetime'] = timezone.now()
+    # 把数据写进数据库
+    try:
+        userInfo.add(param)
+        respData = {'status': 1, 'ret': '注册成功!'}
+    except BaseException as e:
+        print(e)
+        pass
+        respData = {'status': 0, 'ret': '输入信息有误!'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")

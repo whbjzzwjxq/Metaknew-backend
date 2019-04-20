@@ -8,7 +8,7 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 
 # Create your models here.
 
-# 专题
+# 专题信息
 class Document_Information(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True)
     uuid = models.UUIDField(db_column='UUID')  # 专题id
@@ -32,13 +32,16 @@ class Document_Information(models.Model):
     class Meta:
         db_table = 'document_information'
 
-# 专题信息
+# 专题
 class Document(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True) # 专题ID
     included_document = JSONField(db_column='INCLUDED_DOCUMENT') # 包含的专题uuid
-    included_searchAnswer = JSONField(db_column='INCLUDED_SEARCHANSWER') # 包含的搜索结果
-    add_delete_node = JSONField(db_column='ADD/DELETE_NODE') # 记录增加或者删除的节点信息
-    add_delete_relationship = JSONField(db_column='ADD/DELETE_RELATIONSHIP') # 记录增加或者删除的关系
+    node = ArrayField(JSONField(db_column='NODE'))  # json里包含节点的uuid,x,y坐标
+    relationship = ArrayField(JSONField(db_column='RELATIONSHIP'))   # uuid
+
+    class Meta:
+        db_table = 'document'
+
 
 # 专题评论
 class Comment(models.Model):

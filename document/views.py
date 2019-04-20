@@ -1,6 +1,6 @@
 # -*-coding=utf-8 -*-
 
-from document import comment,document_info
+from document import comment,document_info,document
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.encoding import escape_uri_path
@@ -54,13 +54,6 @@ def update_comment(request):
         return HttpResponse(getHttpResponse('0','更新失败',''), content_type='application/json')
 
     id = params['id']
-    ''''
-    filedata = {}
-    filedata['uuid'] = request.POST['uuid']
-    filedata['userid'] = request.POST['userid']
-    filedata['time'] = dt.datetime.now()
-    filedata['content'] = request.POST['content']
-    '''
     params['time'] = dt.datetime.now()
     comm = comment.updateById(id,params)
     print(comm)
@@ -131,33 +124,13 @@ def get_all_doc_info(request):
         return HttpResponse(json.dumps(res), content_type="application/json")
 
 
-# # 依据uuid查询相关专题的title列表    疑问：title是否唯一？每个相关专题的详细信息是否可以通过title查找
-# @csrf_exempt
-# def select_document_relate_title(request):
-#     uuid = request.POST.get("uuid")
-#     print(uuid)
-#     print(request.body)
-#     document = document_info.selectById(uuid)
-#     title_list = {}
-#     for doc in document:
-#         uuids = doc.uuid_list
-#         list = uuids.split(',')
-#         res = []
-#         print(list)
-#         for i in list:
-#             document_relate = document_info.selectById(i)
-#             for doc_relate in document_relate:
-#                 title_list['uuid'] = doc_relate.uuid
-#                 title_list['title'] = doc_relate.title
-#                 title_list['des'] = doc_relate.description
-#                 title_list['url'] = doc_relate.url
-#                 res.append(title_list)
-#                 # return render(request, 'document.html', {'title_list': title_list})
-#     return HttpResponse(json.dumps(res), content_type="application/json")
-
-
 # 根据专题uuid查询资源信息         已测试---4.17----ZXN
 def select_resource(request):
+    """
+            "data":{
+        		"uuid":
+        	}
+    """
     param = json.loads(request.body)['data']
     resource = document_info.selectURLById(param['uuid'])
     urls = []
@@ -169,6 +142,7 @@ def select_resource(request):
 
 
 # 上传文件        已测试---4.18-----ZXN
+# 文件预览路径127.0.0.1:8000/media/files/upload/ + 文件名
 def upload_file(request):
     resp = HttpResponse()
     uuid = request.POST.get("uuid", "")
@@ -248,5 +222,15 @@ def delete_file(request):
                 respData = {'status': '0', 'ret': "文件不存在，删除失败,请于管理员联系。"}
         else:
             respData = {'status': '0', 'ret': "文件不存在，删除失败,请于管理员联系。"}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
+
+
+# 新增专题
+def add_document(request):
+    param = json.loads(request.body)['data']
+    resp = HttpResponse()
+    document.add(param)
+    respData = {'status': '1', 'ret': '添加成功!!!'}
     resp.content = json.dumps(respData)
     return HttpResponse(resp, content_type="application/json")
