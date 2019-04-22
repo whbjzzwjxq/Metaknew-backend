@@ -16,12 +16,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from subgraph import views
-
-import document.urls as url
+from django.conf.urls import url
+from django.views.static import serve
+from django.conf import settings
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # path('admin/', admin.site.urls),
     path('document/', include('document.urls')),
     path('user/', include('users.urls')),
-    path('test/', views.add)
+    path('note/', include('note.urls')),
+    path('test/', views.add),
+    path('uploadExcel', views.uploadExcel),
+    url(r'media/(?P<path>.*)',serve, {'document_root':settings.BASE_DIR})
 ]

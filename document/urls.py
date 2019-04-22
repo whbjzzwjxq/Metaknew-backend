@@ -16,15 +16,19 @@ Including another URLconf
 from django.conf.urls import url
 from django.contrib import admin
 
-from . import views
+from document import views
 
 urlpatterns = [
     url(r'^comment/get$', views.get_comments),
     url('comment/add', views.add_comment),
-    url('documentRelate/add', views.add_document_relate),
-    url('documentRelate/select', views.select_document_relate_title),
-    url('resource/add', views.add_resource),
+    # url('documentRelate/select', views.select_document_relate_title),
     url('resource/select', views.select_resource),
-    url('resource/delete', views.delete_resource),
-    url('resource/update', views.update_resource)
+    url('documentInformation/add', views.add_document_information),
+    url('comment/update', views.update_comment),
+    url('comment/del', views.delete_comment),
+    url('documentInformation/get', views.get_doc_info),
+    url('documentInformation/showAll', views.get_all_doc_info),
+    url('file/upload', views.upload_file),
+    url('file/delete', views.delete_file),
+    url('file/download', views.download_file),
 ]

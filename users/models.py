@@ -1,23 +1,18 @@
 from __future__ import unicode_literals
 
-from peewee import *
-
+from django.db import models
+# import datetime as dt
+from django.utils import timezone
 # Create your models here.
 
-psql_db = PostgresqlDatabase("demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
-
-class BaseModel(Model):
-    class Meta:
-        database = psql_db
-
-
-class User(BaseModel):
-    userid = AutoField(db_column='USER_ID', primary_key=True)
-    username = TextField(db_column='USER_NAME')
-    userpassword = TextField(db_column='USER_PASSWORD')
-    useremail = TextField(db_column='USER_EMAIL')
-    dateTime = DateTimeField(db_column='USER_TIME')
+class User(models.Model):
+    user_id = models.AutoField(db_column='USER_ID', primary_key=True)  # 用户id
+    username = models.TextField(db_column='USER_NAME')  # 用户名
+    user_pw = models.TextField(db_column='USER_PASSWORD')  # 用户密码
+    user_email = models.TextField(db_column='USER_EMAIL')  # 用户邮箱
+    user_phone = models.CharField(db_column='USER_PHONE', max_length=11)  # 用户手机号（用于登录的账号）
+    datetime = models.DateTimeField(db_column='USER_TIME', default=timezone.now())  # 注册时间
 
     class Meta:
-        table_name = 'user'
+        db_table = 'user'
