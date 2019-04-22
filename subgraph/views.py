@@ -31,13 +31,17 @@ def create_node(node):
     NeoNode.add_label('Used')
     NeoNode.update_labels(node['Labels'])
     node.pop("Labels")
+
     for key in Neo4jKeys:
         if key in node:
             NeoNode[key] = node[key]
             node.pop(key)
+
     NeoSet.tx.create(NeoNode)
     NeoSet.tx.commit()
     NeoNode = search_by_name(NeoNode['Name'])
+
+
     node['uuid'] = NeoNode['uuid']
     NewNode = init[NeoNode['PrimaryLabel']]()
     for key in get_dict(NewNode):

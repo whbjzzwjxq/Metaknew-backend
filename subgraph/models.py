@@ -28,7 +28,28 @@ class Person(BaseNode):
     PeriodStart = models.DateField(db_column='PERIOD_START')
     PeriodEnd = models.DateField(db_column='PERIOD_END')
     BirthPlace = models.CharField(db_column='BIRTHPLACE', max_length=30)
+    Nation = models.CharField(db_column='NATION', max_length=30, default='None')
 
     class Meta:
         db_table = 'PERSON'
 
+
+# class Architect(Person):
+#     Projects = ArrayField(models.ForeignKey(to_field='Project', on_delete=models.CASCADE))
+
+
+class Project(BaseNode):
+    PeriodStart = models.DateField(db_column='PERIOD_START')
+    PeriodEnd = models.DateField(db_column='PERIOD_END')
+    Location = models.TextField(db_column='LOCATION')
+    Nation = models.TextField(db_column='NATION', max_length=30)
+
+    class Meta:
+        db_table = 'PROJECT'
+
+
+class ArchProject(Project):
+    Architect = ArrayField(models.TextField(), db_column='ARCHITECT')
+
+    class Meta:
+        db_table = 'ARCH_PROJECT'
