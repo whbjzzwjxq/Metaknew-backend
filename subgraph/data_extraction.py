@@ -15,6 +15,7 @@ Address = 6
 Type = 7
 Remarks = 8
 
+
 def dataframe2dict(data):
     '''
     Arg:
@@ -61,8 +62,7 @@ def name_translation(name):
 
     if '（' in name or '(' in name:
 
-        nameList = re.split('\(+|（+',name)
-
+        nameList = re.split('\(+|（+', name)
         while '' in nameList:
             nameList.remove('')
 
@@ -84,7 +84,7 @@ def name_translation(name):
                 break
 
         for item in nameList:
-            language, translation = connect(item,en2zh=True) 
+            language, translation = connect(item, en2zh=True)
 
             if language == "en2zh-CHS":
                 # get zh and en
@@ -92,15 +92,16 @@ def name_translation(name):
                 break
 
         if not name_zh or not name_en:
-            _, name_zh = connect(name_origin,en2zh=True) 
+            _, name_zh = connect(name_origin,en2zh=True)
             _, name_en = connect(name_zh,en2zh=False)
-        
+
     else:
         name_origin = name
         _, name_zh = connect(name,en2zh=True)
         _, name_en = connect(name_zh,en2zh=False)
 
     return name_origin, name_en, name_zh
+
 
 def architect_translation(architect):
 
@@ -112,8 +113,8 @@ def architect_translation(architect):
     '''
 
     if '（' in architect or '(' in architect:
-        architect_es = re.split('\(+|（+',architect)[-1][:-1]
-        architect_zh = re.split('\(+|（+',architect)[-2]
+        architect_es = re.split('\(+|（+', architect)[-1][:-1]
+        architect_zh = re.split('\(+|（+', architect)[-2]
 
         if not zhPattern.search(architect_zh):
             #无中文

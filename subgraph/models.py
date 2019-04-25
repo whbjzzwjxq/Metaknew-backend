@@ -1,14 +1,10 @@
 from django.contrib.postgres.fields import *
 from py2neo import *
 from django.db import models
-from search.views import search_by_uuid
-
-
-test = list
+# 不要在模型中写字段以外的属性或方法
 
 
 class BaseNode(models.Model):
-
     # 在postgresql里储存的属性
     uuid = models.UUIDField(db_column='UUID', primary_key=True)
     Description = models.TextField(db_column='DESCRIPTION', default='None')
