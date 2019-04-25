@@ -3,7 +3,7 @@
 # APP内定义
 from document import comment, document_info
 from document.models import Document_Information
-from subgraph.views import handle_node, handle_relationship, create_node
+from subgraph.views import handle_node, handle_relationship, create_node, create_relationship
 
 # django定义与工具包
 import datetime as dt
@@ -251,32 +251,45 @@ def add_document(request):
         # 专题信息
         info = data['info']
 
-        doc_nodes = []
-        doc_relationship = []
-        # 处理节点，关系，节点坐标
-        for node in nodes:
-            x = node['conf']['x']
-            y = node['conf']['y']
-            uuid = handle_node(node['info'])
-            loc = {'uuid': uuid, 'x': x, 'y': y}
-            doc_nodes.append(loc)
-        for relationship in relationships:
-            uuid = handle_relationship(relationship['info'])
-            doc_relationship.append(uuid)
-
-        # 存入Neo4j部分
-        # todo 将字段名改为驼峰写法
+        # 新建专题
         NewDocument = {'Name': info['title'],
                        'PrimaryLabel': 'Document',
                        'Area': info['area'],
                        'included_document': data['included_document'],
-                       'node': doc_nodes,
-                       'relationship': doc_relationship
                        }
-        uuid = create_node(NewDocument)
+        NewDocument = create_node(NewDocument)
+        # 预定义容器
+        doc_nodes = []
+        doc_relationship = []
+        node_index = {}
+        for node in nodes:
+            # 记录新建节点自动赋予的uuid
+            old_id = node['info']['uuid']
+            new_node = handle_node(node['info'])
+            node_index.update({old_id: new_node})
 
-        # 存入postgreSQL部分
-        data['info']['uuid'] = uuid
+            # 记录专题内节点坐标
+            loc = {'uuid': new_node['uuid'], 'x': node['conf']['x'], 'y': node['conf']['y']}
+            doc_nodes.append(loc)
+
+            # 记录节点和专题的相关性
+            if new_node['Name'] in info['keywords']:
+                create_relationship({'type': 'Doc2Node', 'source': new_node, 'target': NewDocument})
+        for relationship in relationships:
+
+            # 从node_index里访问提交后的Node对象
+            relationship['source'] = node_index[relationship['source']]
+            relationship['target'] = node_index[relationship['targer']]
+
+            uuid = handle_relationship(relationship['info'])['uuid']
+            doc_relationship.append(uuid)
+
+        # 将uuid存入专题列表
+        NewDocument.update({'node': doc_nodes, 'relationship': doc_relationship})
+
+        # Document_Information部分
+        data['info']['uuid'] = NewDocument['uuid']
         NewDocument = Document_Information(data['info'])
         NewDocument.save()
+        
         return HttpResponse('Create Document Success')

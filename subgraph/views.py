@@ -71,19 +71,20 @@ def create_node(node):
         uuid = NeoNode['uuid']
         setattr(NewNode, 'uuid', uuid)
         NewNode.save()
-        return uuid
+        return NeoNode
     else:
         return None
 
 
 def create_relationship(relationship):
-    NeoRel = Relationship(relationship['type'])
-    relationship.pop('type')
+    # source 和 target 是Node对象
+    NeoRel = Relationship(relationship['source'], relationship['type'], relationship['target'])
+    relationship.pop('type', 'source', 'target')
     NeoRel.update(relationship)
     NeoSet.tx.create(NeoRel)
     NeoSet.tx.commit()
     NeoRel = NeoSet.tx.pull(NeoRel)
-    return NeoRel['uuid']
+    return NeoRel
 
 
 def handle_node(node):
@@ -91,7 +92,7 @@ def handle_node(node):
     if remote:
         node.pop('uuid')
         remote.update(node)
-        return remote['uuid']
+        return remote
     else:
         return create_node(node)
 

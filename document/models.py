@@ -9,7 +9,7 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 # Create your models here.
 
 
-# 专题信息
+# todo 将字段名改为驼峰写法
 class Document_Information(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题id
     create_user = models.IntegerField(db_column='CREATE_USER')  # 发表用户id

@@ -1,5 +1,7 @@
-from django.shortcuts import render
+from django.http import HttpRequest
+from elasticsearch import Elasticsearch
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
+es = Elasticsearch([{'host': '39.96.10.154', 'port': 9200}])
 
 
 class NeoSet:
@@ -9,7 +11,31 @@ class NeoSet:
     Rmatcher = RelationshipMatcher(graph)
 
 
+def es_search(index, keyword):
+    body = {
+        'query': {
+            'bool': {
+                'must': {
+
+                }
+            }
+        }
+    }
+
+
+def fuzzy_ask_node(request):
+    if request.method == 'GET':
+        keyword = request.GET.get('keyword')
+
+
+def fuzzy_ask_document(request):
+    if request.method == 'GET':
+        keyword = request.GET.get('keyword')
+        index = 'Document'
+
 # uuid搜索
+
+
 def search_by_uuid(uuid):
     result = NeoSet.Nmatcher.match(uuid=uuid).first()
     return result
@@ -21,22 +47,15 @@ def search_by_name(name):
     return result
 
 
+def search_rel_by_uuid(uuid):
+    result = NeoSet.Rmatcher.match(uuid=uuid).first()
+    return result
+
+
 # labels as args,key-value as kwargs
 def search_by_dict(*args, **kwargs):
     result = NeoSet.Nmatcher.match(args, kwargs)
     return result
-
-
-# 模糊查询名字
-def fuzzy_name(keyword):
-    name = ''
-    return name
-
-
-# 模糊查询关键字 例如属性 标签
-def fuzzy_word(keyword):
-    word = ''
-    return word
 
 
 # todo 多节点搜索
