@@ -2,10 +2,12 @@
 from document import models
 import datetime as dt
 
+
 def add(filedata={}):
 
     doc = models.Document_Information.objects.create(**filedata)
     return doc
+
 
 # id 表示专题uuid
 def selectById(uuid):

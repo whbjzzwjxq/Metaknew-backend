@@ -8,10 +8,10 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 
 # Create your models here.
 
+
 # 专题信息
 class Document_Information(models.Model):
-    id = models.AutoField(db_column='ID', primary_key=True)
-    uuid = models.UUIDField(db_column='UUID')  # 专题id
+    uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题id
     create_user = models.IntegerField(db_column='CREATE_USER')  # 发表用户id
     time = models.DateTimeField(db_column='TIME', default=datetime.datetime.now)  # 发表时间
     title = models.TextField(db_column='TITLE')  # 标题
@@ -22,20 +22,21 @@ class Document_Information(models.Model):
     hard_level = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
     area = models.TextField(db_column='AREA')  # 领域
     size = models.IntegerField(db_column='SIZE', default=0)  # 节点数量
-    share = models.BooleanField(db_column='SHARE', default=False) # 是否处于分享状态
-    feature_vector = models.TextField(db_column='FEATURE_VECTOR') # 特征值
-    main_nodes = ArrayField(models.TextField(), db_column='MAIN_NODES') # 主要节点的uuid
-    keywords = ArrayField(models.TextField(), db_column='KEYWORDS') # 主要节点的名字
-    authority = ArrayField(models.TextField(), db_column='AUTHORITY') # 拥有权限的用户id
-    included_media = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA') # 包含的多媒体文件url
+    share = models.BooleanField(db_column='SHARE', default=False)  # 是否处于分享状态
+    feature_vector = models.TextField(db_column='FEATURE_VECTOR')  # 特征值
+    main_nodes = ArrayField(models.UUIDField(), db_column='MAIN_NODES')   # 主要节点的uuid
+    keywords = ArrayField(models.TextField(), db_column='KEYWORDS')  # 主要节点的名字
+    authority = ArrayField(models.TextField(), db_column='AUTHORITY')  # 拥有权限的用户id
+    included_media = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA')  # 包含的多媒体文件url
 
     class Meta:
         db_table = 'document_information'
 
+
 # 专题
 class Document(models.Model):
-    id = models.AutoField(db_column='ID', primary_key=True) # 专题ID
-    included_document = JSONField(db_column='INCLUDED_DOCUMENT') # 包含的专题uuid
+    uuid = models.AutoField(db_column='ID', primary_key=True)  # 专题ID
+    included_document = ArrayField(models.UUIDField(db_column='INCLUDED_DOCUMENT'))  # 包含的专题uuid
     node = ArrayField(JSONField(db_column='NODE'))  # json里包含节点的uuid,x,y坐标
     relationship = ArrayField(JSONField(db_column='RELATIONSHIP'))   # uuid
 
@@ -56,6 +57,4 @@ class Comment(models.Model):
 
     class Meta:
         db_table = 'comment'
-
-
 

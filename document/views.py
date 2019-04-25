@@ -1,18 +1,20 @@
 # -*-coding=utf-8 -*-
 
-from document import comment,document_info,document
+# APP内定义
+from document import comment, document_info
+from document.models import Document_Information
+from subgraph.views import handle_node, handle_relationship, create_node
+
+# django定义与工具包
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.encoding import escape_uri_path
-
 from demo import settings
 from django.views.decorators.csrf import csrf_exempt
 import json
-import uuid
 import os
 from demo.tools import getHttpResponse
 from django.forms.models import model_to_dict
-
 
 
 # Create your views here.
@@ -70,7 +72,7 @@ def delete_comment(request):
     res = comment.deleteById(id)
     return HttpResponse(getHttpResponse(res,'删除成功',''), content_type="application/json")
 
-# 新建专题          已测试--4.17-----ZXN
+# 新建专题的信息部分          已测试--4.17-----ZXN
 @csrf_exempt
 def add_document_information(request):
     """
@@ -226,11 +228,55 @@ def delete_file(request):
     return HttpResponse(resp, content_type="application/json")
 
 
+def get_cache_doc(uuids):
+    cache_docs = []
+    for uuid in uuids:
+        doc = document_info.selectById(uuid)
+        cache_doc = {}
+        keys_in_store = ['title', 'url', 'hard_level', 'imp', 'uuid', 'area', 'size']
+        for key in keys_in_store:
+            cache_doc.update({key: doc[key]})
+        cache_docs.append(cache_doc)
+    return cache_docs
+
+
 # 新增专题
 def add_document(request):
-    param = json.loads(request.body)['data']
-    resp = HttpResponse()
-    document.add(param)
-    respData = {'status': '1', 'ret': '添加成功!!!'}
-    resp.content = json.dumps(respData)
-    return HttpResponse(resp, content_type="application/json")
+    if request.method == 'POST':
+        data = json.loads(request.body)['data']
+        # 专题节点与关系
+        nodes = data['nodes']
+        relationships = data['relationships']
+
+        # 专题信息
+        info = data['info']
+
+        doc_nodes = []
+        doc_relationship = []
+        # 处理节点，关系，节点坐标
+        for node in nodes:
+            x = node['conf']['x']
+            y = node['conf']['y']
+            uuid = handle_node(node['info'])
+            loc = {'uuid': uuid, 'x': x, 'y': y}
+            doc_nodes.append(loc)
+        for relationship in relationships:
+            uuid = handle_relationship(relationship['info'])
+            doc_relationship.append(uuid)
+
+        # 存入Neo4j部分
+        # todo 将字段名改为驼峰写法
+        NewDocument = {'Name': info['title'],
+                       'PrimaryLabel': 'Document',
+                       'Area': info['area'],
+                       'included_document': data['included_document'],
+                       'node': doc_nodes,
+                       'relationship': doc_relationship
+                       }
+        uuid = create_node(NewDocument)
+
+        # 存入postgreSQL部分
+        data['info']['uuid'] = uuid
+        NewDocument = Document_Information(data['info'])
+        NewDocument.save()
+        return HttpResponse('Create Document Success')

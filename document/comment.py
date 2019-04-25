@@ -4,7 +4,7 @@ from users import models
 import datetime as dt
 
 
-def add(filedata={}):
+def add(filedata=None):
     """
     uuid = filedata['uuid'] if 'uuid' in filedata else ''
     userid = filedata['userid'] if 'userid' in filedata else ''
@@ -12,6 +12,8 @@ def add(filedata={}):
     content = filedata['content'] if 'content' in filedata else ''
     star = filedata['star'] if 'star' in filedata else 0.0
     """
+    if filedata is None:
+        filedata = {}
     comment = models.Comment.objects.create(**filedata)
 
     return comment

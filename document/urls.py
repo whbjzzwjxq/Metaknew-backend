@@ -30,5 +30,5 @@ urlpatterns = [
     url('documentInformation/showAll', views.get_all_doc_info),
     url('file/upload', views.upload_file),
     url('file/delete', views.delete_file),
-    url('file/download', views.download_file),
+    url('file/download', views.download_file)
 ]
