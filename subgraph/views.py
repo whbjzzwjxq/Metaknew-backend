@@ -2,7 +2,7 @@ from django.shortcuts import render
 import os
 from subgraph.models import *
 from document.models import Document
-from search.views import NeoSet, search_by_name, search_rel_by_uuid, search_by_uuid
+from search.views import NeoSet, search_by_name, search_rel_exist, search_by_uuid
 from py2neo.data import Node, Relationship
 import re, json
 from django.http import HttpResponse
@@ -27,7 +27,7 @@ init = {
 
 def get_dict(node):
     keylist = []
-    for key in dir(node):
+    for key in node.__dict__:
         if not re.match(r'__.*__', key):
             keylist.append(key)
     return keylist
@@ -41,8 +41,9 @@ def create_node(node):
         node.pop("type")
         NeoNode.add_label('Common')
         NeoNode.add_label('Used')
-        NeoNode.update_labels(node['Labels'])
-        node.pop("Labels")
+        if "Labels" in node:
+            NeoNode.update_labels(node['Labels'])
+            node.pop("Labels")
         # 处理名字类信息
 
         def language_setter(node0, language_to, language_from):
@@ -55,7 +56,8 @@ def create_node(node):
         language_setter(node, 'en', node['language'])
 
         # 存入postgreSQL固定属性
-        NewNode = init[NeoNode['PrimaryLabel']]()
+        NewNode = init[node['PrimaryLabel']]()
+        print(get_dict(NewNode))
         for key in get_dict(NewNode):
             if key in node:
                 setattr(NewNode, key, node[key])
@@ -63,12 +65,14 @@ def create_node(node):
 
         # 存入Neo4j属性
         NeoNode.update(node)
-        NeoSet.tx.create(NeoNode)
-        NeoSet.tx.commit()
+        collector = NeoSet()
+        collector.tx.create(NeoNode)
+        collector.tx.commit()
 
         # 从Neo4j读取新建节点的uuid， 将其存入postgre
         NeoNode = search_by_name(NeoNode['Name'])
         uuid = NeoNode['uuid']
+        print(NewNode)
         setattr(NewNode, 'uuid', uuid)
         NewNode.save()
         return NeoNode
@@ -79,11 +83,17 @@ def create_node(node):
 def create_relationship(relationship):
     # source 和 target 是Node对象
     NeoRel = Relationship(relationship['source'], relationship['type'], relationship['target'])
-    relationship.pop('type', 'source', 'target')
+    relationship.pop('type')
+    relationship.pop('source')
+    relationship.pop('target')
     NeoRel.update(relationship)
-    NeoSet.tx.create(NeoRel)
-    NeoSet.tx.commit()
-    NeoRel = NeoSet.tx.pull(NeoRel)
+    collector = NeoSet()
+    collector.tx.create(NeoRel)
+    collector.tx.commit()
+    collector = NeoSet()
+    print(NeoRel)
+    NeoRel = collector.Rmatcher.match({NeoRel['source'], NeoRel['target']}, type(NeoRel)).first()
+    print(NeoRel)
     return NeoRel
 
 
@@ -98,11 +108,14 @@ def handle_node(node):
 
 
 def handle_relationship(relationship):
-    remote = search_rel_by_uuid(relationship)
+    remote = search_rel_exist(relationship)
     if remote:
+        if "uuid" in relationship:
+            relationship.pop('uuid')
         remote.update(relationship)
+        return remote
     else:
-        create_relationship(relationship)
+        return create_relationship(relationship)
 
 
 def upload_excel(request):
