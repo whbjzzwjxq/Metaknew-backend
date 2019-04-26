@@ -27,5 +27,6 @@ urlpatterns = [
     path('note/', include('note.urls')),
     path('uploadExcel', views.upload_excel),
     url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),
-    path('search/', include('search.urls'))
+    path('search/', include('search.urls')),
+    path('subgraph/', include('subgraph.urls'))
 ]

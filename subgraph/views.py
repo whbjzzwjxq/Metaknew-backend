@@ -4,7 +4,9 @@ from subgraph.models import *
 from document.models import Document
 from search.views import NeoSet, search_by_name, search_rel_exist, search_by_uuid
 from py2neo.data import Node, Relationship
-import re, json
+import re
+import uuid
+import json
 from django.http import HttpResponse
 import pandas as pd
 from subgraph.data_extraction import dataframe2dict
@@ -25,12 +27,23 @@ init = {
 }
 
 
+def get_uuid(name):
+    return str(uuid.uuid1())
+
+
 def get_dict(node):
     keylist = []
     for key in node.__dict__:
         if not re.match(r'__.*__', key):
             keylist.append(key)
     return keylist
+
+
+def single_node(request):
+    if request.method == 'POST':
+        node = json.loads(request.body)
+        back = handle_node(node)
+        return HttpResponse('200')
 
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
@@ -44,6 +57,8 @@ def create_node(node):
         if "Labels" in node:
             NeoNode.update_labels(node['Labels'])
             node.pop("Labels")
+        # 分配uuid
+        node.update({'uuid': get_uuid(node['Name'])})
         # 处理名字类信息
 
         def language_setter(node0, language_to, language_from):
@@ -57,24 +72,19 @@ def create_node(node):
 
         # 存入postgreSQL固定属性
         NewNode = init[node['PrimaryLabel']]()
-        print(get_dict(NewNode))
         for key in get_dict(NewNode):
             if key in node:
+                print(node[key])
                 setattr(NewNode, key, node[key])
-                node.pop(key)
+                if key != 'uuid':
+                    node.pop(key)
+        NewNode.save()
 
         # 存入Neo4j属性
         NeoNode.update(node)
         collector = NeoSet()
         collector.tx.create(NeoNode)
         collector.tx.commit()
-
-        # 从Neo4j读取新建节点的uuid， 将其存入postgre
-        NeoNode = search_by_name(NeoNode['Name'])
-        uuid = NeoNode['uuid']
-        print(NewNode)
-        setattr(NewNode, 'uuid', uuid)
-        NewNode.save()
         return NeoNode
     else:
         return None
@@ -82,7 +92,10 @@ def create_node(node):
 
 def create_relationship(relationship):
     # source 和 target 是Node对象
-    NeoRel = Relationship(relationship['source'], relationship['type'], relationship['target'])
+    source = relationship["source"]
+    target = relationship["target"]
+    relationship.update({'uuid': get_uuid(source['Name'] + 'to' + target['Name'])})
+    NeoRel = Relationship(source, relationship['type'], target)
     relationship.pop('type')
     relationship.pop('source')
     relationship.pop('target')
@@ -90,19 +103,18 @@ def create_relationship(relationship):
     collector = NeoSet()
     collector.tx.create(NeoRel)
     collector.tx.commit()
-    collector = NeoSet()
-    print(NeoRel)
-    NeoRel = collector.Rmatcher.match({NeoRel['source'], NeoRel['target']}, type(NeoRel)).first()
-    print(NeoRel)
     return NeoRel
 
 
 def handle_node(node):
-    remote = search_by_uuid(node['uuid'])
-    if remote:
-        node.pop('uuid')
-        remote.update(node)
-        return remote
+    if 'uuid' in node:
+        remote = search_by_uuid(node['uuid'])
+        if remote:
+            node.pop('uuid')
+            remote.update(node)
+            return remote
+        else:
+            return create_node(node)
     else:
         return create_node(node)
 

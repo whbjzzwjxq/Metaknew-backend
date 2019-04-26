@@ -6,8 +6,6 @@ import hashlib
 import time
 import json
 import random
-import _md5
-import unicodedata
 
 YOUDAO_URL = 'http://openapi.youdao.com/api'
 APP_KEY = '2b44d851154f90ca'
@@ -92,6 +90,12 @@ def translate(keyword, language_to, language_from='auto'):
     def do_request_baidu(data):
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         return requests.post(BAIDU_URL, data=data, headers=headers)
-    response = json.loads(bytes.decode(do_request_baidu(data).content))
-    result = response['trans_result'][0]['dst']
-    return response['from'], result
+
+    response = bytes.decode(do_request_baidu(data).content)
+    try:
+        response = json.loads(response)
+        if 'trans_result' in response:
+            result = response['trans_result'][0]['dst']
+            return response['from'], result
+    except:
+        return None, None

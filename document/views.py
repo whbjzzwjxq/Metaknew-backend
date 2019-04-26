@@ -257,20 +257,12 @@ def add_document(request):
         # 专题信息
         info = data['info']
 
-        # 新建专题
-        new_document = {'Name': info['title'],
-                        'PrimaryLabel': 'Document',
-                        'Area': info['area'],
-                        'included_document': data['included_document'],
-                        'type': "InfNode",
-                        "nodes": [],
-                        "relationships": []
-                        }
-        new_document = create_node(new_document)
         # 预定义容器
         doc_nodes = []
-        doc_relationship = []
+        doc_relationships = []
+        Doc2Nodes = []
         node_index = {}
+
         for node in nodes:
             # 记录新建节点自动赋予的uuid
             old_id = node['info']['uuid']
@@ -281,27 +273,38 @@ def add_document(request):
             loc = {'uuid': new_node['uuid'], 'x': node['conf']['x'], 'y': node['conf']['y']}
             doc_nodes.append(loc)
 
-            # 记录节点和专题的相关性
+            # 先记录下节点和专题的相关性
             if new_node['Name'] in info['keywords']:
-                handle_relationship({'type': 'Doc2Node', 'rate': 0.5, 'source': new_node, 'target': new_document})
+                Doc2Nodes.append({'type': 'Doc2Node', 'rate': 0.5, 'source': new_node})
+
         for relationship in relationships:
             # 从node_index里访问提交后的Node对象
             relationship["info"]['source'] = node_index[relationship["info"]['source']]
             relationship["info"]['target'] = node_index[relationship["info"]['target']]
             new_rel = handle_relationship(relationship['info'])
-            print(new_rel)
             uuid = new_rel["uuid"]
-            doc_relationship.append(uuid)
+            doc_relationships.append(uuid)
+        # 新建专题
+        new_document = {'Name': info['title'],
+                        'PrimaryLabel': 'Document',
+                        'Area': info['area'],
+                        'included_document': data['included_document'],
+                        'type': "InfNode",
+                        "nodes": doc_nodes,
+                        "relationships": doc_relationships
+                        }
+        new_document = create_node(new_document)
 
-        # 将uuid存入专题列表
-        new_document.update({'node': doc_nodes, 'relationship': doc_relationship})
+        # 生成专题节点后再生成专题与普通节点的关系
+        for Doc2Node in Doc2Nodes:
+            Doc2Node.update({'target': new_document})
+            handle_relationship(Doc2Node)
+
         # Document_Information部分
         data['info']['uuid'] = new_document['uuid']
-        new_document = Document_Information()
-        for key in get_dict(new_document):
+        new_document_info = Document_Information()
+        for key in get_dict(new_document_info):
             if key in data["info"]:
-                print(key)
-                setattr(new_document, key, data["info"][key])
-        new_document.save()
-
+                setattr(new_document_info, key, data["info"][key])
+        new_document_info.save()
         return HttpResponse('Create Document Success')
