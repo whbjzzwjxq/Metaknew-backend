@@ -69,7 +69,6 @@ INSTALLED_APPS = [
     'document',
     'subgraph',
     'search',
-    'newcontent',
     'note',
 ]
 
@@ -111,19 +110,27 @@ WSGI_APPLICATION = 'demo.wsgi.application'
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
+    # 'default': {
+    #     # 'ENGINE': 'django.db.backends.sqlite3',
+    #     # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    #     'ENGINE': 'django.db.backends.postgresql',
+    #     'NAME': 'demomaster',
+    #     'USER': 'postgres',
+    #     'PASSWORD': '123456',
+    #     'HOST': 'localhost',
+    #     'PORT': '5432',
+    # },
     'default': {
-        # 'ENGINE': 'django.db.backends.sqlite3',
-        # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'demomaster',
+        'NAME': 'Metaknew',
         'USER': 'postgres',
         'PASSWORD': '123456',
-        'HOST': 'localhost',
+        'HOST': '39.96.10.154',
         'PORT': '5432',
     }
 }
 
-conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
+# conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators

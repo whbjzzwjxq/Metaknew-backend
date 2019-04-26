@@ -25,8 +25,8 @@ urlpatterns = [
     path('document/', include('document.urls')),
     path('user/', include('users.urls')),
     path('note/', include('note.urls')),
-    path('test/', views.add),
-    path('uploadExcel', views.uploadExcel),
-    url(r'media/(?P<path>.*)',serve, {'document_root':settings.BASE_DIR}),
-    path('search/', include('search.urls'))
+    path('uploadExcel', views.upload_excel),
+    url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),
+    path('search/', include('search.urls')),
+    path('subgraph/', include('subgraph.urls'))
 ]
