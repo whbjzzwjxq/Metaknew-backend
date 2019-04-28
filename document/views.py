@@ -289,7 +289,7 @@ def add_document(request):
                         'PrimaryLabel': 'Document',
                         'Area': info['area'],
                         'included_document': data['included_document'],
-                        'type': "InfNode",
+                        'type': "Document",
                         "nodes": doc_nodes,
                         "relationships": doc_relationships
                         }

@@ -1,7 +1,6 @@
-from django.http import HttpRequest
-from elasticsearch import Elasticsearch
+from django.http import HttpResponse
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
-es = Elasticsearch([{'host': '39.96.10.154', 'port': 9200}])
+import json
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 
 
@@ -12,33 +11,17 @@ class NeoSet:
         self.Rmatcher = RelationshipMatcher(graph)
 
 
-def es_search(index, body):
-    return es.search(index=index, body=body)
-
-
-def fuzzy_ask_node(keyword):
-    body = {
-        "query": {
-            "fuzzy": {
-                "Name": {
-                    "value": keyword,
-                    "boost": 1.0,
-                    "fuzziness": 2,
-                    "prefix_length": 3,
-                    "max_expansions": 20
-
-                }
-            }
-        }
-    }
-
-
-def fuzzy_ask_document(request):
+def get_search(request):
     if request.method == 'GET':
         keyword = request.GET.get('keyword')
-        index = 'Document'
-
-# uuid搜索
+        node = search_by_name(keyword)
+        return_node = {'conf': {}, 'info': dict(node)}
+        labels = []
+        for label in node.labels:
+            labels.append(label)
+        return_node['info'].update({"labels": labels})
+        return HttpResponse(json.dumps(return_node, ensure_ascii=False))
+        # todo 尝试中英翻译 模糊搜索
 
 
 def search_by_uuid(uuid):
@@ -72,7 +55,7 @@ def search_by_dict(*args, **kwargs):
 
 
 # todo 多节点搜索
-def search_relation(nodeA,nodeB):
+def search_relation(nodeA, nodeB):
     return 0
 
 

@@ -3,7 +3,7 @@ MATCH p=()-[r:Doc2Node]->() delete r
 MATCH (n) where n.PrimaryLabel = "Document" delete n
 
 
-//测试用格式
+//测试专题用格式
 {"data":{
 	"nodes":[
 		{	"info": {
@@ -44,3 +44,6 @@ MATCH (n) where n.PrimaryLabel = "Document" delete n
 	}
   }
 }
+
+
+// es 的 命令需要到home/yu/elasticsearch-6.5.2目录下执行
