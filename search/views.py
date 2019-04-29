@@ -25,9 +25,10 @@ def get_single_node(request):
             return_node['info'].update({"labels": labels})
             if node['PrimaryLabel'] == 'Document':
                 doc = list(Document.objects.filter(uuid=node['uuid'])[:1])[0]
-                key_in_store = doc.__dict__
-                for key in views.get_dict(doc):
-                    return_node['info'].update({key: str(key_in_store[key])})
+                if doc:
+                    key_in_store = doc.__dict__
+                    for key in views.get_dict(doc):
+                        return_node['info'].update({key: str(key_in_store[key])})
             return HttpResponse(json.dumps(return_node, ensure_ascii=False))
         else:
             return HttpResponse(404)
