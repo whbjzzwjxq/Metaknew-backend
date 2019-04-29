@@ -9,7 +9,7 @@ def fuzzy_ask(keyword, target, index):
                 target: {
                     "value": keyword,
                     "boost": 1.0,
-                    "fuzziness": 2,
+                    "fuzziness": 3,
                     "prefix_length": 3,
                     "max_expansions": 20
                 }

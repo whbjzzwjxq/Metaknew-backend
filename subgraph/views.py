@@ -36,6 +36,8 @@ def get_dict(node):
     for key in node.__dict__:
         if not re.match(r'__.*__', key):
             keylist.append(key)
+    if '_state' in keylist:
+        keylist.remove('_state')
     return keylist
 
 
