@@ -15,7 +15,6 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from subgraph import views
 from django.conf.urls import url
 from django.views.static import serve
 from django.conf import settings
@@ -25,7 +24,6 @@ urlpatterns = [
     path('document/', include('document.urls')),
     path('user/', include('users.urls')),
     path('note/', include('note.urls')),
-    path('uploadExcel', views.upload_excel),
     url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),
     path('search/', include('search.urls')),
     path('subgraph/', include('subgraph.urls'))

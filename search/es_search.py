@@ -1,5 +1,5 @@
 from elasticsearch import Elasticsearch
-es = Elasticsearch([{'host': '39.96.10.154', 'port': 9200}])
+es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
 
 
 def fuzzy_ask(keyword, target, index):
