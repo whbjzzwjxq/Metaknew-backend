@@ -3,8 +3,6 @@ from subgraph import views
 import json
 from subgraph.models import *
 from document.models import Document
-from document import views as doc_handle
-from search import es_search
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 
@@ -70,21 +68,6 @@ def get_node(uuid):
         return return_node
     else:
         return {}
-
-
-def fuzzy_ask_node(request):
-    if request.method == 'GET':
-        keyword = request.GET.get('keyword')
-        results = es_search.fuzzy_ask(keyword, 'name.keyword', 'nodes-strnode')
-        if results:
-            results = results['hits']['hits']
-            uuids = []
-            for result in results:
-                for node in search_doc_by_node(search_by_uuid(result['_id'])):
-                    uuids.append(node['uuid'])
-                # todo 调整一下索引 这里两次搜索太蠢了
-            result = doc_handle.get_cache_doc(uuids)
-            return HttpResponse(json.dumps(result, ensure_ascii=False))
 
 
 # 查询关系是否存在
