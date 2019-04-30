@@ -1,4 +1,5 @@
 from elasticsearch import Elasticsearch
+# 注意es必须配置在服务器上 考虑另起一个django项目
 es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
 
 
