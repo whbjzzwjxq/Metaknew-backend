@@ -49,3 +49,4 @@ class ArchProject(Project):
 
     class Meta:
         db_table = 'ARCH_PROJECT'
+

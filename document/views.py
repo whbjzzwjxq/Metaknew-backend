@@ -270,8 +270,8 @@ def add_document(request):
             node_index.update({old_id: new_node})
 
             # 记录专题内节点坐标
-            loc = {'uuid': new_node['uuid'], 'x': node['conf']['x'], 'y': node['conf']['y']}
-            doc_nodes.append(loc)
+            conf = {'uuid': new_node['uuid'], 'conf': node['conf']}
+            doc_nodes.append(conf)
 
             # 先记录下节点和专题的相关性
             if new_node['Name'] in info['keywords']:
@@ -282,14 +282,13 @@ def add_document(request):
             relationship["info"]['source'] = node_index[relationship["info"]['source']]
             relationship["info"]['target'] = node_index[relationship["info"]['target']]
             new_rel = handle_relationship(relationship['info'])
-            uuid = new_rel["uuid"]
-            doc_relationships.append(uuid)
+            conf = {'uuid': new_rel['uuid'], 'conf': relationship['conf']}
+            doc_relationships.append(conf)
         # 新建专题
         new_document = {'Name': info['title'],
                         'PrimaryLabel': 'Document',
                         'Area': info['area'],
-                        'included_document': data['included_document'],
-                        'type': "InfNode",
+                        'type': "Document",
                         "nodes": doc_nodes,
                         "relationships": doc_relationships
                         }

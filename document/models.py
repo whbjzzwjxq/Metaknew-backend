@@ -36,9 +36,8 @@ class Document_Information(models.Model):
 # 专题
 class Document(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题ID
-    included_document = ArrayField(models.UUIDField(db_column='INCLUDED_DOCUMENT'))  # 包含的专题uuid
     nodes = ArrayField(JSONField(db_column='NODE'))  # json里包含节点的uuid,x,y坐标
-    relationships = ArrayField(models.UUIDField(db_column='RELATIONSHIP'))   # uuid
+    relationships = ArrayField(JSONField(db_column='RELATIONSHIP'), default=dict)   # json
 
     class Meta:
         db_table = 'document'
