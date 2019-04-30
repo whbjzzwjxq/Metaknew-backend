@@ -32,12 +32,12 @@ def get_uuid(name):
 
 
 def get_dict(node):
-    keylist = []
-    for key in node.__dict__:
+    keylist = {}
+    for key, value in node.__dict__.items():
         if not re.match(r'__.*__', key):
-            keylist.append(key)
+            keylist.update({key: value})
     if '_state' in keylist:
-        keylist.remove('_state')
+        keylist.pop('_state')
     return keylist
 
 

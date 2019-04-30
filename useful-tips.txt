@@ -34,7 +34,6 @@ MATCH (n) where n.PrimaryLabel = "Document" delete n
 			"conf": {"test": "cache"}
 	}
 	],
-	"included_document":[],
 	"info":{
 		"title": "test",
 		"area": "test",
