@@ -1,5 +1,3 @@
-from django.shortcuts import render
-import os
 from subgraph.models import *
 from document.models import Document
 from search.views import NeoSet, search_by_name, search_rel_exist, search_by_uuid

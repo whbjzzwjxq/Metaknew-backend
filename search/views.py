@@ -1,11 +1,10 @@
 from django.http import HttpResponse
-from py2neo import Graph, NodeMatcher, RelationshipMatcher, walk
 from subgraph import views
 import json
 from subgraph.models import *
 from document.models import Document
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
-
+types = ['StrNode', 'InfNode', 'Media', 'Document']
 
 class_table = {
     'Person': Person,
@@ -32,18 +31,18 @@ class NeoSet:
 def get_single_node(request):
     if request.method == 'GET':
         keyword = request.GET.get('keyword')
-        remote_node = search_by_name(keyword)
-
-        return_node = get_node(remote_node['uuid'])
-
-        if return_node['info']['PrimaryLabel'] == 'Document':
-            for item in return_node['info']['nodes']:
-                item.update(get_node(item['uuid']))
-                item.pop('uuid')
-            for item in return_node['info']['relationships']:
-                item.update(search_rel_uuid(item['uuid']))
-                item.pop('uuid')
-                return HttpResponse(json.dumps(return_node, ensure_ascii=False))
+        remote = search_by_name(keyword)
+        if remote:
+            uuid = remote['uuid']
+            return_node = get_node(uuid)
+            if return_node['info']['PrimaryLabel'] == 'Document':
+                for item in return_node['info']['nodes']:
+                    item.update(get_node(item['uuid']))
+                    item.pop('uuid')
+                for item in return_node['info']['relationships']:
+                    item.update(search_rel_uuid(item['uuid']))
+                    item.pop('uuid')
+            return HttpResponse(json.dumps(return_node, ensure_ascii=False))
         else:
             return HttpResponse(404)
 
@@ -56,6 +55,10 @@ def get_node(uuid):
         for label in node.labels:
             labels.append(label)
         return_node['info'].update({"labels": labels})
+        for label in types:
+            if label in return_node['info']['labels']:
+                return_node['info']['type'] = label
+                return_node['info']['labels'].remove(label)
         primary_label = return_node['info']['PrimaryLabel']
         doc = (list(init(primary_label).objects.filter(uuid=uuid)[:1]))
         if doc:
@@ -66,9 +69,8 @@ def get_node(uuid):
     else:
         return {}
 
+
 # 查询关系是否存在
-
-
 def search_rel_exist(rel):
     result = NeoSet().Rmatcher.match({rel['source'], rel['target']}).first()
     if result:
@@ -118,7 +120,7 @@ def search_doc_by_node(node):
     rels = NeoSet().Rmatcher.match({node, None}, 'Doc2Node')
     result = []
     for rel in rels:
-        end_node = walk(rel).end_node
+        end_node = rel.end_node
         result.append(end_node)
     return result
 

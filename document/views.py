@@ -237,11 +237,13 @@ def delete_file(request):
 def get_cache_doc(uuids):
     cache_docs = []
     for uuid in uuids:
-        doc = document_info.selectById(uuid)
+        doc = list(document_info.selectById(uuid)[:1])
         cache_doc = {}
-        keys_in_store = ['title', 'url', 'hard_level', 'imp', 'uuid', 'area', 'size']
-        for key in keys_in_store:
-            cache_doc.update({key: doc[key]})
+        if doc:
+            doc = get_dict(doc[0])
+            keys_in_store = ['title', 'url', 'hard_level', 'imp', 'uuid', 'area', 'size']
+            for key in keys_in_store:
+                cache_doc.update({key: str(doc[key])})
         cache_docs.append(cache_doc)
     return cache_docs
 
