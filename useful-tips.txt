@@ -46,3 +46,8 @@ MATCH (n) where n.PrimaryLabel = "Document" delete n
 
 
 // es 的 命令需要到home/yu/elasticsearch-6.5.2目录下执行
+
+
+//es的mapping设置:
+index 级别设置analyzer即可
+
