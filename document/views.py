@@ -1,7 +1,8 @@
 # -*-coding=utf-8 -*-
 
 # APP内定义
-from document import comment, document_info
+from document import comment, document_info, document
+from users import user
 from document.models import Document_Information
 from subgraph.views import handle_node, handle_relationship, create_node, get_dict
 
@@ -28,7 +29,12 @@ def get_comments(request):
     for com in comments:
         com.uuid = str(com.uuid)
         com.time = str(com.time)
-        res.append(dict(model_to_dict(com).items() + model_to_dict(com.user).items()))
+        user_info = user.selectById(com.userid)
+        if user_info:
+            user_info[0].datetime = str(user_info[0].datetime)
+            res.append(dict(model_to_dict(com),**model_to_dict(user_info[0])))
+        else:
+            res.append(model_to_dict(com))
     return HttpResponse(json.dumps(res), content_type="application/json")
 
 
@@ -309,3 +315,11 @@ def add_document(request):
                 setattr(new_document_info, key, data["info"][key])
         new_document_info.save()
         return HttpResponse('Create Document Success')
+
+#获取专题
+def get_document(request):
+    if request.method == 'POST':
+        uuid = json.loads(request.body, encoding='utf-8')['data']['uuid']
+        doc = document.selectById(uuid)
+
+        return HttpResponse(json.dumps(model_to_dict(doc[0])), content_type="application/json")

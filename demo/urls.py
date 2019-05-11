@@ -22,6 +22,7 @@ from django.conf import settings
 urlpatterns = [
     # path('admin/', admin.site.urls),
     path('document/', include('document.urls')),
+    path('area/', include('area.urls')),
     path('user/', include('users.urls')),
     path('note/', include('note.urls')),
     url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),

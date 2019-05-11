@@ -38,6 +38,8 @@ class Project(BaseNode):
     PeriodStart = models.DateField(db_column='PERIOD_START')
     PeriodEnd = models.DateField(db_column='PERIOD_END')
     Location = models.TextField(db_column='LOCATION')
+    Longitude = models.FloatField(db_column='LONGITUDE')
+    Latitude = models.FloatField(db_column='LATITUDE')
     Nation = models.TextField(db_column='NATION', max_length=30)
 
     class Meta:

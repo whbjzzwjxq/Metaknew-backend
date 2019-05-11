@@ -1,6 +1,7 @@
 from subgraph.translate import connect
 import pandas as pd
 import re
+import demo.tools as tool
 
 zhPattern = re.compile(u'[\u4e00-\u9fa5]+')
 
@@ -33,6 +34,8 @@ def dataframe2dict(data):
         node["Architect_es"], node["Architect_zh"] = architect_translation(data.iloc[row,Architect])
         node["Nation"] = data.iloc[row,Nation]
         node["Location"] = data.iloc[row,Location] if str(data.iloc[row,Location]) != 'nan' else None
+        node['Longitude'] = tool.getLocation(node['Location'])[0]
+        node['Latitude'] = tool.getLocation(node['Location'])[1]
         # node["Address"] = data.iloc[row,Address]  if str(data.iloc[row,Address]) != 'nan' else None
         # node["Type"] = data.iloc[row,Type]     if str(data.iloc[row,Type]) != 'nan' else None
         # node["Remarks"] = data.iloc[row,Remarks]  if str(data.iloc[row,Remarks]) != 'nan' else None
