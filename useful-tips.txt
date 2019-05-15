@@ -1,0 +1,48 @@
+MATCH p=()-[r:Structure]->() delete r
+MATCH p=()-[r:Doc2Node]->() delete r
+MATCH (n) where n.PrimaryLabel = "Document" delete n
+
+
+//测试专题用格式
+{"data":{
+	"nodes":[
+		{	"info": {
+				"uuid": "45f5f2a3-14a0-11e9-a154-00163e2ebf28",
+				"Name": "Walter Gropius",
+				"PrimaryLabel": "Architect"
+					},
+			"conf": {
+				"x": 0.65,
+				"y": 0.72
+					}
+		},
+		
+		{	"info":	{
+				"uuid": "42437790-2049-11e9-8395-00163e2ebf28",
+				"Name": "Rafael Moneo",
+				"PrimaryLabel": "Architect"
+					},
+			"conf": {
+				"x": 0.65,
+				"y": 0.88
+			}
+		}
+	],
+	"relationships":[
+		{
+			"info":	{"type":"Structure", "Property": "Research", "source":"45f5f2a3-14a0-11e9-a154-00163e2ebf28", "target":"42437790-2049-11e9-8395-00163e2ebf28"},
+			"conf": {"test": "cache"}
+	}
+	],
+	"info":{
+		"title": "test",
+		"area": "test",
+		"main_nodes":["42437790-2049-11e9-8395-00163e2ebf28"],
+		"keywords":["Rafael Moneo"],
+		"create_user":0
+	}
+  }
+}
+
+
+// es 的 命令需要到home/yu/elasticsearch-6.5.2目录下执行

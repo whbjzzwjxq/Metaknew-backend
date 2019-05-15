@@ -15,7 +15,6 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from subgraph import views
 from django.conf.urls import url
 from django.views.static import serve
 from django.conf import settings
@@ -23,10 +22,17 @@ from django.conf import settings
 urlpatterns = [
     # path('admin/', admin.site.urls),
     path('document/', include('document.urls')),
+    path('area/', include('area.urls')),
     path('user/', include('users.urls')),
     path('note/', include('note.urls')),
+<<<<<<< HEAD
     path('test/', views.add),
     path('uploadExcel', views.uploadExcel),
     url(r'media/(?P<path>.*)',serve, {'document_root':settings.BASE_DIR}),
     path('path/', include('path.urls'))
+=======
+    url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),
+    path('search/', include('search.urls')),
+    path('subgraph/', include('subgraph.urls'))
+>>>>>>> refs/remotes/origin/master
 ]

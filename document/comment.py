@@ -1,10 +1,9 @@
 # -*-coding=utf-8 -*-
 from document import models
-from users import models
 import datetime as dt
 
 
-def add(filedata={}):
+def add(filedata=None):
     """
     uuid = filedata['uuid'] if 'uuid' in filedata else ''
     userid = filedata['userid'] if 'userid' in filedata else ''
@@ -12,16 +11,19 @@ def add(filedata={}):
     content = filedata['content'] if 'content' in filedata else ''
     star = filedata['star'] if 'star' in filedata else 0.0
     """
+    if filedata is None:
+        filedata = {}
     comment = models.Comment.objects.create(**filedata)
 
     return comment
-#
-# # id 表示专题id
-# # 根据专题id得到用户及评论信息
-# def selectById(uuid):
-#     assert uuid
-#     comments = models.Comment.select(Comment,User).join(User,on=(User.userid == Comment.userid)).where(Comment.uuid == uuid)
-#     return comments
+
+# id 表示专题id
+# 根据专题id得到用户及评论信息
+def selectById(uuid):
+    assert uuid
+    #comments = models.Comment.select(Comment,User).join(User,on=(User.userid == Comment.userid)).where(Comment.uuid == uuid)
+    comments = models.Comment.objects.filter(uuid=uuid)
+    return comments
 
 # ID 表示评论id
 def updateById(id,filedata={}):

@@ -32,4 +32,6 @@ urlpatterns = [
     url('file/download', views.download_file),
     url('test/top', views.select_top),
     url('test/select', views.selectFromRedis),
+    url('change/add', views.add_document)
+
 ]

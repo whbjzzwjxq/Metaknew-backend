@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
-import psycopg2
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -70,9 +69,12 @@ INSTALLED_APPS = [
     'document',
     'subgraph',
     'search',
-    'newcontent',
     'note',
+<<<<<<< HEAD
     'path',
+=======
+    'area',
+>>>>>>> refs/remotes/origin/master
 ]
 
 SITE_ID = 1
@@ -113,18 +115,27 @@ WSGI_APPLICATION = 'demo.wsgi.application'
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
+    # 'default': {
+    #     # 'ENGINE': 'django.db.backends.sqlite3',
+    #     # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    #     'ENGINE': 'django.db.backends.postgresql',
+    #     'NAME': 'demomaster',
+    #     'USER': 'postgres',
+    #     'PASSWORD': '123456',
+    #     'HOST': 'localhost',
+    #     'PORT': '5432',
+    # },
     'default': {
-        # 'ENGINE': 'django.db.backends.sqlite3',
-        # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'demomaster',
         'USER': 'postgres',
         'PASSWORD': '123456',
-        'HOST': 'localhost',
+        'HOST': '192.168.1.166',
         'PORT': '5432',
     }
 }
 
+<<<<<<< HEAD
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -137,6 +148,26 @@ CACHES = {
 }
 
 conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
+=======
+#conn = psycopg2.connect(database="Metaknew", user="postgres", password="123456", host="192.168.1.166", port="5432")
+
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379',
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+             "PASSWORD": "",
+        },
+    },
+}
+
+
+REDIS_TIMEOUT = 1*60
+CUBES_REDIS_TIMEOUT = 60*60
+NEVER_REDIS_TIMEOUT = 365*24*60*60
+>>>>>>> refs/remotes/origin/master
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators

@@ -22,3 +22,8 @@ def updateById(filedata):
     user = models.User.objects.filter(userid=userid).update(username=username, useremail=useremail, userpw=userpw)
     return user
 
+#根据user_id查询用户
+def selectById(id):
+    assert id
+    user = models.User.objects.filter(user_id=id)
+    return user
