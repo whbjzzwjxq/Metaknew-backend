@@ -1,9 +1,10 @@
 # -*-coding=utf-8 -*-
 
-from document import comment,document_info,document
+from document import comment,document_info,document, tasks
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.encoding import escape_uri_path
+from document import models
 
 from demo import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -12,6 +13,7 @@ import uuid
 import os
 from demo.tools import getHttpResponse
 from django.forms.models import model_to_dict
+from django.core.cache import cache
 
 
 
@@ -230,7 +232,31 @@ def delete_file(request):
 def add_document(request):
     param = json.loads(request.body)['data']
     resp = HttpResponse()
-    document.add(param)
+    tasks.add_document.delay(param)
     respData = {'status': '1', 'ret': '添加成功!!!'}
     resp.content = json.dumps(respData)
     return HttpResponse(resp, content_type="application/json")
+
+
+# redis 测试存数据
+def select_top(request):
+    docs = models.Document_Information.objects.filter().order_by('id')[:3]
+    filedata = {}
+    for doc in docs:
+        filedata['title'] = doc.title
+        filedata['url'] = doc.url
+        filedata['hard_level'] = doc.hard_level
+        filedata['imp'] = doc.imp
+        filedata['area'] = doc.area
+        filedata['size'] = doc.size
+        cache.set(doc.uuid, filedata, 60*60)
+    return HttpResponse("成功！！！", content_type="application/json")
+
+
+# 测试从redis中读取数据
+def selectFromRedis(request):
+    docs = models.Document_Information.objects.filter().order_by('id')[:3]
+    res = []
+    for doc in docs:
+        res.append(cache.get(doc.uuid))
+    return HttpResponse(res, content_type="application/json")

@@ -14,7 +14,6 @@ Including another URLconf
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
 from django.conf.urls import url
-from django.contrib import admin
 
 from document import views
 
@@ -31,4 +30,6 @@ urlpatterns = [
     url('file/upload', views.upload_file),
     url('file/delete', views.delete_file),
     url('file/download', views.download_file),
+    url('test/top', views.select_top),
+    url('test/select', views.selectFromRedis),
 ]

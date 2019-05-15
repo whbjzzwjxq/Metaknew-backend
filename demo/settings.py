@@ -65,12 +65,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.postgres',
     'django.contrib.sites',
+    'djcelery',
     'users',
     'document',
     'subgraph',
     'search',
     'newcontent',
     'note',
+    'path',
 ]
 
 SITE_ID = 1
@@ -123,6 +125,17 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379",  # 这里设定了本机的redis数据
+        # "LOCATION": "redis://:passwordpassword@47.193.146.xxx:6379/0", # 如果redis设置密码的话，需要以这种格式host前面是密码
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
 
 # Password validation
@@ -160,6 +173,12 @@ USE_L10N = True
 
 USE_TZ = True
 
+import djcelery
+djcelery.setup_loader()
+#数据库调度
+CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
+# celery setting
+BROKER_URL = 'amqp://guest:guest@localhost:5672//'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/

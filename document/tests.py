@@ -1,4 +1,3 @@
-from document import resource
 
 
 if __name__ == '__main__':
