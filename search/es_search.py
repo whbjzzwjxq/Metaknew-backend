@@ -48,8 +48,14 @@ def es_ask(request):
                 return_nodes += nodes
             if fuzzy:
                 docs, nodes = fuzzy_ask_node_doc(keyword)
-                return_docs += docs
-                return_nodes += nodes
+                for doc in docs:
+                    for exist_doc in return_docs:
+                        if doc["uuid"] != exist_doc["uuid"]:
+                            return_docs.append(doc)
+                for node in docs:
+                    for exist_node in return_docs:
+                        if node["uuid"] != exist_node["uuid"]:
+                            return_docs.append(node)
             result = {'return_docs': return_docs, 'return_nodes': return_nodes}
             return HttpResponse(json.dumps(result, ensure_ascii=False))
         else:
@@ -82,10 +88,12 @@ def get_result_nodes(nodes):
     if nodes:
         nodes = nodes['hits']['hits']
         for node in nodes:
-            return_node = search_by_uuid(node['_id'])
-            return_node['score'] = node['_score']
+            if '_id' in node:
+                return_node = search_by_uuid(node['_id'])
+                if return_node:
+                    return_node['score'] = node['_score']
             # todo 这里没有排序 以后要改一下
-            return_nodes.append(return_node)
+                    return_nodes.append(return_node)
     return_nodes = list(map(get_node, return_nodes))
     return return_nodes
 
@@ -96,7 +104,8 @@ def get_result_docs(docs):
     if docs:
         docs = docs['hits']['hits']
         for doc in docs:
-            return_docs.append(doc['_id'])
+            if '_id' in doc:
+                return_docs.append(doc['_id'])
     return_docs = views.get_cache_doc(return_docs)
     return return_docs
 

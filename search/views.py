@@ -73,7 +73,10 @@ def get_node(node):
             if label in return_node['info']['labels']:
                 return_node['info']['type'] = label
                 return_node['info']['labels'].remove(label)
-        primary_label = return_node['info']['PrimaryLabel']
+        if 'PrimaryLabel' in return_node['info']:
+            primary_label = return_node['info']['PrimaryLabel']
+        else:
+            primary_label = 'None'
         doc = (list(init(primary_label).objects.filter(uuid=return_node['info']['uuid'])[:1]))
         if doc:
             doc = views.get_dict(doc[0])
