@@ -70,11 +70,8 @@ INSTALLED_APPS = [
     'subgraph',
     'search',
     'note',
-<<<<<<< HEAD
     'path',
-=======
     'area',
->>>>>>> refs/remotes/origin/master
 ]
 
 SITE_ID = 1
@@ -127,15 +124,14 @@ DATABASES = {
     # },
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'demomaster',
+        'NAME': 'Metaknew',
         'USER': 'postgres',
         'PASSWORD': '123456',
-        'HOST': '192.168.1.166',
+        'HOST': '39.96.10.154',
         'PORT': '5432',
     }
 }
 
-<<<<<<< HEAD
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -147,8 +143,7 @@ CACHES = {
     }
 }
 
-conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
-=======
+# conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
 #conn = psycopg2.connect(database="Metaknew", user="postgres", password="123456", host="192.168.1.166", port="5432")
 
 
@@ -167,7 +162,6 @@ CACHES = {
 REDIS_TIMEOUT = 1*60
 CUBES_REDIS_TIMEOUT = 60*60
 NEVER_REDIS_TIMEOUT = 365*24*60*60
->>>>>>> refs/remotes/origin/master
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators

@@ -25,14 +25,8 @@ urlpatterns = [
     path('area/', include('area.urls')),
     path('user/', include('users.urls')),
     path('note/', include('note.urls')),
-<<<<<<< HEAD
-    path('test/', views.add),
-    path('uploadExcel', views.uploadExcel),
-    url(r'media/(?P<path>.*)',serve, {'document_root':settings.BASE_DIR}),
-    path('path/', include('path.urls'))
-=======
     url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),
+    path('path/', include('path.urls')),
     path('search/', include('search.urls')),
     path('subgraph/', include('subgraph.urls'))
->>>>>>> refs/remotes/origin/master
 ]
