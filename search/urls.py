@@ -3,6 +3,6 @@ from django.conf.urls import url
 from search import views, es_search
 
 urlpatterns = [
-    url('fuzzy/', es_search.fuzzy_ask_node),
-    url('', views.get_single_node)
+    url('single/', views.get_node_uuid),
+    url('es_ask/', es_search.es_ask)
 ]

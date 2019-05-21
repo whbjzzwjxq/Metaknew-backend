@@ -259,7 +259,9 @@ def get_cache_doc(uuids):
             keys_in_store = ['title', 'url', 'hard_level', 'imp', 'uuid', 'area', 'size']
             for key in keys_in_store:
                 cache_doc.update({key: str(doc[key])})
-        cache_docs.append(cache_doc)
+            cache_doc.update({'type': 'document'})
+        if cache_doc:
+            cache_docs.append(cache_doc)
     return cache_docs
 
 
