@@ -288,6 +288,7 @@ def selectFromRedis(request):
         res.append(cache.get(doc.uuid))
     return HttpResponse(res, content_type="application/json")
 
+
 # 新增专题
 def add_document(request):
     if request.method == 'POST':

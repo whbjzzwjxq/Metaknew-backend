@@ -87,6 +87,35 @@ def get_node(node):
         return {}
 
 
+def criteria_query(request):
+    if request.method == 'GET':
+        criteria = json.loads(request.body, encoding='utf-8')['criteria']
+        limit = int(request.GET.get('limit', 100))
+        args = criteria["labels"]
+        kwargs = criteria["propertys"]
+        propertys = {}
+        for prop in kwargs:
+            name = prop["name"]
+            query_type = prop["query_type"]
+            min_range = prop["min_range"]
+            max_range = prop["max_range"]
+            # todo 这里是不是可能有数据库注入
+            if query_type == 'equal':
+                propertys.update({name + '__exact': min_range})
+            if query_type == 'not_equal':
+                propertys.update({name + '__not': min_range})
+            if query_type == 'range':
+                propertys.update({name + '__gte': min_range})
+                propertys.update({name + '__lte': max_range})
+            if query_type == 'more':
+                propertys.update({name + '__gte': min_range})
+            if query_type == 'less':
+                propertys.update({name + '__lte': max_range})
+            result = search_by_dict(*args, **propertys).limit(limit)
+            results = list(map(get_node, result.__iter__()))
+            return HttpResponse(json.dumps(results, ensure_ascii=False))
+
+
 # 查询关系是否存在
 def search_rel_exist(rel):
     result = NeoSet().Rmatcher.match({rel['source'], rel['target']}).first()
@@ -103,7 +132,7 @@ def search_rel_exist(rel):
 
 # labels as args,key-value as kwargs
 def search_by_dict(*args, **kwargs):
-    result = NeoSet().Nmatcher.match(args, kwargs)
+    result = NeoSet().Nmatcher.match(*args, **kwargs)
     return result
 
 
