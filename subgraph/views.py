@@ -25,6 +25,17 @@ init = {
 }
 
 
+def get_dict_class(label):
+    query_class = init["label"]
+    keylist = {}
+    for key, value in query_class.__dict__.items():
+        if not re.match(r'__.*__', key):
+            keylist.update({key: value})
+    if '_state' in keylist:
+        keylist.pop('_state')
+    return keylist
+
+
 def get_uuid(name):
     return str(uuid.uuid1())
 
