@@ -1,7 +1,7 @@
 from django.contrib.postgres.fields import *
 from django.db import models
 from django.utils.timezone import now
-import demo.tools as tool
+import tools.location as tool
 from users.models import User
 # 不要在模型中写字段以外的属性或方法， 这里是储存用的
 
@@ -22,6 +22,7 @@ class BaseNode(models.Model):
     CreateUser = models.IntegerField(db_column='USER', default='0')
 
     class Meta:
+        db_tablespace = 'nodes'
         abstract = True
 
 
@@ -32,11 +33,7 @@ class Person(BaseNode):
     Nation = models.CharField(db_column='NATION', max_length=30, default='None')
 
     class Meta:
-        db_table = 'PERSON'
-
-
-# class Architect(Person):
-#     Projects = ArrayField(models.ForeignKey(to_field='Project', on_delete=models.CASCADE))
+        db_table = 'person'
 
 
 class Project(BaseNode):
@@ -48,11 +45,12 @@ class Project(BaseNode):
     Nation = models.TextField(db_column='NATION', max_length=30)
 
     class Meta:
-        db_table = 'PROJECT'
+        db_table = 'project'
 
 
 class ArchProject(Project):
     Architect = ArrayField(models.TextField(), db_column='ARCHITECT')
 
     class Meta:
-        db_table = 'ARCH_PROJECT'
+        db_table = 'arch_project'
+

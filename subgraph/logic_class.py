@@ -1,8 +1,7 @@
-from py2neo.data import Node
-from py2neo.data import Relationship
-from document.models import Document, DocumentInformation
-from search.views import NeoSet, search_by_name, search_rel_exist, search_by_uuid
-from subgraph import tools, translate
+from py2neo.data import Node, Relationship, walk
+from document.models import DocumentGraph, DocumentInformation
+from search.views import NeoSet
+from tools import base_tools, translate
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias']
@@ -50,9 +49,9 @@ class Doc(object):
         assert 'nodes' in data
         assert 'rels' in data
         info = data['info']
-        uuid = tools.get_uuid(info['title'], 'Document', 0)
+        uuid = base_tools.get_uuid(info['title'], 'Document', 0)
         self.Info = DocumentInformation(uuid=uuid)
-        self.Document = Document(uuid=uuid)
+        self.Document = DocumentGraph(uuid=uuid)
         self.nodes = data['nodes']
 
     def update_info(self, uuid, data):
@@ -74,7 +73,7 @@ class Doc(object):
 
     @staticmethod
     def query_graph(uuid):
-        return Document.objects.get(pk=uuid)
+        return DocumentGraph.objects.get(pk=uuid)
 
     @history
     def add_node(self, uuid, conf):
@@ -82,7 +81,7 @@ class Doc(object):
 
     @history
     def remove_node(self, uuid):
-        self.nodes = tools.delete_by_uuid(self.nodes, uuid, 'uuid')
+        self.nodes = base_tools.delete_by_uuid(self.nodes, uuid, 'uuid')
         self.remove_rel(uuid)
 
     @history
@@ -97,7 +96,7 @@ class Doc(object):
 
     @history
     def remove_rel(self, uuid):
-        self.rels = tools.delete_by_uuid(self.rels, uuid, 'source', 'target')
+        self.rels = base_tools.delete_by_uuid(self.rels, uuid, 'source', 'target')
 
     @history
     def update_rel(self, uuid, conf):
@@ -126,7 +125,7 @@ class NeoNode(object):
 
     def __init__(self, collector=NeoSet()):
         self.root = Node()
-        self.info = tools.init('None')()
+        self.info = base_tools.init('None')()
         self.origin = ''
         self.collector = collector
 
@@ -134,7 +133,7 @@ class NeoNode(object):
         self.root = self.collector.Nmatcher.match(uuid=uuid).first()
         self.origin = uuid
         if self.root:
-            self.info = tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
+            self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
             return True
         else:
             return False
@@ -146,8 +145,8 @@ class NeoNode(object):
         assert 'PrimaryLabel' in node
         # 初始化
         self.origin = node['uuid']
-        node['uuid'] = tools.get_uuid(node['Name'], node['PrimaryLabel'], 0)
-        self.info = tools.init([node['PrimaryLabel']])()
+        node['uuid'] = base_tools.get_uuid(node['Name'], node['PrimaryLabel'], 0)
+        self.info = base_tools.init([node['PrimaryLabel']])()
         self.root = Node(node['type'])
         node.pop("type")
 
@@ -191,7 +190,7 @@ class NeoNode(object):
         # history记录器还是看一下怎么分类比较合适
         uuid = node['uuid']
         # 存入postgreSQL固定属性
-        for key, value in tools.get_dict(self.info).items():
+        for key, value in base_tools.get_dict(self.info).items():
             if key in node:
                 history_kv(user, uuid, 'postgre', key, value, node[key])
                 setattr(self.info, key, node[key])
@@ -215,3 +214,37 @@ class NeoNode(object):
     def save(self):
         self.collector.tx.push(self.root)
         self.info.save()
+
+
+class NeoRel(object):
+    def __init__(self, collector):
+        self.start = {}
+        self.end = {}
+        self.walk = {}
+        self.root = {}
+        self.collector = collector
+
+    def query(self, uuid):
+        self.root = self.collector.Rmatcher.match(uuid=uuid).first()
+        if self.root:
+            self.walk = walk(self.root)
+            self.start = self.walk.start_node
+            self.end = self.walk.en_node
+            return True
+        else:
+            return False
+
+    def create(self, user, relationship):
+        # source 和 target 是Node对象
+        source = relationship["source"]
+        target = relationship["target"]
+        relationship.update({'uuid': base_tools.get_uuid(source['Name'] + 'to' + target['Name'])})
+        NeoRel = Relationship(source, relationship['type'], target)
+        relationship.pop('type')
+        relationship.pop('source')
+        relationship.pop('target')
+        NeoRel.update(relationship)
+        collector = NeoSet()
+        collector.tx.create(NeoRel)
+        collector.tx.commit()
+        return NeoRel

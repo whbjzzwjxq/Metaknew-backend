@@ -1,10 +1,7 @@
 # -*-coding=utf-8 -*-
 
 
-from document import comment,document_info,document, tasks
-import datetime as dt
-from django.http import HttpResponse, StreamingHttpResponse
-from django.utils.encoding import escape_uri_path
+from document import comment,document_info,document
 from document import models
 
 # APP内定义
@@ -12,7 +9,7 @@ from document import models
 from users import user
 from document.models import DocumentInformation
 from subgraph.views import handle_node, handle_relationship
-from subgraph.tools import get_dict
+from tools.base_tools import get_dict
 # django定义与工具包
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
@@ -22,7 +19,7 @@ from demo import settings
 from django.views.decorators.csrf import csrf_exempt
 import json
 import os
-from demo.tools import getHttpResponse
+from tools.location import getHttpResponse
 from django.forms.models import model_to_dict
 from django.core.cache import cache
 
@@ -359,3 +356,172 @@ def get_document(request):
         doc = document.selectById(uuid)
         return HttpResponse(json.dumps(model_to_dict(doc[0])), content_type="application/json")
 
+
+# Create your views here.
+
+# 新增路径               已测试-----4.24-----ZXN
+def add_path(request):
+    """
+    	"data":{
+		"path_title":"计算机",
+		"path_document":[
+			{"uuid":"b81cb129-9631-4d2f-9af0-74b8c56af8d5","order":"1","time":"200"},
+			{"uuid":"3ad90c1a-601a-4d24-a22b-9931d6b5174c","order":"2","time":"300"},
+			{"uuid":"3ad90c1a-601a-4d24-a22b-9931d6b5174c","order":"2","time":"300"},
+			{"uuid":"924d061c-5517-11e9-9703-04d3b0eb8835","order":"3", "time":"100"}
+		],
+		"path_info":{
+			"create_user":"2",
+			"imp":"0.94",
+			"hard_level":"0.99"
+		}
+	}
+    """
+    param = json.loads(request.body)['data']
+    resp = HttpResponse()
+    paths.add(param)
+    respData = {'status': '1', 'ret': '添加成功!!!'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
+
+
+
+# 依据路径id查询路径，redis里有缓存的，则从redis里返回，没有则从数据库表里查找数据返回        已测试-----4.24-----ZXN
+def showAllPath(request):
+    param = json.loads(request.body)['data']
+    path_id = param['path_id']
+    path = paths.showById(path_id)
+    res = []
+    for p in path:
+        documents = p.path_document
+        for doc in documents:
+            doc_info = json.loads(doc)
+            # print(doc_info)
+            doc_uuid = doc_info['uuid']
+            if cache.has_key(doc_uuid):
+                res.append(cache.get(doc_uuid))
+                # print(1)
+            else:
+                docs = document_info.selectById(doc_uuid)
+                for doc in docs:
+                    doc.uuid = str(doc.uuid)
+                    doc.time = str(doc.time)
+                    res.append(dict(model_to_dict(doc).items()))
+                    # print(2)
+    return HttpResponse(json.dumps(res), content_type="application/json")
+
+
+
+# 新增路径
+def add(filedata = {}):
+    path = models.Path.objects.create(**filedata)
+    return path
+
+# 查询全部路径列表
+def showById(path_id):
+    assert path_id
+    paths = models.Path.objects.filter(path_id=path_id)
+    return paths
+
+
+import json
+from django.http import HttpResponse
+from django.forms.models import model_to_dict
+from note import note_info
+# Create your views here.
+
+# 添加便签         已测试-----4.19----ZXN
+def add_note(request):
+    """
+        "data":{
+        "user_id":
+        "tags_type":
+        "content":
+        "document_id":
+    }
+    """
+    param = json.loads(request.body)['data']
+    resp = HttpResponse()
+    note_info.add(param)
+    respData = {'status': '1', 'ret': '添加成功!!!'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
+
+
+# 删除便签         已测试-----4.19----ZXN
+def delete_note(request):
+    param = json.loads(request.body)['data']
+    resp = HttpResponse()
+    note_info.deleteById(param['id'])
+    respData = {'status': '1', 'ret': '删除成功！！！'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
+
+# 更新便签         已测试-----4.19----ZXN
+def update_note(request):
+    """
+     "data": {
+         "id":
+         "user_id":
+         "tags_type":
+         "content":
+         "document_id":
+     }
+     :param filedata:
+     :return:
+     """
+    param = json.loads(request.body)['data']
+    resp = HttpResponse()
+    note_info.updateById(param)
+    respData = {'status': '1', 'ret': '更新成功！！！'}
+    resp.content = json.dumps(respData)
+    return HttpResponse(resp, content_type="application/json")
+
+
+# 显示便签         已测试-----4.19----ZXN
+def show_note(request):
+    """
+       "data":{
+           "user_id":
+           "document_id":
+       }
+       :param request:
+       :return:
+       """
+    param = json.loads(request.body)['data']
+    notes = note_info.selectByUserId(param['user_id'], param['document_id'])
+    res = []
+    for note in notes:
+        note.document_id = str(note.document_id)
+        res.append(dict(model_to_dict(note).items()))
+    return HttpResponse(json.dumps(res), content_type="application/json")
+
+
+
+from note import models
+
+# 添加便签
+def add(filedata = {}):
+    notes = models.Note.objects.create(**filedata)
+    return notes
+
+
+# 删除便签
+def deleteById(id):
+    assert id
+    notes = models.Note.objects.filter(id=id).delete()
+    return notes
+
+
+# 更新便签
+def updateById(filedata = {}):
+    id = filedata['id']
+    notes = models.Note.objects.filter(id=id).update(**filedata)
+    return notes
+
+
+# 依据用户id和专题uuid查询便签, document_id代表专题的uuid
+def selectByUserId(user_id, document_id):
+    assert user_id, document_id
+    notes = models.Note.objects.filter(user_id=user_id, document_id=document_id)
+    return notes

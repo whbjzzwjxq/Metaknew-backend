@@ -69,9 +69,6 @@ INSTALLED_APPS = [
     'document',
     'subgraph',
     'search',
-    'note',
-    'path',
-    'area',
 ]
 
 SITE_ID = 1
@@ -79,7 +76,7 @@ SITE_ID = 1
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware', # 注意顺序，必须放在这儿
+    'corsheaders.middleware.CorsMiddleware',  # 注意顺序，必须放在这儿
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -197,6 +194,7 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+
 
 import djcelery
 djcelery.setup_loader()

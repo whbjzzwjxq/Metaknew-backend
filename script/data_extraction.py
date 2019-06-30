@@ -1,7 +1,6 @@
-from subgraph.translate import connect
-import pandas as pd
+from tools.translate import connect
 import re
-import demo.tools as tool
+import tools.location as tool
 
 zhPattern = re.compile(u'[\u4e00-\u9fa5]+')
 

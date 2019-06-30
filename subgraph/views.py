@@ -1,11 +1,13 @@
-from search.views import NeoSet, search_by_name, search_rel_exist, search_by_uuid
-from py2neo.data import Node, Relationship
+from search.views import NeoSet, search_rel_exist, search_by_uuid
+from py2neo.data import Relationship
 from django.http import HttpResponse
 import pandas as pd
-from subgraph.data_extraction import dataframe2dict
+from script.data_extraction import dataframe2dict
 from subgraph.logic_class import NeoNode
-from subgraph import tools
+from tools import base_tools
 import json
+
+
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
 
@@ -13,7 +15,7 @@ def create_relationship(relationship):
     # source 和 target 是Node对象
     source = relationship["source"]
     target = relationship["target"]
-    relationship.update({'uuid': tools.get_uuid(source['Name'] + 'to' + target['Name'])})
+    relationship.update({'uuid': base_tools.get_uuid(source['Name'] + 'to' + target['Name'])})
     NeoRel = Relationship(source, relationship['type'], target)
     relationship.pop('type')
     relationship.pop('source')
@@ -58,10 +60,13 @@ def upload_excel(request):
 
 
 def add_node(request):
+    collector = base_tools.NeoSet()
     data = json.loads(request.body, encoding='utf-8')['data']
     user = json.loads(request.body, encoding='utf-8')['user']  # todo 用户注册登录
-    node = NeoNode(user=user)
-    if node.create(data) is not None:
+    node = NeoNode(collector=collector)
+    try:
+        node.create(user=user, node=data)
+        node.collector.tx.commit()
         return HttpResponse("add node success")
-    else:
+    except AssertionError:
         return HttpResponse("bad information")

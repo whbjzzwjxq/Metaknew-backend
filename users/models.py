@@ -7,12 +7,13 @@ from django.utils.timezone import now
 
 
 class User(models.Model):
-    user_id = models.AutoField(db_column='USER_ID', primary_key=True)  # 用户id
-    username = models.TextField(db_column='USER_NAME')  # 用户名
-    user_pw = models.TextField(db_column='USER_PASSWORD')  # 用户密码
-    user_email = models.TextField(db_column='USER_EMAIL')  # 用户邮箱
-    user_phone = models.CharField(db_column='USER_PHONE', max_length=11)  # 用户手机号（用于登录的账号）
-    datetime = models.DateTimeField(db_column='USER_TIME', default=now)  # 注册时间
+    UserId = models.AutoField(db_column='USER_ID', primary_key=True)  # 用户id
+    UserName = models.TextField(db_column='USER_NAME')  # 用户名
+    UserPw = models.TextField(db_column='USER_PASSWORD')  # 用户密码
+    UserEmail = models.TextField(db_column='USER_EMAIL')  # 用户邮箱
+    UserPhone = models.CharField(db_column='USER_PHONE', max_length=11)  # 用户手机号（用于登录的账号）
+    DateTime = models.DateTimeField(db_column='USER_TIME', default=now)  # 注册时间
 
     class Meta:
-        db_table = 'user'
+        db_tablespace = 'user'
+        db_table = 'user_info_base'
