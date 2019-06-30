@@ -1,7 +1,7 @@
 # -*-coding=utf-8 -*-
 from document import models
 import datetime as dt
-
+from authority.authFunction import Authority
 
 def add(filedata={}):
 
@@ -10,10 +10,14 @@ def add(filedata={}):
 
 
 # id 表示专题uuid
-def selectById(uuid):
+def selectById(uuid,user_id,level):
     assert uuid
-    doc = models.DocumentInformation.objects.filter(uuid=uuid)
-    return doc
+    result = Authority.checkAuth(uuid,user_id,level)
+    if result is True:
+        doc = models.Document_Information.objects.filter(uuid=uuid)
+        return True
+    else:
+        return False
 
 # 查询所有专题信息的uuid和title
 def selectAll():
@@ -35,7 +39,7 @@ def updateById(id,filedata={}):
     return res
 
 # 更新专题多媒体文件
-def updateURLById(id, medias = []):
+def updateURLById(id, medias = {}):
     assert id
     res = models.DocumentInformation.objects.filter(uuid=id).update(included_media=medias)
     return res

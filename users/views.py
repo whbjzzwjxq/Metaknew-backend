@@ -11,7 +11,7 @@ from django.contrib.auth.hashers import make_password
 import numpy as np
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from tools.location import getHttpResponse
+from demo.tools import getHttpResponse
 from django.core.cache import cache as cache
 
 # Create your views here.

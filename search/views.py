@@ -5,8 +5,17 @@ from subgraph.models import *
 from document.models import Document
 from document import views
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
+from django.forms.models import model_to_dict
+
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
+
+try:
+    from django.apps import apps
+    get_model=apps.get_model
+except ImportError:
+    from django.db.models.loading import get_model
+
 
 class_table = {
     'Person': Person,
@@ -117,6 +126,50 @@ def criteria_query(request):
             return HttpResponse(json.dumps(results, ensure_ascii=False))
 
 
+def search_by_condition(request):
+    """
+    {
+	"data":{
+		"lable":"Person",  # model名称
+		"properties":[{	"name":"Hot",  # 表中的字段名称
+			"query_type":"equal",  # 评判标准（equal，not_equal，range，more，less）
+            "min_range":"100",  # 查询范围下限
+            "max_range":"160"}]  # 查询范围上限
+	}
+}
+    :param request:
+    :return:
+    """
+    param = json.loads(request.body)['data']
+    lable = param['lable']
+    properties = param['properties']
+    tab = class_table.get(lable)
+    propertys = {}
+    for p in properties:
+        name = p['name']
+        query_type = p["query_type"]
+        min_range = p["min_range"]
+        max_range = p["max_range"]
+        if query_type == 'equal':
+            propertys.update({name + '__exact': min_range})
+        if query_type == 'not_equal':
+            propertys.update({name + '__not': min_range})
+        if query_type == 'range':
+            propertys.update({name + '__gte': min_range})
+            propertys.update({name + '__lte': max_range})
+        if query_type == 'more':
+            propertys.update({name + '__gte': min_range})
+        if query_type == 'less':
+            propertys.update({name + '__lte': max_range})
+        results = select_by_condition(lable, **propertys)
+        # results = list(result.__iter__())
+        res = []
+        for result in results:
+            res.append(dict(model_to_dict(result).items()))
+        print(res)
+        # return HttpResponse(json.dumps(result, ensure_ascii=False))
+
+
 # 查询关系是否存在
 def search_rel_exist(rel):
     result = NeoSet().Rmatcher.match({rel['source'], rel['target']}).first()
@@ -134,6 +187,11 @@ def search_rel_exist(rel):
 # labels as args,key-value as kwargs
 def search_by_dict(*args, **kwargs):
     result = NeoSet().Nmatcher.match(*args, **kwargs)
+    return result
+
+def select_by_condition(tab, **propertys):
+    tableModel = get_model("subgraph", tab)
+    result = tableModel.objects.filter(**propertys)
     return result
 
 

@@ -8,8 +8,6 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.utils.timezone import now
 from users.models import User
 # Create your models here.
-
-
 # 专题的信息 也就是在cache_doc里面请求的内容
 class DocumentInformation(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题id
@@ -26,6 +24,7 @@ class DocumentInformation(models.Model):
     Useful = models.FloatField(db_column='USEFUL', default=0)  # 有用的程度
     Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
     IncludedMedia = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
+
 
     class Meta:
         db_tablespace = 'document'

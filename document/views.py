@@ -1,7 +1,13 @@
 # -*-coding=utf-8 -*-
 
 
-from document import comment,document_info,document
+from document import comment, document_info, document
+from document import comment, document_info, document, tasks
+from authority.authFunction import Authority
+from authority import authority
+import datetime as dt
+from django.http import HttpResponse, StreamingHttpResponse
+from django.utils.encoding import escape_uri_path
 from document import models
 
 # APP内定义
@@ -10,6 +16,9 @@ from users import user
 from document.models import DocumentInformation
 from subgraph.views import handle_node, handle_relationship
 from tools.base_tools import get_dict
+from subgraph.views import handle_node, handle_relationship
+from history.tasks import history_info
+
 # django定义与工具包
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
@@ -38,7 +47,7 @@ def get_comments(request):
         user_info = user.selectById(com.userid)
         if user_info:
             user_info[0].datetime = str(user_info[0].datetime)
-            res.append(dict(model_to_dict(com),**model_to_dict(user_info[0])))
+            res.append(dict(model_to_dict(com), **model_to_dict(user_info[0])))
         else:
             res.append(model_to_dict(com))
     return HttpResponse(json.dumps(res), content_type="application/json")
@@ -105,7 +114,14 @@ def add_document_information(request):
     resp = HttpResponse()
     params = json.loads(request.body)['data']
     params['time'] = dt.datetime.now()
-    document_info.add(params)
+    filedata = {}
+    filedata['time'] = params['time']
+    filedata['userId'] = params['create_user']
+    filedata['uuid'] = params['uuid']
+    filedata['type'] = 'document'
+    filedata['operation'] = 'insert'
+    history_info.add_history.delay(filedata)
+    tasks.add_document_info.delay(params)
     respData = {'status': '1', 'ret': '添加成功!!!'}
     resp.content = json.dumps(respData)
     return HttpResponse(resp, content_type="application/json")
@@ -116,18 +132,40 @@ def add_document_information(request):
 def get_doc_info(request):
     """
         "data":{
+            "userId":
     		"uuid":
     	}
         """
     params = json.loads(request.body)['data']
     doc_id = params['uuid']
+    userId = params['userId']
     docs = document_info.selectById(doc_id)
-    res = []
-    for doc in docs:
-        doc.uuid = str(doc.uuid)
-        doc.time = str(doc.time)
-        res.append(dict(model_to_dict(doc).items()))
-    return HttpResponse(json.dumps(res), content_type="application/json")
+    filedata = {}
+    filedata['time'] = dt.datetime.now()
+    filedata['userId'] = params['userId']
+    filedata['uuid'] = params['uuid']
+    filedata['type'] = 'document'
+    filedata['operation'] = 'select'
+    history_info.add_history.delay(filedata)
+    if (docs == False):
+        resp = HttpResponse()
+        respData = {'status': '1', 'ret': "您没有读取此专题的权限！"}
+        resp.content = json.dumps(respData)
+        return HttpResponse(resp, content_type="application/json")
+    else:
+        res = []
+        for doc in docs:
+            doc.uuid = str(doc.uuid)
+            doc.time = str(doc.time)
+            dd = doc.main_nodes
+            res_uuid = []
+            for d in dd:
+                res_uuid.append(d)
+            doc.main_nodes = res_uuid
+            print(res_uuid)
+            res.append(dict(model_to_dict(doc).items()))
+        print(res)
+        return HttpResponse(json.dumps(res), content_type="application/json")
 
 
 # 获取全部的专题信息（uuid + title）     已测试---4.17-----ZXN
@@ -273,7 +311,7 @@ def select_top(request):
         filedata['imp'] = doc.imp
         filedata['area'] = doc.area
         filedata['size'] = doc.size
-        cache.set(doc.uuid, filedata, 60*60)
+        cache.set(doc.uuid, filedata, 60 * 60)
     return HttpResponse("成功！！！", content_type="application/json")
 
 
@@ -385,7 +423,6 @@ def add_path(request):
     return HttpResponse(resp, content_type="application/json")
 
 
-
 # 依据路径id查询路径，redis里有缓存的，则从redis里返回，没有则从数据库表里查找数据返回        已测试-----4.24-----ZXN
 def showAllPath(request):
     param = json.loads(request.body)['data']
@@ -411,11 +448,11 @@ def showAllPath(request):
     return HttpResponse(json.dumps(res), content_type="application/json")
 
 
-
 # 新增路径
-def add(filedata = {}):
+def add(filedata={}):
     path = models.Path.objects.create(**filedata)
     return path
+
 
 # 查询全部路径列表
 def showById(path_id):
@@ -424,10 +461,6 @@ def showById(path_id):
     return paths
 
 
-import json
-from django.http import HttpResponse
-from django.forms.models import model_to_dict
-from note import note_info
 # Create your views here.
 
 # 添加便签         已测试-----4.19----ZXN
@@ -456,6 +489,7 @@ def delete_note(request):
     respData = {'status': '1', 'ret': '删除成功！！！'}
     resp.content = json.dumps(respData)
     return HttpResponse(resp, content_type="application/json")
+
 
 # 更新便签         已测试-----4.19----ZXN
 def update_note(request):
@@ -497,11 +531,8 @@ def show_note(request):
     return HttpResponse(json.dumps(res), content_type="application/json")
 
 
-
-from note import models
-
 # 添加便签
-def add(filedata = {}):
+def add(filedata={}):
     notes = models.Note.objects.create(**filedata)
     return notes
 
@@ -514,7 +545,7 @@ def deleteById(id):
 
 
 # 更新便签
-def updateById(filedata = {}):
+def updateById(filedata={}):
     id = filedata['id']
     notes = models.Note.objects.filter(id=id).update(**filedata)
     return notes
