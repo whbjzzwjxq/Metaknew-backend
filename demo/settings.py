@@ -66,8 +66,10 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'djcelery',
     'users',
-    'document',
+    'authority',
     'subgraph',
+    'history',
+    'document',
     'search',
     'note',
     'path',
@@ -112,16 +114,6 @@ WSGI_APPLICATION = 'demo.wsgi.application'
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
-    # 'default': {
-    #     # 'ENGINE': 'django.db.backends.sqlite3',
-    #     # 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     'NAME': 'demomaster',
-    #     'USER': 'postgres',
-    #     'PASSWORD': '123456',
-    #     'HOST': 'localhost',
-    #     'PORT': '5432',
-    # },
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'Metaknew',
@@ -133,24 +125,9 @@ DATABASES = {
 }
 
 CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379",  # 这里设定了本机的redis数据
-        # "LOCATION": "redis://:passwordpassword@47.193.146.xxx:6379/0", # 如果redis设置密码的话，需要以这种格式host前面是密码
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
-    }
-}
-
-# conn = psycopg2.connect(database="demomaster", user="postgres", password="123456", host="localhost", port="5432")
-#conn = psycopg2.connect(database="Metaknew", user="postgres", password="123456", host="192.168.1.166", port="5432")
-
-
-CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379',
+        'LOCATION': 'redis://39.96.10.154:6379',
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
              "PASSWORD": "",
@@ -162,6 +139,7 @@ CACHES = {
 REDIS_TIMEOUT = 1*60
 CUBES_REDIS_TIMEOUT = 60*60
 NEVER_REDIS_TIMEOUT = 365*24*60*60
+
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
@@ -203,7 +181,7 @@ djcelery.setup_loader()
 #数据库调度
 CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
 # celery setting
-BROKER_URL = 'amqp://guest:guest@localhost:5672//'
+BROKER_URL = 'amqp://guest:guest@39.96.10.154:5672//'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/

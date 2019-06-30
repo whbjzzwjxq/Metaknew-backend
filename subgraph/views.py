@@ -24,15 +24,20 @@ init = {
     'Document': Document
 }
 
-
-def get_dict_class(label):
-    query_class = init["label"]
+# 获取postgre中lable对应的属性
+def get_dict_class(lable):
+    query_class = init.get(lable)
     keylist = {}
     for key, value in query_class.__dict__.items():
         if not re.match(r'__.*__', key):
             keylist.update({key: value})
     if '_state' in keylist:
         keylist.pop('_state')
+    if 'Meta' in keylist:
+        keylist.pop('Meta')
+    if '_meta' in keylist:
+        keylist.pop('_meta')
+    print(keylist)
     return keylist
 
 
@@ -147,4 +152,5 @@ def upload_excel(request):
     nodelist = dataframe2dict(a)
 
     return HttpResponse("upload nodes ok")
+
 

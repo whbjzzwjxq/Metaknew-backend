@@ -1,7 +1,8 @@
 # -*-coding=utf-8 -*-
 
-
 from document import comment,document_info,document, tasks
+from authority.authFunction import Authority
+from authority import authority
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.encoding import escape_uri_path
@@ -12,6 +13,7 @@ from document import models
 from users import user
 from document.models import Document_Information
 from subgraph.views import handle_node, handle_relationship, create_node, get_dict
+from history.tasks import history_info
 
 # django定义与工具包
 import datetime as dt
@@ -108,7 +110,14 @@ def add_document_information(request):
     resp = HttpResponse()
     params = json.loads(request.body)['data']
     params['time'] = dt.datetime.now()
-    document_info.add(params)
+    filedata = {}
+    filedata['time'] = params['time']
+    filedata['userId'] = params['create_user']
+    filedata['uuid'] = params['uuid']
+    filedata['type'] = 'document'
+    filedata['operation'] = 'insert'
+    history_info.add_history.delay(filedata)
+    tasks.add_document_info.delay(params)
     respData = {'status': '1', 'ret': '添加成功!!!'}
     resp.content = json.dumps(respData)
     return HttpResponse(resp, content_type="application/json")
@@ -119,18 +128,40 @@ def add_document_information(request):
 def get_doc_info(request):
     """
         "data":{
+            "userId":
     		"uuid":
     	}
         """
     params = json.loads(request.body)['data']
     doc_id = params['uuid']
+    userId = params['userId']
     docs = document_info.selectById(doc_id)
-    res = []
-    for doc in docs:
-        doc.uuid = str(doc.uuid)
-        doc.time = str(doc.time)
-        res.append(dict(model_to_dict(doc).items()))
-    return HttpResponse(json.dumps(res), content_type="application/json")
+    filedata = {}
+    filedata['time'] = dt.datetime.now()
+    filedata['userId'] = params['userId']
+    filedata['uuid'] = params['uuid']
+    filedata['type'] = 'document'
+    filedata['operation'] = 'select'
+    history_info.add_history.delay(filedata)
+    if(docs == False):
+        resp = HttpResponse()
+        respData = {'status': '1', 'ret': "您没有读取此专题的权限！"}
+        resp.content = json.dumps(respData)
+        return HttpResponse(resp, content_type="application/json")
+    else:
+        res = []
+        for doc in docs:
+            doc.uuid = str(doc.uuid)
+            doc.time = str(doc.time)
+            dd = doc.main_nodes
+            res_uuid = []
+            for d in dd:
+                res_uuid.append(d)
+            doc.main_nodes = res_uuid
+            print(res_uuid)
+            res.append(dict(model_to_dict(doc).items()))
+        print(res)
+        return HttpResponse(json.dumps(res), content_type="application/json")
 
 
 # 获取全部的专题信息（uuid + title）     已测试---4.17-----ZXN

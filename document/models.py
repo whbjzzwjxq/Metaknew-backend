@@ -8,7 +8,6 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.utils.timezone import now
 # Create your models here.
 
-
 # todo 将字段名改为驼峰写法
 class Document_Information(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题id
@@ -28,6 +27,7 @@ class Document_Information(models.Model):
     keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 主要节点的名字
     authority = ArrayField(models.TextField(), db_column='AUTHORITY', default=list)  # 拥有权限的用户id
     included_media = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
+
 
     class Meta:
         db_table = 'document_information'

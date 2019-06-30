@@ -21,3 +21,10 @@ def add(x, y):
 def add_document(filedata = {}):
     doc = models.Document.objects.create(**filedata)
     return doc
+
+# 新增专题信息
+@app.task
+def add_document_info(filedata={}):
+
+    doc = models.Document_Information.objects.create(**filedata)
+    return doc
