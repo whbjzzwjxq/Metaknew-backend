@@ -1,6 +1,5 @@
 *.pyc
 .idea\
-*\migrations
 *.iml
 *.xml
 *\__pycache__\*

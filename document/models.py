@@ -6,54 +6,85 @@ import datetime
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.utils.timezone import now
+from users.models import User
 # Create your models here.
-
-# todo 将字段名改为驼峰写法
-class Document_Information(models.Model):
+# 专题的信息 也就是在cache_doc里面请求的内容
+class DocumentInformation(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题id
-    create_user = models.IntegerField(db_column='CREATE_USER')  # 发表用户id
-    time = models.DateTimeField(db_column='TIME', default=now)  # 发表时间
-    title = models.TextField(db_column='TITLE')  # 标题
-    url = models.TextField(db_column='URL', default='')  # 缩略图
-    description = models.TextField(db_column='DESCRIPTION', default='')  # 描述
-    imp = models.FloatField(db_column='IMP', default=0)    # 重要度
-    hot = models.FloatField(db_column='HOT', default=0)  # 热度
-    hard_level = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
-    area = models.TextField(db_column='AREA')  # 领域
-    size = models.IntegerField(db_column='SIZE', default=0)  # 节点数量
-    share = models.BooleanField(db_column='SHARE', default=False)  # 是否处于分享状态
-    feature_vector = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
-    main_nodes = ArrayField(models.UUIDField(), db_column='MAIN_NODES', default=list)   # 主要节点的uuid
-    keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 主要节点的名字
-    authority = ArrayField(models.TextField(), db_column='AUTHORITY', default=list)  # 拥有权限的用户id
-    included_media = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
+    Title = models.TextField(db_column='TITLE', default=uuid)  # 标题
+    Url = models.TextField(db_column='URL', default='')  # 缩略图
+    Area = models.TextField(db_column='AREA', default='None')  # 领域
+    CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
+    CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
+    UpdateTime = models.DateTimeField(db_column='UPDATE_TIME', auto_now=True)  # 最后更新的时间
+    HardLevel = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
+    Size = models.IntegerField(db_column='SIZE', default=0)  # 节点数量
+    Imp = models.IntegerField(db_column='IMP', default=0)  # 重要度
+    Hot = models.IntegerField(db_column='HOT', default=0)  # 热度
+    Useful = models.FloatField(db_column='USEFUL', default=0)  # 有用的程度
+    Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
+    IncludedMedia = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
 
 
     class Meta:
-        db_table = 'document_information'
+        db_tablespace = 'document'
+        db_table = 'document_info'
 
 
-# 专题
-class Document(models.Model):
+# 专题的Graph相关的内容 也就是在svg绘制的时候请求的内容
+class DocumentGraph(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题ID
-    nodes = ArrayField(JSONField(db_column='NODE'))  # json里包含节点的uuid,x,y坐标
-    relationships = ArrayField(JSONField(db_column='RELATIONSHIP'), default=dict)   # json
+    MainNodes = ArrayField(models.UUIDField(), db_column='MAIN_NODES', default=list)   # 主要节点的uuid
+    Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)
+    IncludedNodes = ArrayField(JSONField(db_column='NODES'), default=list)  # json里包含节点在该专题下的设置
+    IncludedRels = ArrayField(JSONField(db_column='RELATIONSHIPS'), default=list)  # json里包含关系在该专题下的设置
+    FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
 
     class Meta:
-        db_table = 'document'
+        db_tablespace = 'document'
+        db_table = 'document_graph'
 
 
 # 专题评论
 class Comment(models.Model):
-    id = models.AutoField(db_column='ID', primary_key=True)  # 评论id
-    uuid = models.UUIDField(db_column='UUID')  # 关联专题id
-    userid = models.IntegerField(db_column='USER_ID')  # 用户id
-    time = models.DateTimeField(db_column='TIME')  # 评论时间
-    content = models.TextField(db_column='CONTENT')  # 评论内容
-    imp = models.FloatField(db_column='IMP')  # 评论重要度
-    hard_level = models.FloatField(db_column='HARD_LEVEL')  # 评论难易度
-    useful = models.BooleanField(db_column='USEFUL')  # 是否有用
+    id = models.UUIDField(db_column='ID', primary_key=True)  # 评论id
+    uuid = models.UUIDField(db_column='UUID')  # 注意是回复的内容的id
+    User = models.IntegerField(db_column='USER', default='0')  # 发表用户id
+    Time = models.DateTimeField(db_column='TIME', default=now)  # 评论时间
+    Content = models.TextField(db_column='CONTENT', default='')  # 评论内容
 
     class Meta:
+        db_tablespace = 'document'
         db_table = 'comment'
 
+
+class Path(models.Model):
+    uuid = models.UUIDField(db_column='PATH_ID', primary_key=True)  # 路径id
+    PathTitle = models.TextField(db_column='PATH_TITLE')  # 路径题目
+    PathDocument = ArrayField(JSONField(), db_column='PATH_DOCUMENT')  # 路径包含的专题信息（uuid//uuid Order//查看节点的顺序 Time//持续时间）
+    Title = models.TextField(db_column='TITLE')  # 标题
+    Area = ArrayField(models.TextField(), db_column='AREA', default='None')  # 领域
+    CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
+    CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
+    UpdateTime = models.DateTimeField(db_column='UPDATE_TIME', auto_now=True)  # 最后更新的时间
+    HardLevel = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
+    Imp = models.IntegerField(db_column='IMP', default=0)  # 重要度
+    Hot = models.IntegerField(db_column='HOT', default=0)  # 热度
+    Useful = models.FloatField(db_column='USEFUL', default=0)  # 有用的程度
+    Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
+
+    class Meta:
+        db_tablespace = 'document'
+        db_table = 'path'
+
+
+class Note(models.Model):
+    uuid = models.UUIDField(db_column="ID", primary_key=True)  # 便签id
+    CreateUser = models.IntegerField(db_column="USER_ID", default='1')  # 用户id
+    TagType = models.TextField(db_column="TAGS_TYPE")  # 便签类型
+    Content = models.TextField(db_column="CONTENT")  # 便签内容
+    Document_id = models.UUIDField(db_column="DOCUMENT_ID")  # 所属专题uuid
+
+    class Meta:
+        db_tablespace = 'document'
+        db_table = 'note'
