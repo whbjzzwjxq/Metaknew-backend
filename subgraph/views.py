@@ -1,111 +1,19 @@
-from subgraph.models import *
-from document.models import Document
 from search.views import NeoSet, search_by_name, search_rel_exist, search_by_uuid
 from py2neo.data import Node, Relationship
-import re
-import uuid
-import json
 from django.http import HttpResponse
 import pandas as pd
 from subgraph.data_extraction import dataframe2dict
-from subgraph.translate import translate
-
-# Neo4j Node用到的key
-NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language']
-# Neo4j Relationship用到的key
-NeoRelKeys = []
-# 这是已经处理好的数据，这里只存储
-
-init = {
-    'Person': Person,
-    'BaseNode': BaseNode,
-    'Project': Project,
-    'ArchProject': ArchProject,
-    'Document': Document
-}
-
-
-def get_dict_class(label):
-    query_class = init["label"]
-    keylist = {}
-    for key, value in query_class.__dict__.items():
-        if not re.match(r'__.*__', key):
-            keylist.update({key: value})
-    if '_state' in keylist:
-        keylist.pop('_state')
-    return keylist
-
-
-def get_uuid(name):
-    return str(uuid.uuid1())
-
-
-def get_dict(node):
-    keylist = {}
-    for key, value in node.__dict__.items():
-        if not re.match(r'__.*__', key):
-            keylist.update({key: value})
-    if '_state' in keylist:
-        keylist.pop('_state')
-    return keylist
-
-
-def single_node(request):
-    if request.method == 'POST':
-        node = json.loads(request.body)
-        back = handle_node(node)
-        return HttpResponse('200')
-
-
+from subgraph.logic_class import NeoNode
+from subgraph import tools
+import json
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
-def create_node(node):
-    if 'type' and 'Name' in node:
-        # 处理Label类信息
-        NeoNode = Node(node['type'])
-        node.pop("type")
-        NeoNode.add_label('Common')
-        NeoNode.add_label('Used')
-        if "Labels" in node:
-            NeoNode.update_labels(node['Labels'])
-            node.pop("Labels")
-        # 分配uuid
-        node.update({'uuid': get_uuid(node['Name'])})
-        # 处理名字类信息
-
-        def language_setter(node0, language_to, language_from):
-            name_tran = 'Name_{}'.format(language_to)
-            if name_tran not in node0:
-                node0['language'], node0[name_tran] = translate(node0['Name'], language_to, language_from)
-        if 'language' not in node:
-            node['language'] = 'auto'
-        language_setter(node, 'zh', node['language'])
-        language_setter(node, 'en', node['language'])
-
-        # 存入postgreSQL固定属性
-        NewNode = init[node['PrimaryLabel']]()
-        for key in get_dict(NewNode):
-            if key in node:
-                print(node[key])
-                setattr(NewNode, key, node[key])
-                if key != 'uuid':
-                    node.pop(key)
-        NewNode.save()
-
-        # 存入Neo4j属性
-        NeoNode.update(node)
-        collector = NeoSet()
-        collector.tx.create(NeoNode)
-        collector.tx.commit()
-        return NeoNode
-    else:
-        return None
 
 
 def create_relationship(relationship):
     # source 和 target 是Node对象
     source = relationship["source"]
     target = relationship["target"]
-    relationship.update({'uuid': get_uuid(source['Name'] + 'to' + target['Name'])})
+    relationship.update({'uuid': tools.get_uuid(source['Name'] + 'to' + target['Name'])})
     NeoRel = Relationship(source, relationship['type'], target)
     relationship.pop('type')
     relationship.pop('source')
@@ -148,3 +56,12 @@ def upload_excel(request):
 
     return HttpResponse("upload nodes ok")
 
+
+def add_node(request):
+    data = json.loads(request.body, encoding='utf-8')['data']
+    user = json.loads(request.body, encoding='utf-8')['user']  # todo 用户注册登录
+    node = NeoNode(user=user)
+    if node.create(data) is not None:
+        return HttpResponse("add node success")
+    else:
+        return HttpResponse("bad information")

@@ -96,6 +96,6 @@ def translate(keyword, language_to, language_from='auto'):
         response = json.loads(response)
         if 'trans_result' in response:
             result = response['trans_result'][0]['dst']
-            return response['from'], result
+            return result
     except:
-        return None, None
+        return None

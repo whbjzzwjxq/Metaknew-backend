@@ -10,9 +10,9 @@ from document import models
 # APP内定义
 
 from users import user
-from document.models import Document_Information
-from subgraph.views import handle_node, handle_relationship, create_node, get_dict
-
+from document.models import DocumentInformation
+from subgraph.views import handle_node, handle_relationship
+from subgraph.tools import get_dict
 # django定义与工具包
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
@@ -58,7 +58,7 @@ def add_comment(request):
     comm = comment.add(params)
     comm.time = str(comm.time)
     # return render(request,'comment.html',{'comment:':comm})
-    return HttpResponse(getHttpResponse('1', '添加成功', model_to_dict(comm, backrefs=True)),
+    return HttpResponse(getHttpResponse('1', '添加成功', model_to_dict(comm)),
                         content_type="application/json")
 
 
@@ -267,7 +267,7 @@ def get_cache_doc(uuids):
 
 # redis 测试存数据
 def select_top(request):
-    docs = models.Document_Information.objects.filter().order_by('id')[:3]
+    docs = models.DocumentInformation.objects.filter().order_by('id')[:3]
     filedata = {}
     for doc in docs:
         filedata['title'] = doc.title
@@ -282,7 +282,7 @@ def select_top(request):
 
 # 测试从redis中读取数据
 def selectFromRedis(request):
-    docs = models.Document_Information.objects.filter().order_by('id')[:3]
+    docs = models.DocumentInformation.objects.filter().order_by('id')[:3]
     res = []
     for doc in docs:
         res.append(cache.get(doc.uuid))
@@ -342,16 +342,17 @@ def add_document(request):
             Doc2Node.update({'target': new_document})
             handle_relationship(Doc2Node)
 
-        # Document_Information部分
+        # DocumentInformation部分
         data['info']['uuid'] = new_document['uuid']
-        new_document_info = Document_Information()
+        new_document_info = DocumentInformation()
         for key in get_dict(new_document_info):
             if key in data["info"]:
                 setattr(new_document_info, key, data["info"][key])
         new_document_info.save()
         return HttpResponse('Create Document Success')
 
-#获取专题
+
+# 获取专题
 def get_document(request):
     if request.method == 'POST':
         uuid = json.loads(request.body, encoding='utf-8')['data']['uuid']

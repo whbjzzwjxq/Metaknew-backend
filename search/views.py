@@ -4,6 +4,7 @@ import json
 from subgraph.models import *
 from document.models import Document
 from document import views
+from py2neo import Graph, NodeMatcher, RelationshipMatcher
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 

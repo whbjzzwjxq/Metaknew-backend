@@ -8,7 +8,7 @@ from django.contrib.postgres.fields import ArrayField
 class Area(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True)
     areaname = models.TextField(db_column='AREA')
-    relative_area = ArrayField(models.TextField(),db_column='RELATIVE_AREA')  #关联的area
+    relative_area = ArrayField(models.TextField(), db_column='RELATIVE_AREA')  #关联的area
 
     class Meta:
         db_table = 'area'
