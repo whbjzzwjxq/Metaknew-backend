@@ -1,8 +1,6 @@
 from search.views import NeoSet, search_rel_exist, search_by_uuid
 from py2neo.data import Relationship
 from django.http import HttpResponse
-import pandas as pd
-from script.data_extraction import dataframe2dict
 from subgraph.logic_class import NeoNode
 from tools import base_tools
 import json
@@ -27,17 +25,18 @@ def create_relationship(relationship):
     return NeoRel
 
 
-def handle_node(node):
+def check_node_exist(user, node, collector):
     if 'uuid' in node:
-        remote = search_by_uuid(node['uuid'])
-        if remote:
+        remote = NeoNode(collector=collector)
+        if remote.query(uuid=node['uuid']):
             node.pop('uuid')
-            remote.update(node)
+            remote.update_labels(node['Labels'])
+
             return remote
         else:
-            return create_node(node)
+            return remote.create(user=user, node=node)
     else:
-        return create_node(node)
+        return None
 
 
 def handle_relationship(relationship):
@@ -51,14 +50,6 @@ def handle_relationship(relationship):
         return create_relationship(relationship)
 
 
-def upload_excel(request):
-    excelFile = request.FILES['excelFile']
-    a = pd.read_excel(excelFile)
-    nodelist = dataframe2dict(a)
-
-    return HttpResponse("upload nodes ok")
-
-
 def add_node(request):
     collector = base_tools.NeoSet()
     data = json.loads(request.body, encoding='utf-8')['data']
@@ -70,3 +61,65 @@ def add_node(request):
         return HttpResponse("add node success")
     except AssertionError:
         return HttpResponse("bad information")
+
+
+def add_document(request):
+    data = json.loads(request.body, encoding='utf-8')['data']
+    user = json.loads(request.body, encoding='utf-8')['user']
+    # 专题节点与关系
+    nodes = data['nodes']
+    relationships = data['relationships']
+
+    # 专题信息
+    info = data['info']
+
+    # 预定义容器
+    doc_nodes = []
+    doc_relationships = []
+    Doc2Nodes = []
+    node_index = {}
+
+    for node in nodes:
+        # 记录新建节点自动赋予的uuid
+        old_id = node['info']['uuid']
+        new_node = handle_node(node['info'])
+        node_index.update({old_id: new_node})
+
+        # 记录专题内节点坐标
+        conf = {'uuid': new_node['uuid'], 'conf': node['conf']}
+        doc_nodes.append(conf)
+
+        # 先记录下节点和专题的相关性
+        if new_node['Name'] in info['keywords']:
+            Doc2Nodes.append({'type': 'Doc2Node', 'rate': 0.5, 'source': new_node})
+
+    for relationship in relationships:
+        # 从node_index里访问提交后的Node对象
+        relationship["info"]['source'] = node_index[relationship["info"]['source']]
+        relationship["info"]['target'] = node_index[relationship["info"]['target']]
+        new_rel = handle_relationship(relationship['info'])
+        conf = {'uuid': new_rel['uuid'], 'conf': relationship['conf']}
+        doc_relationships.append(conf)
+    # 新建专题
+    new_document = {'Name': info['title'],
+                    'PrimaryLabel': 'Document',
+                    'Area': info['area'],
+                    'type': "Document",
+                    "nodes": doc_nodes,
+                    "relationships": doc_relationships
+                    }
+    new_document = create_node(new_document)
+
+    # 生成专题节点后再生成专题与普通节点的关系
+    for Doc2Node in Doc2Nodes:
+        Doc2Node.update({'target': new_document})
+        handle_relationship(Doc2Node)
+
+    # DocumentInformation部分
+    data['info']['uuid'] = new_document['uuid']
+    new_document_info = DocumentInformation()
+    for key in get_dict(new_document_info):
+        if key in data["info"]:
+            setattr(new_document_info, key, data["info"][key])
+    new_document_info.save()
+    return HttpResponse('Create Document Success')

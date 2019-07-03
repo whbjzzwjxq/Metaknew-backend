@@ -1,10 +1,10 @@
 from py2neo.data import Node, Relationship, walk
-from document.models import DocumentGraph, DocumentInformation
+from document.models import DocGraph, DocInfo
 from search.views import NeoSet
 from tools import base_tools, translate
-
+from subgraph.models import BaseNodeCtrl
 types = ['StrNode', 'InfNode', 'Media', 'Document']
-NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias']
+NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
 
 # input item类的实例
@@ -31,18 +31,20 @@ class Doc(object):
 
     def __init__(self, user=1):
         self.Info = {}
-        self.Document = {}
+        self.Graph = {}
         self.nodes = []
         self.rels = []
         self.NeoNode = {}
         self.user = user
+        self.origin = ''
 
     def query(self, uuid):
+        self.origin = uuid
         self.Info = self.query_info(uuid)
-        self.Document = self.query_graph(uuid)
-        self.nodes = self.Document['IncludedNodes']
-        self.rels = self.Document['IncludedRels']
-        self.NeoNode = NeoNode(uuid).root
+        self.Graph = self.query_graph(uuid)
+        self.nodes = self.Graph['IncludedNodes']
+        self.rels = self.Graph['IncludedRels']
+        self.NeoNode = BaseNode(uuid).root
 
     def create(self, data):
         assert 'info' in data
@@ -50,8 +52,8 @@ class Doc(object):
         assert 'rels' in data
         info = data['info']
         uuid = base_tools.get_uuid(info['title'], 'Document', 0)
-        self.Info = DocumentInformation(uuid=uuid)
-        self.Document = DocumentGraph(uuid=uuid)
+        self.Info = DocInfo(uuid=uuid)
+        self.Graph = DocGraph(uuid=uuid)
         self.nodes = data['nodes']
 
     def update_info(self, uuid, data):
@@ -69,11 +71,11 @@ class Doc(object):
 
     @staticmethod
     def query_info(uuid):
-        return DocumentInformation.objects.get(pk=uuid)
+        return DocInfo.objects.get(pk=uuid)
 
     @staticmethod
     def query_graph(uuid):
-        return DocumentGraph.objects.get(pk=uuid)
+        return DocGraph.objects.get(pk=uuid)
 
     @history
     def add_node(self, uuid, conf):
@@ -121,34 +123,41 @@ class Doc(object):
         pass
 
 
-class NeoNode(object):
+class BaseNode(object):
 
-    def __init__(self, collector=NeoSet()):
+    def __init__(self, collector=NeoSet(), user=1):
         self.root = Node()
-        self.info = base_tools.init('None')()
-        self.origin = ''
+        self.uuid = ''
+        self.info = BaseNode()
+        self.ctrl_info = BaseNodeCtrl()
+
+        self.user = user
         self.collector = collector
 
     def query(self, uuid):
         self.root = self.collector.Nmatcher.match(uuid=uuid).first()
-        self.origin = uuid
+        self.uuid = uuid
         if self.root:
             self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
+            self.ctrl_info = BaseNodeCtrl.objects.get(pk=uuid)
             return True
         else:
             return False
 
-    def create(self, user, node):
+    def create(self, node):
         # 这里的type是指的节点的类型， 定义在types中的
         assert 'type' in node
         assert 'Name' in node
         assert 'PrimaryLabel' in node
         # 初始化
-        self.origin = node['uuid']
-        node['uuid'] = base_tools.get_uuid(node['Name'], node['PrimaryLabel'], 0)
-        self.info = base_tools.init([node['PrimaryLabel']])()
+        origin = node['uuid']
         self.root = Node(node['type'])
-        node.pop("type")
+        self.uuid = base_tools.get_uuid(node['Name'], node['PrimaryLabel'], 0)
+        self.info = base_tools.init(node['PrimaryLabel'])()
+        self.ctrl_info = BaseNodeCtrl(uuid=self.uuid,
+                                      ImportMethod='Web',
+                                      CreateUser=self.user
+                                      )
 
         # Neo4j主标签主键设定
         self.root.__primarylabel__ = node['PrimaryLabel']
@@ -156,8 +165,6 @@ class NeoNode(object):
         self.root.__primaryvalue__ = node['uuid']
 
         # 处理Label类信息
-        self.root.add_label('Common')
-        self.root.add_label('Used')
         self.update_labels(node)
 
         # 翻译名字
@@ -167,13 +174,13 @@ class NeoNode(object):
         self.language_setter('en', node['Language'])
 
         # 设置属性
-        self.update_prop(user=user, node=node)
+        self.update_prop(node=node)
 
         # 启动Neo4j连接
         self.collector.tx.create(self.root)
         self.save()
         # 返回一个uuid-NeoNode的字典对象
-        return {self.origin: self.root}
+        return {origin: self}
 
     def language_setter(self, language_to, language_from):
         name_tran = 'Name_{}'.format(language_to)
@@ -183,49 +190,55 @@ class NeoNode(object):
     def update_labels(self, node):
         if "Labels" in node:
             self.root.update_labels(node['Labels'])
-            node.pop("Labels")
 
-    def update_prop(self, user, node):
-        node.pop("Labels")
-        # history记录器还是看一下怎么分类比较合适
-        uuid = node['uuid']
+    def update_prop(self, node):
+        temp = node
+        temp.pop('Labels')
+        temp.pop('uuid')
+        temp.pop('type')
         # 存入postgreSQL固定属性
         for key, value in base_tools.get_dict(self.info).items():
-            if key in node:
-                history_kv(user, uuid, 'postgre', key, value, node[key])
-                setattr(self.info, key, node[key])
+            if key in temp:
+                setattr(self.info, key, temp[key])
                 if key != 'uuid':
-                    node.pop(key)
+                    temp.pop(key)
         # 存入不定的Neo4j属性
         if self.root:
-            dict1 = dict(self.root)
-            self.root.update(node)
-            history_dict(user, uuid, 'neo4j', dict1, dict(self.root))
+            self.root.update(temp)
+
+    def update_all(self, node):
+        self.update_labels(node=node)
+        self.update_prop(node=node)
 
     def delete(self):
-        if 'Used' in self.root:
-            self.root.remove_label('Used')
-            self.root.add_label('Deleted')
+        pass
 
     # 这里的node1指另一个NeoNode
     def merge(self, node1):
         pass
 
+    # 这里Neo4j还没有commit
     def save(self):
         self.collector.tx.push(self.root)
         self.info.save()
+        self.ctrl_info.save()
+
+    def handle_for_front(self):
+        pass
 
 
-class NeoRel(object):
-    def __init__(self, collector):
+class BaseRel(object):
+    def __init__(self, collector=NeoSet()):
+        self.origin = ''
         self.start = {}
         self.end = {}
         self.walk = {}
-        self.root = {}
+        self.root = Relationship()
         self.collector = collector
 
     def query(self, uuid):
         self.root = self.collector.Rmatcher.match(uuid=uuid).first()
+        self.origin = uuid
         if self.root:
             self.walk = walk(self.root)
             self.start = self.walk.start_node
@@ -234,17 +247,19 @@ class NeoRel(object):
         else:
             return False
 
-    def create(self, user, relationship):
+    def create(self, relationship):
         # source 和 target 是Node对象
-        source = relationship["source"]
-        target = relationship["target"]
-        relationship.update({'uuid': base_tools.get_uuid(source['Name'] + 'to' + target['Name'])})
-        NeoRel = Relationship(source, relationship['type'], target)
+        self.start = relationship["source"]
+        self.end = relationship["target"]
+        relationship.update({'uuid': base_tools.rel_uuid()})
+        self.root = Relationship(self.start, relationship['type'], self.end)
         relationship.pop('type')
         relationship.pop('source')
         relationship.pop('target')
-        NeoRel.update(relationship)
-        collector = NeoSet()
-        collector.tx.create(NeoRel)
-        collector.tx.commit()
-        return NeoRel
+        self.root.update(relationship)
+        self.collector.tx.create(self.root)
+        self.save()
+    
+    def save(self):
+        self.collector.tx.push(self.root)
+
