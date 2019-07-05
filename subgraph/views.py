@@ -1,7 +1,7 @@
 from search.views import NeoSet, search_rel_exist, search_by_uuid
 from py2neo.data import Relationship
 from django.http import HttpResponse
-from subgraph.logic_class import NeoNode
+from subgraph.logic_class import BaseNode
 from tools import base_tools
 import json
 
@@ -27,14 +27,12 @@ def create_relationship(relationship):
 
 def check_node_exist(user, node, collector):
     if 'uuid' in node:
-        remote = NeoNode(collector=collector)
+        remote = BaseNode(collector=collector, user=user)
         if remote.query(uuid=node['uuid']):
-            node.pop('uuid')
-            remote.update_labels(node['Labels'])
-
+            remote.update_all(node=node)
             return remote
         else:
-            return remote.create(user=user, node=node)
+            return remote.create(node=node)
     else:
         return None
 
@@ -54,9 +52,9 @@ def add_node(request):
     collector = base_tools.NeoSet()
     data = json.loads(request.body, encoding='utf-8')['data']
     user = json.loads(request.body, encoding='utf-8')['user']  # todo 用户注册登录
-    node = NeoNode(collector=collector)
+    node = BaseNode(collector=collector, user=user)
     try:
-        node.create(user=user, node=data)
+        node.create(node=data)
         node.collector.tx.commit()
         return HttpResponse("add node success")
     except AssertionError:

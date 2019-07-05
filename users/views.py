@@ -11,8 +11,9 @@ import numpy as np
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
 from tools.location import getHttpResponse
-from django.core.cache import cache as cache
+from django.core.cache import cache
 from users.models import User
+from tools.token import make_token, week
 # Create your views here.
 
 
@@ -35,7 +36,6 @@ def login_by_phone_pw(request):
     param = json.loads(request.body)['data']
     phone = param['user_phone']
     password = param['user_pw']
-    # 查询邮箱为phone的用户
     user = User.objects.get(UserPhone=phone)
     if not user:
         resp_data = {'status': '0', 'ret': '用户不存在!!!'}
@@ -43,12 +43,15 @@ def login_by_phone_pw(request):
         # 检查密码是否匹配
         if check_password(password, user.UserPw):
             try:
+                token = make_token(user.UserName, user.UserId)
                 resp_data = {'status': '1', 'ret': '登录成功!'}
+                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
+                response.set_cookie(key='user_name', value=user.UserName, max_age=week)
             except BaseException as e:
                 print(e)
-                resp_data = {'status': '0', 'ret': '登录失败，输入信息有误!!!'}
+                resp_data = {'status': '0', 'ret': '登录失败，请与管理员联系'}
         else:
-            resp_data = {'status': '0', 'ret': '登录失败，密码不正确!!!'}
+            resp_data = {'status': '0', 'ret': '登录失败，账号或密码不正确'}
     response.content = json.dumps(resp_data)
     return HttpResponse(response, content_type="application/json")
 

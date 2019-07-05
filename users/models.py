@@ -3,10 +3,12 @@ from __future__ import unicode_literals
 from django.db import models
 from django.utils.timezone import now
 from django.contrib.postgres.fields import ArrayField
+import uuid
 # Create your models here.
 
 
 class User(models.Model):
+
     UserId = models.AutoField(db_column='USER_ID', primary_key=True)  # 用户id
     UserName = models.TextField(db_column='USER_NAME', unique=True)  # 用户名
     UserPw = models.TextField(db_column='USER_PASSWORD')  # 用户密码
@@ -48,9 +50,10 @@ class UserCollection(models.Model):
 class UserLabel(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
-    SourceId = models.UUIDField(db_column='SOURCE_ID')
-    Labels = ArrayField(models.TextField(), db_column='LABELS')
+    SourceId = models.UUIDField(db_column='SOURCE_ID')  # 用户打标签的内容
+    Labels = ArrayField(models.TextField(), db_column='LABELS')  # 用户打的标签
 
     class Meta:
         db_tablespace = 'user'
         db_table = 'user_labels'
+

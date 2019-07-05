@@ -82,9 +82,10 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # 注意顺序，必须放在这儿
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # 'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'authority.logic_class.AuthMiddleware'
 ]
 
 ROOT_URLCONF = 'demo.urls'
@@ -127,6 +128,7 @@ CACHES = {
         'LOCATION': 'redis://39.96.10.154:6379',
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
             "PASSWORD": "",
         },
     },

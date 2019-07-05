@@ -1,12 +1,7 @@
 # -*-coding=utf-8 -*-
 # APP内定义
-
-from document.models import DocInfo
-from document import document_info, document, tasks
-from document import models
 from tools.base_tools import get_dict
-from subgraph.views import handle_node, handle_relationship
-
+from document.logic_class import BaseComment
 # django定义与工具包
 import datetime as dt
 from django.http import HttpResponse, StreamingHttpResponse
@@ -19,179 +14,58 @@ import os
 from tools.location import getHttpResponse
 from django.forms.models import model_to_dict
 from django.core.cache import cache
+from document.logic_class import PersonalDoc
 
 
 # Create your views here.
 @csrf_exempt
-# 根据专题id得到用户及评论信息
-def get_comments(request):
-    comment_id = json.loads(request.body)['data']['uuid']
-    print(comment_id)
-    comments = comment.selectById(comment_id)
-    res = []
-    for com in comments:
-        com.uuid = str(com.uuid)
-        com.time = str(com.time)
-        user_info = user.selectById(com.userid)
-        if user_info:
-            user_info[0].datetime = str(user_info[0].datetime)
-            res.append(dict(model_to_dict(com), **model_to_dict(user_info[0])))
-        else:
-            res.append(model_to_dict(com))
-    return HttpResponse(json.dumps(res), content_type="application/json")
+# 根据专题id得到个人化的信息
+def get_personal_by_doc(request):
+    doc_id = request.GET.get('uuid')
+    user = request.GET.get('user_id')
+    result = PersonalDoc(uuid=doc_id, user=user).query_all()
+    return HttpResponse(json.dumps(result), content_type="application/json")
 
 
 # 添加评论
 @csrf_exempt
 def add_comment(request):
-    params = json.loads(request.body)['data']
-    if params['content'] == '':
-        return HttpResponse(getHttpResponse('0', '添加失败', ''), content_type='application/json')
+    data = json.loads(request.body)['data']
+    uuid = request.GET.get('uuid')
+    user_id = request.GET.get('user_id')
+    if data['content'] == '':
+        return HttpResponse("评论不能为空")
+    else:
+        BaseComment().add(
+            base=uuid,
+            target=data['target'],
+            user=user_id,
+            content=str(data['content']),
+            time=dt.datetime.now()
+        )
 
-    params['time'] = dt.datetime.now()
-    comm = comment.add(params)
-    comm.time = str(comm.time)
-    # return render(request,'comment.html',{'comment:':comm})
-    return HttpResponse(getHttpResponse('1', '添加成功', model_to_dict(comm)),
-                        content_type="application/json")
-
-
-# 根据commentID 更新评论
-@csrf_exempt
-def update_comment(request):
-    params = json.loads(request.body)['data']
-    if params['id'] == '':
-        return HttpResponse(getHttpResponse('0', '更新失败', ''), content_type='application/json')
-
-    if params['content'] == '':
-        return HttpResponse(getHttpResponse('0', '更新失败', ''), content_type='application/json')
-
-    id = params['id']
-    params['time'] = dt.datetime.now()
-    comm = comment.updateById(id, params)
-    print(comm)
-    return HttpResponse(getHttpResponse(comm, '更新成功', ''), content_type="application/json")
+    return HttpResponse("回复成功")
 
 
 # 根据commentId删除评论
 @csrf_exempt
 def delete_comment(request):
-    params = json.loads(request.body)['data']
-    if params['id'] == '':
+    uuid = request.GET.get('uuid')
+    if uuid == '':
         return HttpResponse(getHttpResponse('0', '删除失败', ''), content_type='application/json')
-
-    id = params['id']
-    res = comment.deleteById(id)
-    return HttpResponse(getHttpResponse(res, '删除成功', ''), content_type="application/json")
-
-
-# 新建专题的信息部分          已测试--4.17-----ZXN
-@csrf_exempt
-def add_document_information(request):
-    """
-    "data":{
-		"uuid":
-		"create_user":
-		"title":
-		"url":
-		"description":
-		"area":
-		"included_media":
-	}
-    """
-    resp = HttpResponse()
-    params = json.loads(request.body)['data']
-    params['time'] = dt.datetime.now()
-    filedata = {}
-    filedata['time'] = params['time']
-    filedata['userId'] = params['create_user']
-    filedata['uuid'] = params['uuid']
-    filedata['type'] = 'document'
-    filedata['operation'] = 'insert'
-    history_info.add_history.delay(filedata)
-    tasks.add_document_info.delay(params)
-    respData = {'status': '1', 'ret': '添加成功!!!'}
-    resp.content = json.dumps(respData)
-    return HttpResponse(resp, content_type="application/json")
-
-
-# 根据专题id得到专题信息   已测试--4.17------ZXN
-@csrf_exempt
-def get_doc_info(request):
-    """
-        "data":{
-            "userId":
-    		"uuid":
-    	}
-        """
-    params = json.loads(request.body)['data']
-    doc_id = params['uuid']
-    userId = params['userId']
-    docs = document_info.selectById(doc_id)
-    filedata = {}
-    filedata['time'] = dt.datetime.now()
-    filedata['userId'] = params['userId']
-    filedata['uuid'] = params['uuid']
-    filedata['type'] = 'document'
-    filedata['operation'] = 'select'
-    history_info.add_history.delay(filedata)
-    if (docs == False):
-        resp = HttpResponse()
-        respData = {'status': '1', 'ret': "您没有读取此专题的权限！"}
-        resp.content = json.dumps(respData)
-        return HttpResponse(resp, content_type="application/json")
     else:
-        res = []
-        for doc in docs:
-            doc.uuid = str(doc.uuid)
-            doc.time = str(doc.time)
-            dd = doc.main_nodes
-            res_uuid = []
-            for d in dd:
-                res_uuid.append(d)
-            doc.main_nodes = res_uuid
-            print(res_uuid)
-            res.append(dict(model_to_dict(doc).items()))
-        print(res)
-        return HttpResponse(json.dumps(res), content_type="application/json")
-
-
-# 获取全部的专题信息（uuid + title）     已测试---4.17-----ZXN
-@csrf_exempt
-def get_all_doc_info(request):
-    if request.method == 'GET':
-        docs = document_info.selectAll()
-        res = []
-        # print(docs)
-        for doc in docs:
-            doc["uuid"] = str(doc["uuid"])
-            res.append(doc)
-        return HttpResponse(json.dumps(res), content_type="application/json")
-
-
-# 根据专题uuid查询资源信息         已测试---4.17----ZXN
-def select_resource(request):
-    """
-            "data":{
-        		"uuid":
-        	}
-    """
-    param = json.loads(request.body)['data']
-    resource = document_info.selectURLById(param['uuid'])
-    urls = []
-    url = {}
-    for res in resource:
-        url['included_media'] = res.included_media
-        urls.append(url)
-    return HttpResponse(json.dumps(urls), content_type='application/json')
+        comment = BaseComment().query(uuid=uuid)
+        comment.delete()
+    return HttpResponse(getHttpResponse('1', '删除成功', ''), content_type="application/json")
 
 
 # 上传文件        已测试---4.18-----ZXN
 # 文件预览路径127.0.0.1:8000/media/files/upload/ + 文件名
 def upload_file(request):
-    resp = HttpResponse()
-    uuid = request.POST.get("uuid", "")
-    my_file = request.FILES.get("myfile", None)
+    response = HttpResponse()
+    uuid = request.POST.get("uuid")
+    user_id = request.GET.get('user_id')
+    my_file = request.FILES.get("my_file", None)
     if not my_file:
         respData = {'status': '0', 'ret': '没有可上传的文件！！！'}
     else:
@@ -272,7 +146,7 @@ def delete_file(request):
     return HttpResponse(resp, content_type="application/json")
 
 
-def get_cache_doc(uuids):
+def get_cache_doc(uuid_list):
     cache_docs = []
     for uuid in uuids:
         doc = list(document_info.selectById(uuid)[:1])
@@ -549,46 +423,51 @@ def selectByUserId(user_id, document_id):
 # -*-coding=utf-8 -*-
 from document import models
 
-def add(filedata={}):
 
+def add(filedata={}):
     doc = models.DocumentInformation.objects.create(**filedata)
     return doc
 
 
 # id 表示专题uuid
-def selectById(uuid,user_id,level):
+def selectById(uuid, user_id, level):
     assert uuid
-    result = Authority.checkAuth(uuid,user_id,level)
+    result = Authority.checkAuth(uuid, user_id, level)
     if result is True:
         doc = models.Document_Information.objects.filter(uuid=uuid)
         return True
     else:
         return False
 
+
 # 查询所有专题信息的uuid和title
 def selectAll():
-    doc = models.DocumentInformation.objects.all().values('uuid','title')
+    doc = models.DocumentInformation.objects.all().values('uuid', 'title')
     return doc
+
 
 # 查询专题包含的多媒体文件
 def selectURLById(uuid):
     doc = models.DocumentInformation.objects.filter(uuid=uuid)
     return doc
 
+
 # ID 表示专题id
-def updateById(id,filedata={}):
+def updateById(id, filedata={}):
     assert id
     update_field = {}
     for filename in filedata:
-        update_field['Document.'+filename] = filedata[filename]
+        update_field['Document.' + filename] = filedata[filename]
     res = models.DocumentInformation.objects.filter(uuid=id).update(update_field)
     return res
 
+
 # 更新专题多媒体文件
-def updateURLById(id, medias = {}):
+def updateURLById(id, medias={}):
     assert id
     res = models.DocumentInformation.objects.filter(uuid=id).update(included_media=medias)
     return res
+
 
 # ID 表示专题id not专题uuid
 def deleteById(id):

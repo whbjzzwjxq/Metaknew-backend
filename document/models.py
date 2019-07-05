@@ -22,7 +22,7 @@ class DocInfo(models.Model):
     Hot = models.IntegerField(db_column='HOT', default=0)  # 热度
     Useful = models.IntegerField(db_column='USEFUL', default=0)  # 有用的程度
     Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
-    IncludedMedia = ArrayField(models.TextField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
+    IncludedMedia = ArrayField(models.URLField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
     FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
 
     class Meta:
@@ -34,9 +34,8 @@ class DocInfo(models.Model):
 class DocGraph(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题ID
     MainNodes = ArrayField(models.UUIDField(), db_column='MAIN_NODES', default=list)   # 主要节点的uuid
-    Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)
     IncludedNodes = ArrayField(JSONField(), db_column='NODES', default=list)  # json里包含节点在该专题下的设置
-    IncludedRels = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=list)  # json里包含关系在该专题下的设置
+    IncludedLinks = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=list)  # json里包含关系在该专题下的设置
 
     class Meta:
         db_tablespace = 'document'
@@ -46,10 +45,12 @@ class DocGraph(models.Model):
 # 专题评论
 class Comment(models.Model):
     id = models.UUIDField(db_column='ID', primary_key=True)  # 评论id
-    uuid = models.UUIDField(db_column='UUID')  # 注意是回复的内容的id
-    User = models.IntegerField(db_column='USER', default='0')  # 发表用户id
+    BaseTarget = models.UUIDField(db_column='TARGET')  # 注意是回复的专题的id
+    Target = models.UUIDField(db_column='')
+    Owner = models.IntegerField(db_column='USER', default='0')  # 发表用户id
     Time = models.DateTimeField(db_column='TIME', default=now)  # 评论时间
     Content = models.TextField(db_column='CONTENT', default='')  # 评论内容
+    Is_Delete = models.BooleanField(db_column='DELETED', default=False)
 
     class Meta:
         db_tablespace = 'document'

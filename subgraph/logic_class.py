@@ -27,111 +27,14 @@ def history_dict(user, uuid, part, dict1, dict2):
     pass
 
 
-class Doc(object):
-
-    def __init__(self, user=1):
-        self.Info = {}
-        self.Graph = {}
-        self.nodes = []
-        self.rels = []
-        self.NeoNode = {}
-        self.user = user
-        self.origin = ''
-
-    def query(self, uuid):
-        self.origin = uuid
-        self.Info = self.query_info(uuid)
-        self.Graph = self.query_graph(uuid)
-        self.nodes = self.Graph['IncludedNodes']
-        self.rels = self.Graph['IncludedRels']
-        self.NeoNode = BaseNode(uuid).root
-
-    def create(self, data):
-        assert 'info' in data
-        assert 'nodes' in data
-        assert 'rels' in data
-        info = data['info']
-        uuid = base_tools.get_uuid(info['title'], 'Document', 0)
-        self.Info = DocInfo(uuid=uuid)
-        self.Graph = DocGraph(uuid=uuid)
-        self.nodes = data['nodes']
-
-    def update_info(self, uuid, data):
-        self.query_info(uuid=uuid)
-
-    def update_graph(self):
-        pass
-
-    def reference(self):
-        pass
-
-    @staticmethod
-    def privilege(user, uuid):
-        pass
-
-    @staticmethod
-    def query_info(uuid):
-        return DocInfo.objects.get(pk=uuid)
-
-    @staticmethod
-    def query_graph(uuid):
-        return DocGraph.objects.get(pk=uuid)
-
-    @history
-    def add_node(self, uuid, conf):
-        self.nodes.append({'uuid': uuid, 'conf': conf})
-
-    @history
-    def remove_node(self, uuid):
-        self.nodes = base_tools.delete_by_uuid(self.nodes, uuid, 'uuid')
-        self.remove_rel(uuid)
-
-    @history
-    def update_node(self, uuid, conf):
-        for node in self.nodes:
-            if node['uuid'] == uuid:
-                node['conf'] = conf
-
-    @history
-    def add_rel(self, uuid, source, target, conf):
-        self.rels.append({'uuid': uuid, 'source': source, 'target': target, 'conf': conf})
-
-    @history
-    def remove_rel(self, uuid):
-        self.rels = base_tools.delete_by_uuid(self.rels, uuid, 'source', 'target')
-
-    @history
-    def update_rel(self, uuid, conf):
-        for rel in self.rels:
-            if rel['uuid'] == uuid:
-                rel['conf'] = conf
-                break
-
-    def save(self):
-        pass
-
-    @from_redis
-    def save_cache(self):
-        pass
-
-    @from_redis
-    def query_cache(self):
-        pass
-
-    @from_redis
-    def clear_cache(self):
-        pass
-
-
 class BaseNode(object):
 
-    def __init__(self, collector=NeoSet(), user=1):
+    def __init__(self, collector=NeoSet()):
         self.root = Node()
         self.uuid = ''
         self.info = BaseNode()
         self.ctrl_info = BaseNodeCtrl()
 
-        self.user = user
         self.collector = collector
 
     def query(self, uuid):
@@ -140,11 +43,11 @@ class BaseNode(object):
         if self.root:
             self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
             self.ctrl_info = BaseNodeCtrl.objects.get(pk=uuid)
-            return True
+            return self
         else:
-            return False
+            return None
 
-    def create(self, node):
+    def create(self, user, node):
         # 这里的type是指的节点的类型， 定义在types中的
         assert 'type' in node
         assert 'Name' in node
@@ -155,9 +58,7 @@ class BaseNode(object):
         self.uuid = base_tools.get_uuid(node['Name'], node['PrimaryLabel'], 0)
         self.info = base_tools.init(node['PrimaryLabel'])()
         self.ctrl_info = BaseNodeCtrl(uuid=self.uuid,
-                                      ImportMethod='Web',
-                                      CreateUser=self.user
-                                      )
+                                      CreateUser=user)
 
         # Neo4j主标签主键设定
         self.root.__primarylabel__ = node['PrimaryLabel']
@@ -196,6 +97,7 @@ class BaseNode(object):
         temp.pop('Labels')
         temp.pop('uuid')
         temp.pop('type')
+        temp.pop('PrimaryLabel')
         # 存入postgreSQL固定属性
         for key, value in base_tools.get_dict(self.info).items():
             if key in temp:
@@ -259,7 +161,6 @@ class BaseRel(object):
         self.root.update(relationship)
         self.collector.tx.create(self.root)
         self.save()
-    
+
     def save(self):
         self.collector.tx.push(self.root)
-
