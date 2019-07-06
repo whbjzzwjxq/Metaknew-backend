@@ -8,6 +8,7 @@ class MediaNode(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)
     FileName = models.TextField(db_column='NAME')
     Format = models.TextField(db_column='FORMAT')
+    Url = models.URLField(db_column='URL', default='')
     UploadUser = models.IntegerField(db_column='UPLOAD_USER')
     UploadTime = models.DateTimeField(db_column='UPLOAD_TIME', default=now)
     Description = models.TextField(db_column='DESCRIPTION', default='None')
