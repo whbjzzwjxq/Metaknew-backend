@@ -1,3 +1,4 @@
+PyJWT
 celery
 aliyunsdkcore
 asn1crypto==0.24.0

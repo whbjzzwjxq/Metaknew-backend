@@ -1,6 +1,5 @@
 # -*-coding=utf-8 -*-
 from django.http import HttpResponse
-from users import user as userInfo
 import json
 import time
 from django.http import JsonResponse
@@ -11,59 +10,50 @@ from django.contrib.auth.hashers import make_password
 import numpy as np
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from demo.tools import getHttpResponse
-from django.core.cache import cache as cache
-
+from tools.location import getHttpResponse
+from django.core.cache import cache
+from users.models import User
+from tools.token import make_token, week
 # Create your views here.
-
-'''
-# 删除
-def delete_user(request):
-    userid = request.POST['userid']
-    username = request.POST['username']
-    userpw = request.POST['userpassword']
-    User.delete().where(User.userid == userid or User.username == username or User.userpassword == userpw).execute()
-'''
 
 
 # 修改用户资料     未测
 def update_user(request):
-    resp = HttpResponse()
-    filedata = {}
-    filedata['userid'] = request.POST.get('userid', None)
-    filedata['username'] = request.POST.get('username', None)
-    filedata['useremail'] = request.POST.get('useremail', None)
-    filedata['userpw'] = request.POST.get('userpw', None)
-    user = userInfo.updateById(filedata)
-    respData = {'status': '1', 'ret': '资料修改成功！！'}
-    resp.content = json.dumps(respData)
-    return HttpResponse(resp, content_type="application/json")
+    response = HttpResponse()
+    file_data = {'UserId': request.POST.get('user_id', None),
+                 'UserName': request.POST.get('user_name', None),
+                 'UserEmail': request.POST.get('user_email', None)}
+    User.objects.update(file_data)
+    resp_data = {'status': '1', 'ret': '资料修改成功！！'}
+    response.content = json.dumps(resp_data)
+    return HttpResponse(response, content_type="application/json")
 
 
 # 登录
-def login(request):
-    resp = HttpResponse()
+def login_by_phone_pw(request):
     # 获取用户输入的手机号、密码
+    response = HttpResponse()
     param = json.loads(request.body)['data']
     phone = param['user_phone']
     password = param['user_pw']
-    # 查询邮箱为phone的用户
-    users = userInfo.selectByPhone(phone)
-    if not users:
-        respData = {'status': '0', 'ret': '用户不存在!!!'}
-    for i in users:
+    user = User.objects.get(UserPhone=phone)
+    if not user:
+        resp_data = {'status': '0', 'ret': '用户不存在!!!'}
+    else:
         # 检查密码是否匹配
-        if check_password(password, i.user_pw):
+        if check_password(password, user.UserPw):
             try:
-                respData = {'status': '1', 'ret': '登录成功!'}
+                token = make_token(user.UserName, user.UserId)
+                resp_data = {'status': '1', 'ret': '登录成功!'}
+                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
+                response.set_cookie(key='user_name', value=user.UserName, max_age=week)
             except BaseException as e:
                 print(e)
-                pass
-                respData = {'status': '0', 'ret': '登录失败，输入信息有误!!!'}
+                resp_data = {'status': '0', 'ret': '登录失败，请与管理员联系'}
         else:
-            respData = {'status': '0', 'ret': '登录失败，密码不正确!!!'}
-    resp.content = json.dumps(respData)
-    return HttpResponse(resp, content_type="application/json")
+            resp_data = {'status': '0', 'ret': '登录失败，账号或密码不正确'}
+    response.content = json.dumps(resp_data)
+    return HttpResponse(response, content_type="application/json")
 
 
 # 注册
@@ -79,55 +69,48 @@ def register(request):
     :return:
     """
     resp = HttpResponse()
-    filedata = {}
     param = json.loads(request.body)['data']
-    filedata['user_pw'] = make_password(param['user_pw'])  # 密码加密
-    filedata['datetime'] = timezone.now()
-    filedata['user_phone'] = param['user_phone']
-    filedata['user_email'] = param['user_email']
-    filedata['username'] = param['username']
-
+    if param['user_name'] == '':
+        param['user_name'] = param['user_phone']
     # redis中读取验证码信息
     message_code = cache.get(param['user_phone'])  # 用户session
-    if message_code == None:
+    if message_code is None:
         return HttpResponse(getHttpResponse('0', '验证码失效，请重新发送验证码', ''), content_type='application/json')
-    if message_code != param['code']:
+    elif message_code != param['code']:
         return HttpResponse(getHttpResponse('0', '验证码有误，请重新输入', ''), content_type='application/json')
-
-    '''
-    # 验证验证码 start
-    response_info = query_send_detail(param['biz_id'], param['mobile'])
-    
-    if param['code']!= json.loads(response_info)['SmsSendDetailDTOs']['SmsSendDetailDTO'][0]['OutId']:
-        return HttpResponse(getHttpResponse('0', '验证码有误，请重新输入', ''), content_type='application/json')
-    # 验证验证码 end
-    '''
-
-    # 把数据写进数据库
-    try:
-        user_info = userInfo.selectByPhone(param['user_phone'])
-        if len(user_info) > 0:
-            return HttpResponse(getHttpResponse('0', '该手机号已注册', ''), content_type='application/json')
-        userInfo.add(filedata)
-        respData = {'status': 1, 'ret': '注册成功!'}
-    except BaseException as e:
-        print(e)
-        pass
-        respData = {'status': 0, 'ret': '输入信息有误!'}
-    resp.content = json.dumps(respData)
-    return HttpResponse(resp, content_type="application/json")
+    else:
+        # 把数据写进数据库
+        try:
+            user_info = User.objects.get(UserPhone=param['user_phone'])
+            if user_info:
+                return HttpResponse(getHttpResponse('0', '该手机号已注册', ''), content_type='application/json')
+            else:
+                user_info = User.objects.create(
+                    UserPhone=param['user_phone'],
+                    UserEmail=param['user_email'],
+                    UserName=param['user_name'],
+                    UserPw=make_password(param['user_pw']),
+                    DateTime=timezone.now()
+                )
+                user_info.save()
+                respData = {'status': 1, 'ret': '注册成功!'}
+        except BaseException as e:
+            print(e)
+            respData = {'status': 0, 'ret': '输入信息有误!'}
+        resp.content = json.dumps(respData)
+        return HttpResponse(resp, content_type="application/json")
 
 
 # 发送验证码短信
 def send_message(request):
-    '''
+    """
     返回参数{
     BizId 发送回执ID
     Code OK
     Message OK
     RequestId 请求ID
     }
-    '''
+    """
 
     # 模版变量对应参数值
     TemplateParam = {}
@@ -147,7 +130,7 @@ def send_message(request):
     alirequest = requestAPI('SendSms', 'MetaKnew', 'SMS_163847373')
     alirequest.add_query_param('TemplateParam', TemplateParam)
     alirequest.add_query_param('PhoneNumbers', mobile)
-    response = client.do_action(alirequest)
+    response = client.do_action_with_exception(alirequest)
     print(str(response, encoding='utf-8'))
 
     return HttpResponse(getHttpResponse('1', '发送成功', json.loads(str(response, encoding='utf-8'))),

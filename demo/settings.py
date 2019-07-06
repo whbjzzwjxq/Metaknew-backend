@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import djcelery
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,9 +70,12 @@ INSTALLED_APPS = [
     'users',
     'authority',
     'subgraph',
-    'history',
     'document',
     'search',
+    'group',
+    'media',
+    'history',
+
 ]
 
 SITE_ID = 1
@@ -84,6 +89,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'authority.logic_class.AuthMiddleware'
 ]
 
 ROOT_URLCONF = 'demo.urls'
@@ -106,7 +112,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'demo.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
@@ -127,16 +132,15 @@ CACHES = {
         'LOCATION': 'redis://39.96.10.154:6379',
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-             "PASSWORD": "",
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
+            "PASSWORD": "",
         },
     },
 }
 
-
-REDIS_TIMEOUT = 1*60
-CUBES_REDIS_TIMEOUT = 60*60
-NEVER_REDIS_TIMEOUT = 365*24*60*60
-
+REDIS_TIMEOUT = 1 * 60
+CUBES_REDIS_TIMEOUT = 60 * 60
+NEVER_REDIS_TIMEOUT = 365 * 24 * 60 * 60
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
@@ -156,7 +160,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
@@ -174,9 +177,8 @@ USE_L10N = True
 USE_TZ = True
 
 
-import djcelery
 djcelery.setup_loader()
-#数据库调度
+# 数据库调度
 CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
 # celery setting
 BROKER_URL = 'amqp://guest:guest@39.96.10.154:5672//'
@@ -185,4 +187,3 @@ BROKER_URL = 'amqp://guest:guest@39.96.10.154:5672//'
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-

@@ -1,15 +1,15 @@
-
+from django.db import models
+from django.contrib.postgres.fields import ArrayField
 # Create your models here.
 
-from django.db import models
 
-class history(models.Model):
-    id = models.AutoField(db_column='id')
-    userId = models.IntegerField(db_column='userId')  # 用户ID
-    uuid = models.UUIDField(db_column='uuid')
-    type = models.TextField(db_column='type')  # 操作的内容类型
-    time = models.DateField(db_column='time')
-    operation = models.TextField(db_column='operation')  # 具体执行的操作
+class ExcelRecord(models.Model):
+
+    uuid = models.UUIDField(db_column='UUID', primary_key=True)
+    ExcelURL = models.URLField(db_column='URL')
+    UserId = models.IntegerField(db_column='USER_ID')
+    Nodes = ArrayField(models.UUIDField(), db_column='NODES')
 
     class Meta:
-        db_table = 'History'
+
+        db_table = 'excel_upload'

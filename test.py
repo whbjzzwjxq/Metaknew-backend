@@ -1,26 +1,29 @@
+from py2neo.data import Node
+from py2neo import Graph, NodeMatcher, RelationshipMatcher
+graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
+# class NeoSet:
+#     def __init__(self):
+#         self.tx = graph.begin()
+#         self.Nmatcher = NodeMatcher(graph)
+#         self.Rmatcher = RelationshipMatcher(graph)
+# test = Node('test')
+# a = NeoSet()
+# a.tx.create(test)
+# a.tx.push(test)
+# a.tx.commit()
 
 
-def test_add(func):
-    def wrapped(*args, **kwargs):
-        print(func.__name__)
-        print(args[0].__name__)
-        result = func(*args, **kwargs)
-        print(2)
-        return result
-    return wrapped
+class A:
+    a = 1
+
+    def __init__(self):
+        self.output = self.a
 
 
-class test(object):
+class B(A):
 
-    def __init__(self, user=0):
-        self.user = user
+    a = 2
 
-    @test_add
-    def save(self, props):
+    def output(self):
+        print(self.a)
 
-        print(props)
-
-
-a = test(user=1)
-
-a.save('whb')

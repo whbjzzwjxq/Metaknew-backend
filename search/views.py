@@ -1,35 +1,13 @@
 from django.http import HttpResponse
 from subgraph import views
 import json
-from subgraph.models import *
-from document.models import Document
 from document import views
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from django.forms.models import model_to_dict
-
+from tools import base_tools
+from document.logic_class import BaseDoc
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
-
-try:
-    from django.apps import apps
-    get_model=apps.get_model
-except ImportError:
-    from django.db.models.loading import get_model
-
-
-class_table = {
-    'Person': Person,
-    'Project': Project,
-    'ArchProject': ArchProject,
-    'Document': Document,
-}
-
-
-def init(label):
-    if label in class_table:
-        return class_table[label]
-    else:
-        return Person
 
 
 class NeoSet:
@@ -64,7 +42,7 @@ def search_doc_by_nodes(request):
         for uuid in uuids:
             node = search_by_uuid(uuid)
             docs = search_doc_by_node(node)
-            docs = list(map(views.get_cache_doc, docs))
+            docs = [BaseDoc().query_abbr_doc(uuid=uuid) for uuid in docs]
             results.append({'uuid': uuid, 'docs': docs})
         return HttpResponse(json.dumps(results, ensure_ascii=False))
     else:
@@ -87,7 +65,7 @@ def get_node(node):
             primary_label = return_node['info']['PrimaryLabel']
         else:
             primary_label = 'None'
-        doc = (list(init(primary_label).objects.filter(uuid=return_node['info']['uuid'])[:1]))
+        doc = (list(base_tools.init(primary_label).objects.filter(uuid=return_node['info']['uuid'])[:1]))
         if doc:
             doc = views.get_dict(doc[0])
             doc.pop('uuid')
@@ -129,21 +107,20 @@ def criteria_query(request):
 def search_by_condition(request):
     """
     {
-	"data":{
-		"lable":"Person",  # model名称
-		"properties":[{	"name":"Hot",  # 表中的字段名称
-			"query_type":"equal",  # 评判标准（equal，not_equal，range，more，less）
+    "data":{
+        "lable":"Person",  # model名称
+        "properties":[{	"name":"Hot",  # 表中的字段名称
+            "query_type":"equal",  # 评判标准（equal，not_equal，range，more，less）
             "min_range":"100",  # 查询范围下限
             "max_range":"160"}]  # 查询范围上限
-	}
+    }
 }
     :param request:
     :return:
     """
     param = json.loads(request.body)['data']
-    lable = param['lable']
+    label = param['label']
     properties = param['properties']
-    tab = class_table.get(lable)
     propertys = {}
     for p in properties:
         name = p['name']
@@ -161,7 +138,7 @@ def search_by_condition(request):
             propertys.update({name + '__gte': min_range})
         if query_type == 'less':
             propertys.update({name + '__lte': max_range})
-        results = select_by_condition(lable, **propertys)
+        results = select_by_condition(label, **propertys)
         # results = list(result.__iter__())
         res = []
         for result in results:
@@ -189,8 +166,9 @@ def search_by_dict(*args, **kwargs):
     result = NeoSet().Nmatcher.match(*args, **kwargs)
     return result
 
-def select_by_condition(tab, **propertys):
-    tableModel = get_model("subgraph", tab)
+
+def select_by_condition(label, **propertys):
+    tableModel = base_tools.init(label)
     result = tableModel.objects.filter(**propertys)
     return result
 
@@ -228,4 +206,3 @@ def search_doc_by_node(node):
         end_node = rel.end_node
         result.append(end_node['uuid'])
     return result
-
