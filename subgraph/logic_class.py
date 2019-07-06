@@ -1,6 +1,5 @@
 from py2neo.data import Node, Relationship, walk
-from document.models import DocGraph, DocInfo
-from search.views import NeoSet
+from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
 from subgraph.models import BaseNodeCtrl
 types = ['StrNode', 'InfNode', 'Media', 'Document']
@@ -10,26 +9,9 @@ NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language',
 # input item类的实例
 # output dict
 
-
-def from_redis(function):
-    pass
-
-
-def history(user):
-    pass
-
-
-def history_kv(user, uuid, part, key, value1, value2):
-    pass
-
-
-def history_dict(user, uuid, part, dict1, dict2):
-    pass
-
-
 class BaseNode(object):
 
-    def __init__(self, collector=NeoSet()):
+    def __init__(self, collector=base_tools.NeoSet()):
         self.root = Node()
         self.uuid = ''
         self.info = BaseNode()
@@ -41,9 +23,12 @@ class BaseNode(object):
         self.root = self.collector.Nmatcher.match(uuid=uuid).first()
         self.uuid = uuid
         if self.root:
-            self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
-            self.ctrl_info = BaseNodeCtrl.objects.get(pk=uuid)
-            return self
+            try:
+                self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
+                self.ctrl_info = BaseNodeCtrl.objects.get(pk=uuid)
+                return self
+            except ObjectDoesNotExist:
+                return None
         else:
             return None
 
@@ -53,9 +38,10 @@ class BaseNode(object):
         assert 'Name' in node
         assert 'PrimaryLabel' in node
         # 初始化
-        origin = node['uuid']
         self.root = Node(node['type'])
-        self.uuid = base_tools.get_uuid(node['Name'], node['PrimaryLabel'], 0)
+        self.uuid = base_tools.get_uuid(name=node['Name'],
+                                        label=node['PrimaryLabel'],
+                                        device=0)
         self.info = base_tools.init(node['PrimaryLabel'])()
         self.ctrl_info = BaseNodeCtrl(uuid=self.uuid,
                                       CreateUser=user)
@@ -81,7 +67,7 @@ class BaseNode(object):
         self.collector.tx.create(self.root)
         self.save()
         # 返回一个uuid-NeoNode的字典对象
-        return {origin: self}
+        return self
 
     def language_setter(self, language_to, language_from):
         name_tran = 'Name_{}'.format(language_to)
@@ -129,8 +115,8 @@ class BaseNode(object):
         pass
 
 
-class BaseRel(object):
-    def __init__(self, collector=NeoSet()):
+class BaseLink(object):
+    def __init__(self, collector=base_tools.NeoSet()):
         self.origin = ''
         self.start = {}
         self.end = {}
@@ -145,20 +131,21 @@ class BaseRel(object):
             self.walk = walk(self.root)
             self.start = self.walk.start_node
             self.end = self.walk.en_node
-            return True
+            return self
         else:
-            return False
+            return None
 
-    def create(self, relationship):
+    def create(self, link, user):
         # source 和 target 是Node对象
-        self.start = relationship["source"]
-        self.end = relationship["target"]
-        relationship.update({'uuid': base_tools.rel_uuid()})
-        self.root = Relationship(self.start, relationship['type'], self.end)
-        relationship.pop('type')
-        relationship.pop('source')
-        relationship.pop('target')
-        self.root.update(relationship)
+        self.start = link["source"]
+        self.end = link["target"]
+        link.update({'uuid': base_tools.rel_uuid()})
+        self.root = Relationship(self.start, link['type'], self.end)
+        link.pop('type')
+        link.pop('source')
+        link.pop('target')
+        self.root.update(link)
+        self.root.update({'user': user})
         self.collector.tx.create(self.root)
         self.save()
 

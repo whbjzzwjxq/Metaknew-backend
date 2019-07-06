@@ -20,7 +20,7 @@ class User(models.Model):
     Is_Banned = models.BooleanField(db_column='BANNED', default=False)
 
     class Meta:
-        db_tablespace = 'user'
+
         db_table = 'user_info_base'
 
 
@@ -31,7 +31,7 @@ class UserRole(models.Model):
     Is_Organizer = models.BooleanField(db_column='ORGANIZER', default=False)
 
     class Meta:
-        db_tablespace = 'user'
+
         db_table = 'user_info_role'
 
 
@@ -43,17 +43,20 @@ class UserCollection(models.Model):
     UploadSource = ArrayField(models.UUIDField(), db_column='UPLOAD')
 
     class Meta:
-        db_tablespace = 'user'
+
         db_table = 'user_collection'
 
 
-class UserLabel(models.Model):
+class UserConcern(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
     SourceId = models.UUIDField(db_column='SOURCE_ID')  # 用户打标签的内容
     Labels = ArrayField(models.TextField(), db_column='LABELS')  # 用户打的标签
+    Imp = models.IntegerField(db_column='IMP', default=-1)
+    HardLevel = models.IntegerField(db_column='HARD_LEVEL', default=-1)
+    Useful = models.IntegerField(db_column='USEFUL', default=-1)
 
     class Meta:
-        db_tablespace = 'user'
+
         db_table = 'user_labels'
 

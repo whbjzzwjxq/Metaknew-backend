@@ -5,7 +5,7 @@ from document import views
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from django.forms.models import model_to_dict
 from tools import base_tools
-
+from document.logic_class import BaseDoc
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 
@@ -42,7 +42,7 @@ def search_doc_by_nodes(request):
         for uuid in uuids:
             node = search_by_uuid(uuid)
             docs = search_doc_by_node(node)
-            docs = list(map(views.get_cache_doc, docs))
+            docs = [BaseDoc().query_abbr_doc(uuid=uuid) for uuid in docs]
             results.append({'uuid': uuid, 'docs': docs})
         return HttpResponse(json.dumps(results, ensure_ascii=False))
     else:

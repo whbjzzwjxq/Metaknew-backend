@@ -16,7 +16,7 @@ class BaseAuthority(models.Model):
     reference = ArrayField(models.IntegerField(), db_column='referencePrivilege', default=list)  # 拥有引用权限的用户
     delete = ArrayField(models.IntegerField(), db_column='deletePrivilege', default=list)  # 拥有删除权限的用户
     export = ArrayField(models.IntegerField(), db_column='exportPrivilege', default=list)  # 拥有导出权限的用户
-    payment = ArrayField(models.IntegerField(), db_column='exportPrivilege', default=list)  # 已经支付的用户
+    payment = ArrayField(models.IntegerField(), db_column='payment', default=list)  # 已经支付的用户
     source_type = models.TextField(db_column='type', default='Document')  # 权限针对的对象类型
 
     Common = models.BooleanField(db_column='common', default=True)
@@ -24,6 +24,5 @@ class BaseAuthority(models.Model):
     Paid = models.BooleanField(db_column='paid', default=False)
 
     class Meta:
-        db_tablespace = 'authority'
-        db_table = 'base_authority'
 
+        db_table = 'base_authority'

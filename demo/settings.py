@@ -72,6 +72,10 @@ INSTALLED_APPS = [
     'subgraph',
     'document',
     'search',
+    'group',
+    'media',
+    'history',
+
 ]
 
 SITE_ID = 1
@@ -82,7 +86,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # 注意顺序，必须放在这儿
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
-    # 'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'authority.logic_class.AuthMiddleware'

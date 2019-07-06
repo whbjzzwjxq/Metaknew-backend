@@ -1,10 +1,13 @@
 from document.models import Comment, Note
-from py2neo.data import Node, Relationship, walk
-from document.models import DocGraph, DocInfo
-from search.views import NeoSet
-from tools import base_tools, translate
+from document.models import DocGraph, DocInfo, StudyNet
+from django.core.exceptions import ObjectDoesNotExist
+from tools import base_tools, token
 from subgraph.logic_class import BaseNode
-
+from django.core.cache import cache
+from time import time
+import datetime
+from users.models import UserConcern
+from django.db.models import Avg
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
@@ -13,55 +16,45 @@ NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language',
 # output dict
 
 
-def from_redis(function):
-    pass
-
-
-def history(user):
-    pass
-
-
-def history_kv(user, uuid, part, key, value1, value2):
-    pass
-
-
-def history_dict(user, uuid, part, dict1, dict2):
-    pass
-
-
-class BaseDoc(object):
+class BaseDoc:
 
     def __init__(self):
-        self.Info = DocInfo
-        self.Graph = DocGraph
+        self.Info = DocInfo()
+        self.Graph = DocGraph()
         self.nodes = []
         self.links = []
-        self.NeoNode = {}
+        self.NeoNode = BaseNode()
+        self.comments = []
 
         self.origin = ''
 
     def query(self, uuid):
+        key = "cache_doc_" + self.origin[-17:]
+        cache_doc = cache.get(key)
         self.origin = uuid
-        self.NeoNode = BaseNode().query(uuid=uuid)
-        self.Info = self.NeoNode.info
-        self.Graph = self.query_graph(uuid)
+        if not cache_doc:
+            self.NeoNode = BaseNode().query(uuid=uuid)
+            self.Graph = self.query_graph(uuid)
+            self.save_cache()
+        else:
+            self.NeoNode = cache_doc["NeoNode"]
+            self.Graph = cache_doc["Graph"]
+            timeout = cache.ttl(key) + token.hour
+            cache.expire(key, timeout=timeout)
 
+        self.Info = self.NeoNode.info
         self.nodes = [node['uuid'] for node in self.nodes]
         self.links = [link['uuid'] for link in self.links]
-
         return self
 
     def create(self, data):
-        assert 'info' in data
-        assert 'nodes' in data
-        assert 'links' in data
-        info = data['info']
-        uuid = base_tools.get_uuid(info['title'], 'Document', 0)
-        self.Info = DocInfo(uuid=uuid)
-        self.Graph = DocGraph(uuid=uuid)
+        pass
 
-    def update_info(self, uuid, data):
-        self.query_info(uuid=uuid)
+    def update_info(self, data):
+        self.Info.Title = data['title']
+        self.Info.MainPic = data['main_pic']
+        self.Info.Area = data['area']
+        self.Info.Description = data['description']
 
     def update_graph(self):
         pass
@@ -69,29 +62,46 @@ class BaseDoc(object):
     def reference(self):
         pass
 
-    @staticmethod
-    def privilege(user, uuid):
-        pass
+    def query_info(self, uuid):
+        self.origin = uuid
+        try:
+            self.Info = DocInfo.objects.get(pk=uuid)
+            return self
+        except ObjectDoesNotExist:
+            return self
 
-    @staticmethod
-    def query_info(uuid):
-        return DocInfo.objects.get(pk=uuid)
+    def query_graph(self, uuid):
+        self.origin = uuid
+        try:
+            self.Graph = DocGraph.objects.get(pk=uuid)
+            return self
+        except ObjectDoesNotExist:
+            return self
 
-    @staticmethod
-    def query_graph(uuid):
-        return DocGraph.objects.get(pk=uuid)
+    def query_abbr_doc(self, uuid):
+        self.query_info(uuid)
+        key = "abbr_" + self.origin[-17:]
+        abbr_doc = cache.get(key)
+        if abbr_doc:
+            cache.expire(key, timeout=token.week)
+            return abbr_doc
+        else:
+            abbr_doc = {
+                'uuid': self.origin,
+                'title': self.Info.Title,
+                'area': self.Info.Area,
+                'main_pic': self.Info.MainPic,
+                'imp': self.Info.Imp,
+                'hard_level': self.Info.HardLevel,
+                'size': self.Info.Size
+            }
+            cache.add(key, abbr_doc, timeout=token.week)
+            return abbr_doc
 
-    def query_cache_doc(self):
-        cache_doc = {
-            'uuid': self.origin,
-            'title': self.Info.Title,
-            'area': self.Info.Area,
-            'main_pic': self.Info.MainPic,
-            'imp': self.Info.Imp,
-            'hard_level': self.Info.HardLevel,
-            'size': self.Info.Size
-        }
-        return cache_doc
+    def query_comment(self):
+        self.comments = Comment.objects.filter(BaseTarget=self.origin,
+                                               Is_Delete=False)
+        return self.comments
 
     def add_node(self, uuid, conf):
         self.nodes.append({'uuid': uuid, 'conf': conf})
@@ -105,7 +115,6 @@ class BaseDoc(object):
         self.remove_rel(node=uuid, link_uuid=None)
 
     def update_node(self, uuid, conf):
-
         if uuid in self.nodes:
             index = self.nodes.index(uuid)
             self.Graph.IncludedNodes[index]['conf'] = conf
@@ -144,25 +153,43 @@ class BaseDoc(object):
             self.Graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
+        if time() - self.Info.CountCacheTime > token.week:
+            self.re_count()
+        self.Info.UpdateTime = datetime.datetime.now()
+        self.Info.save()
+        self.Graph.save()
+
+    def re_count(self):
+        self.Info.Size = self.Graph.IncludedNodes.count()
+        result = UserConcern.objects.filter(SourceId=self.origin)
+        self.Info.Useful = result.filter(Useful__gte=0).aggregate(Avg('Useful'))
+        self.Info.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg('HardLevel'))
+        self.Info.Imp = result.filter(Imp__gte=0).aggregate(Avg('Imp'))
+        self.Info.CountCacheTime = time()
+        # todo hot_count
+
+    def get_default_image(self):
         pass
 
-    def save_image(self):
-        pass
+    def upload_media(self, uuid_list):
+        self.Info.IncludedMedia.extend(uuid_list)
 
-    def upload_media(self, urls):
-        self.Info.IncludedMedia.append(urls)
-        
-    @from_redis
+    def remove_media(self, uuid_list):
+        for uuid in uuid_list:
+            if uuid in self.Info.IncludedMedia:
+                self.Info.IncludedMedia.remove(uuid)
+
     def save_cache(self):
-        pass
+        key = "cache_doc_" + self.origin[-17:]
+        cache_doc = {
+            "NeoNode": self.NeoNode,
+            "Graph": self.Graph
+        }
+        cache.add(key, cache_doc, timeout=token.hour * 2)
 
-    @from_redis
-    def query_cache(self):
-        pass
-
-    @from_redis
     def clear_cache(self):
-        pass
+        key = "cache_doc_" + self.origin[-17:]
+        cache.expire(key, timeout=1)
 
 
 class PersonalDoc:
@@ -170,23 +197,23 @@ class PersonalDoc:
     def __init__(self, uuid, user):
         self.user = user
         self.uuid = uuid
-        self.comments = []
+        self.concern = {}
         self.notes = []
 
     def query_all(self):
-        self.query_comment()
         self.query_note()
+        self.query_concern()
         return self
-
-    def query_comment(self):
-        self.comments = Comment.objects.filter(BaseTarget=self.uuid,
-                                               Is_Delete=False)
-        return self.comments
 
     def query_note(self):
         self.notes = Note.objects.filter(CreateUser=self.user,
                                          DocumentId=self.uuid)
         return self.notes
+
+    def query_concern(self):
+        self.concern = UserConcern.objects.filter(UserId=self.user,
+                                                  SourceId=self.uuid)
+        return self.concern
 
 
 class BaseComment:
@@ -195,13 +222,18 @@ class BaseComment:
         self.comment = Comment()
 
     def query(self, uuid):
-        comment = Comment.objects.get(id=uuid)
+        comment = Comment.objects.get(uuid=uuid)
         if not comment.Is_Delete:
             self.comment = comment
         return self
 
     def add(self, base, target, user, content, time):
-        self.comment = Comment(BaseTarget=base,
+        content = str(content)
+        uuid = base_tools.get_uuid(name=content[0]+'comment',
+                                   label='Comment',
+                                   device=0)
+        self.comment = Comment(uuid=uuid,
+                               BaseTarget=base,
                                Target=target,
                                UserId=user,
                                Content=content,
@@ -211,3 +243,57 @@ class BaseComment:
     def delete(self):
         self.comment.Is_Delete = True
         self.comment.save()
+
+
+class BaseNote:
+
+    tag_type = [
+        "normal",
+        "dark",
+        "circle"
+    ]
+
+    def __init__(self):
+        self.note = Note()
+
+    def query(self, uuid):
+        try:
+            self.note = Note.objects.get(uuid=uuid)
+            return self
+        except ObjectDoesNotExist:
+            return None
+
+    def add(self, user, note_type, content, doc_uuid):
+        content = str(content)
+        uuid = base_tools.get_uuid(name=content[0]+'comment',
+                                   label='Note',
+                                   device=0)
+        self.note = Note(uuid=uuid,
+                         CreateUser=user,
+                         TagType=note_type,
+                         Content=content,
+                         DocumentId=doc_uuid)
+        self.note.save()
+
+    def delete(self):
+        self.note.delete()
+
+    def update_content(self, new_content, new_type):
+        self.note.Content = str(new_content)
+        if new_type in self.tag_type:
+            self.note.TagType = new_type
+        self.note.save()
+
+
+class BasePath(BaseDoc):
+
+    def query_graph(self, uuid):
+        self.origin = uuid
+        try:
+            self.Graph = StudyNet.objects.get(pk=uuid)
+            return self
+        except ObjectDoesNotExist:
+            return self
+
+    def set_prop_node(self):
+        pass

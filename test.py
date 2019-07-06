@@ -1,7 +1,6 @@
 from py2neo.data import Node
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
-
 # class NeoSet:
 #     def __init__(self):
 #         self.tx = graph.begin()
@@ -28,8 +27,3 @@ class B(A):
     def output(self):
         print(self.a)
 
-
-
-
-b = B()
-print(1)

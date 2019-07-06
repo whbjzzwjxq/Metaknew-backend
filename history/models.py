@@ -5,11 +5,11 @@ from django.contrib.postgres.fields import ArrayField
 
 class ExcelRecord(models.Model):
 
-    id = models.AutoField(db_column='ID', primary_key=True)
+    uuid = models.UUIDField(db_column='UUID', primary_key=True)
     ExcelURL = models.URLField(db_column='URL')
     UserId = models.IntegerField(db_column='USER_ID')
     Nodes = ArrayField(models.UUIDField(), db_column='NODES')
 
     class Meta:
-        db_tablespace = 'history'
+
         db_table = 'excel_upload'

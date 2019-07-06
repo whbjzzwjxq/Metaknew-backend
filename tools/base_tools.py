@@ -2,6 +2,7 @@ import hashlib
 import re
 import uuid
 from subgraph.models import *
+from media.models import *
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from document.models import DocInfo
 
@@ -35,7 +36,8 @@ label_hash = {
     'ArchProject': '001b',
     'Document': 'a000',
     'Path': 'ab00',
-    'Rel': 'aa99'
+    'Rel': 'aa99',
+    'Comment': 'a0a0'
 }
 
 device_hash = {

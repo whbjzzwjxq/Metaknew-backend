@@ -3,6 +3,7 @@ from django.http import HttpResponse
 import json
 from search.views import search_by_uuid, search_doc_by_node, get_node
 from document import views
+from document.logic_class import BaseDoc
 # 注意es必须配置在服务器上 考虑另起一个django项目
 es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
 
@@ -106,7 +107,7 @@ def get_result_docs(docs):
         for doc in docs:
             if '_id' in doc:
                 return_docs.append(doc['_id'])
-    return_docs = views.get_cache_doc(return_docs)
+    return_docs = [BaseDoc().query_abbr_doc(uuid=uuid) for uuid in return_docs]
     return return_docs
 
 
@@ -116,5 +117,5 @@ def get_rel_doc_by_nodes(nodes):
     for node in nodes:
         for doc in search_doc_by_node(node):
             return_docs.append(doc)
-    return_docs = views.get_cache_doc(return_docs)
+    return_docs = [BaseDoc().query_abbr_doc(uuid=uuid) for uuid in return_docs]
     return return_docs

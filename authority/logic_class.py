@@ -24,6 +24,8 @@ class AuthMiddleware:
 
                 # 注意这里的参数要求
                 uuid = request.GET.get('uuid')
+                if not uuid:
+                    uuid = request.POST.get('uuid')
                 request_info = self.get_user_auth(request)
                 for _check in _checkers:
                     result = result and _check(user_id=request_info.user_id,
@@ -73,7 +75,7 @@ class RequestInfo:
 
 
 class AuthChecker:
-    auth_sheet = models.Model()
+    auth_sheet = BaseAuthority()
 
     def __init__(self, user_id, uuid):
         self.user_id = user_id
