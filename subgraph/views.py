@@ -42,7 +42,7 @@ def add_node(request):
         "CreateUser": user
     })
     try:
-        node.create(node=data, user=user)
+        node.create(node=data)
         node.collector.tx.commit()
         return HttpResponse("add node success")
     except AssertionError:

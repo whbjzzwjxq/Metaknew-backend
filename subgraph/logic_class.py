@@ -30,7 +30,7 @@ class BaseNode(object):
         else:
             return None
 
-    def create(self, user, node):
+    def create(self, node):
         # 这里的type是指的节点的类型， 定义在types中的
         assert 'type' in node
         assert 'Name' in node

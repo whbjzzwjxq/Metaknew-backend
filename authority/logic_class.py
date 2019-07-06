@@ -14,6 +14,7 @@ class AuthMiddleware:
             '/document/add_comment': [AuthChecker],
             '/subgraph/add/node': [],
             '/subgraph/add/document': [],
+            '/subgraph/run/script': [],
             '/user/login': [],
             '/user/register': [],
             '/user/send_message': [],

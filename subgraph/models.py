@@ -11,6 +11,8 @@ from users.models import User
 class Node(models.Model):
     # 在postgresql里储存的属性
     uuid = models.UUIDField(db_column='UUID', primary_key=True, editable=False)
+    Name = models.TextField(db_column='NAME')
+
     Imp = models.IntegerField(db_column='IMP', default=0)
     Hot = models.IntegerField(db_column='HOT', default=0)
     StrLevel = models.FloatField(db_column='STR', default=0)
@@ -29,8 +31,8 @@ class Node(models.Model):
 
 
 class Person(Node):
-    PeriodStart = models.DateField(db_column='PERIOD_START')
-    PeriodEnd = models.DateField(db_column='PERIOD_END')
+    PeriodStart = models.TextField(db_column='PERIOD_START')
+    PeriodEnd = models.TextField(db_column='PERIOD_END')
     BirthPlace = models.CharField(db_column='BIRTHPLACE', max_length=30)
     Nation = models.CharField(db_column='NATION', max_length=30, default='None')
 
@@ -39,19 +41,21 @@ class Person(Node):
 
 
 class Project(Node):
-    PeriodStart = models.DateField(db_column='PERIOD_START')
-    PeriodEnd = models.DateField(db_column='PERIOD_END')
-    Location = models.TextField(db_column='LOCATION')
-    Longitude = models.FloatField(db_column='LONGITUDE', default=tool.getLocation(Location)[0])
-    Latitude = models.FloatField(db_column='LATITUDE', default=tool.getLocation(Location)[1])
+
+    PeriodStart = models.TextField(db_column='PERIOD_START')
+    PeriodEnd = models.TextField(db_column='PERIOD_END')
     Nation = models.TextField(db_column='NATION', max_length=30)
+    Leader = ArrayField(models.TextField(), db_column='LEADER', default=list)  # 领头人
 
     class Meta:
         db_table = 'project'
 
 
 class ArchProject(Project):
-    Architect = ArrayField(models.TextField(), db_column='ARCHITECT')
+    Location = models.TextField(db_column='LOCATION', default='Beijing')
+    Longitude = models.FloatField(db_column='LONGITUDE', default=tool.getLocation(Location)[0])
+    Latitude = models.FloatField(db_column='LATITUDE', default=tool.getLocation(Location)[1])
+    WorkTeam = ArrayField(models.TextField(), db_column='WORK_TEAM', default=list)
 
     class Meta:
         db_table = 'arch_project'
