@@ -21,5 +21,6 @@ urlpatterns = [
     url('login', views.login_by_phone_pw),
     url('register', views.register),
     url('update', views.update_user),
+    url('send_message', views.send_message)
     # url('send_message', views.send_message),
 ]

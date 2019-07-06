@@ -10,13 +10,17 @@ class AuthMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.url_auth_list = {
-            'search/single': [DocQueryChecker],
-            'document/add_comment': [AuthChecker]
+            '/search/single': [DocQueryChecker],
+            '/document/add_comment': [AuthChecker],
+            '/user/login': [],
+            '/user/register': [],
+            '/user/send_message': [],
+            '/search/es_ask/': []
         }
 
     def __call__(self, request: HttpRequest()):
         path = request.path
-        if path in self.url_auth_list:
+        if str(path) in self.url_auth_list:
             _checkers = self.url_auth_list[path]
 
             if _checkers is not []:
