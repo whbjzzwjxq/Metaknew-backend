@@ -22,7 +22,7 @@ class NeoSet:
 
 
 class_table = {
-    'Base': BaseNode,
+    'Base': Node,
     'Person': Person,
     'Project': Project,
     'ArchProject': ArchProject,
@@ -50,7 +50,7 @@ def init(label):
     if label in class_table:
         return class_table[label]
     else:
-        return BaseNode
+        return Node
 
 
 def get_uuid(name, label, device):

@@ -83,13 +83,12 @@ class RequestInfo:
 
 
 class AuthChecker:
-    auth_sheet = BaseAuthority()
+    auth_sheet = BaseAuthority
 
     def __init__(self, user_id, uuid):
         self.user_id = user_id
         self.uuid = uuid
         self.status = False
-        self.record = self.auth_sheet.objects.get(uuid=self.uuid)
 
     def check(self):
         self.status = True
@@ -108,23 +107,31 @@ class AuthChecker:
 
 class DocQueryChecker(AuthChecker):
 
-    auth_sheet = BaseAuthority()
+    auth_sheet = BaseAuthority
+
+    def __init__(self, user_id, uuid):
+        super().__init__(user_id, uuid)
+        self.user_id = user_id
+        self.uuid = uuid
+        self.status = False
+        self.record = self.auth_sheet.objects.get(uuid=self.uuid)
 
     def common_checker(self):
-        if self.record.Common:
+        record = self.record
+        if record.Common:
             self.status = True
-        elif self.record.Shared and self.user_id in self.record.SharedTo:
+        elif record.Shared and self.user_id in record.SharedTo:
             self.status = True
-        elif self.record.Paid and self.user_id in self.record.payment:
+        elif record.Paid and self.user_id in record.payment:
             self.status = True
-        elif self.user_id in self.record.ChangeState:
+        elif self.user_id in record.ChangeState:
             self.status = True
-        elif self.user_id == self.record.Owner:
+        elif self.user_id == record.Owner:
             self.status = True
 
     def check(self):
-
-        if self.user_id in self.record.query:
+        record = self.record
+        if self.user_id in record.query:
             self.status = True
         self.common_checker()
         self.user_status()

@@ -50,7 +50,7 @@ class BaseNode(object):
         })
         self.root.__primarylabel__ = node['PrimaryLabel']
         self.root.__primarykey__ = "uuid"
-        self.root.__primaryvalue__ = node['uuid']
+        self.root.__primaryvalue__ = self.uuid
 
         # 处理Label类信息
         self.update_labels(node)
