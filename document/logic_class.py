@@ -153,8 +153,9 @@ class BaseDoc:
             self.Graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
-        if time() - self.Info.CountCacheTime > token.week:
+        if time() - self.Info.CountCacheTime.timestamp() > token.week:
             self.re_count()
+            self.Info.CountCacheTime = datetime.datetime.now()
         self.Info.UpdateTime = datetime.datetime.now()
         self.Info.save()
         self.Graph.save()

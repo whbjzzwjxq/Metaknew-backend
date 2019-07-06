@@ -1,7 +1,7 @@
 from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
-from subgraph.models import BaseNodeCtrl
+from subgraph.models import Node as NodeCtrl
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
@@ -14,8 +14,7 @@ class BaseNode(object):
     def __init__(self, collector=base_tools.NeoSet()):
         self.root = Node()
         self.uuid = ''
-        self.info = BaseNode()
-        self.ctrl_info = BaseNodeCtrl()
+        self.info = NodeCtrl()
 
         self.collector = collector
 
@@ -25,7 +24,6 @@ class BaseNode(object):
         if self.root:
             try:
                 self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=uuid)
-                self.ctrl_info = BaseNodeCtrl.objects.get(pk=uuid)
                 return self
             except ObjectDoesNotExist:
                 return None
@@ -42,11 +40,14 @@ class BaseNode(object):
         self.uuid = base_tools.get_uuid(name=node['Name'],
                                         label=node['PrimaryLabel'],
                                         device=0)
-        self.info = base_tools.init(node['PrimaryLabel'])()
-        self.ctrl_info = BaseNodeCtrl(uuid=self.uuid,
-                                      CreateUser=user)
 
+        self.info = base_tools.init(node['PrimaryLabel'])()
+        self.info.uuid = self.uuid
         # Neo4j主标签主键设定
+        self.root.update({
+            "uuid": self.uuid,
+            "Name": node["Name"]
+        })
         self.root.__primarylabel__ = node['PrimaryLabel']
         self.root.__primarykey__ = "uuid"
         self.root.__primaryvalue__ = node['uuid']
@@ -81,15 +82,13 @@ class BaseNode(object):
     def update_prop(self, node):
         temp = node
         temp.pop('Labels')
-        temp.pop('uuid')
         temp.pop('type')
         temp.pop('PrimaryLabel')
         # 存入postgreSQL固定属性
         for key, value in base_tools.get_dict(self.info).items():
             if key in temp:
                 setattr(self.info, key, temp[key])
-                if key != 'uuid':
-                    temp.pop(key)
+                temp.pop(key)
         # 存入不定的Neo4j属性
         if self.root:
             self.root.update(temp)
@@ -109,7 +108,6 @@ class BaseNode(object):
     def save(self):
         self.collector.tx.push(self.root)
         self.info.save()
-        self.ctrl_info.save()
 
     def handle_for_front(self):
         pass

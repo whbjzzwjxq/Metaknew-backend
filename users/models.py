@@ -38,9 +38,9 @@ class UserRole(models.Model):
 class UserCollection(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
-    Star = ArrayField(models.UUIDField(), db_column='STAR')
-    CreateDoc = ArrayField(models.UUIDField(), db_column='CREATE')
-    UploadSource = ArrayField(models.UUIDField(), db_column='UPLOAD')
+    Star = ArrayField(models.UUIDField(), db_column='STAR', default=list)
+    CreateDoc = ArrayField(models.UUIDField(), db_column='CREATE', default=list)
+    UploadSource = ArrayField(models.UUIDField(), db_column='UPLOAD', default=list)
 
     class Meta:
 
@@ -51,7 +51,7 @@ class UserConcern(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
     SourceId = models.UUIDField(db_column='SOURCE_ID')  # 用户打标签的内容
-    Labels = ArrayField(models.TextField(), db_column='LABELS')  # 用户打的标签
+    Labels = ArrayField(models.TextField(), db_column='LABELS', default=list)  # 用户打的标签
     Imp = models.IntegerField(db_column='IMP', default=-1)
     HardLevel = models.IntegerField(db_column='HARD_LEVEL', default=-1)
     Useful = models.IntegerField(db_column='USEFUL', default=-1)

@@ -7,8 +7,8 @@ from users.models import User
 
 # 不要在模型中写字段以外的属性或方法， 这里是储存用的
 
-# 没有修改接口的基本控制属性
-class BaseNodeCtrl(models.Model):
+# 基本控制属性, 不修改
+class Node(models.Model):
     # 在postgresql里储存的属性
     uuid = models.UUIDField(db_column='UUID', primary_key=True, editable=False)
     Imp = models.IntegerField(db_column='IMP', default=0)
@@ -25,18 +25,10 @@ class BaseNodeCtrl(models.Model):
 
     class Meta:
 
-        db_table = 'nodes_ctrl'
-
-
-class BaseNode(models.Model):
-    uuid = models.UUIDField(db_column='UUID', primary_key=True, editable=False)
-
-    class Meta:
-
         db_table = 'base_node'
 
 
-class Person(BaseNode):
+class Person(Node):
     PeriodStart = models.DateField(db_column='PERIOD_START')
     PeriodEnd = models.DateField(db_column='PERIOD_END')
     BirthPlace = models.CharField(db_column='BIRTHPLACE', max_length=30)
@@ -46,7 +38,7 @@ class Person(BaseNode):
         db_table = 'person'
 
 
-class Project(BaseNode):
+class Project(Node):
     PeriodStart = models.DateField(db_column='PERIOD_START')
     PeriodEnd = models.DateField(db_column='PERIOD_END')
     Location = models.TextField(db_column='LOCATION')

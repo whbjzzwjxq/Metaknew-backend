@@ -14,6 +14,7 @@ from tools.location import getHttpResponse
 from django.core.cache import cache
 from users.models import User
 from tools.token import make_token, week
+from users.models import UserCollection, UserRole
 # Create your views here.
 
 
@@ -47,20 +48,21 @@ def login_by_phone_pw(request):
                 resp_data = {'status': '1', 'ret': '登录成功!'}
                 response.set_cookie(key='token', value=token, max_age=week, httponly=True)
                 response.set_cookie(key='user_name', value=user.UserName, max_age=week)
+                print(token)
             except BaseException as e:
                 print(e)
                 resp_data = {'status': '0', 'ret': '登录失败，请与管理员联系'}
         else:
             resp_data = {'status': '0', 'ret': '登录失败，账号或密码不正确'}
     response.content = json.dumps(resp_data)
-    return HttpResponse(response, content_type="application/json")
+    return response
 
 
 # 注册
 def register(request):
     """
         "data":{
-        "username":
+        "user_name":
         "user_pw":
         "user_email":
         "user_phone":
@@ -68,7 +70,7 @@ def register(request):
     :param request:
     :return:
     """
-    resp = HttpResponse()
+    response = HttpResponse()
     param = json.loads(request.body)['data']
     if param['user_name'] == '':
         param['user_name'] = param['user_phone']
@@ -92,13 +94,18 @@ def register(request):
                     UserPw=make_password(param['user_pw']),
                     DateTime=timezone.now()
                 )
+                token = make_token(user_info.UserName, user_info.UserId)
+                UserCollection.objects.create(UserId=user_info).save()
+                UserRole.objects.create(UserId=user_info).save()
                 user_info.save()
+                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
+                response.set_cookie(key='user_name', value=user_info.UserName, max_age=week)
                 respData = {'status': 1, 'ret': '注册成功!'}
         except BaseException as e:
             print(e)
             respData = {'status': 0, 'ret': '输入信息有误!'}
-        resp.content = json.dumps(respData)
-        return HttpResponse(resp, content_type="application/json")
+        response.content = json.dumps(respData)
+        return response
 
 
 # 发送验证码短信

@@ -12,6 +12,8 @@ class AuthMiddleware:
         self.url_auth_list = {
             '/search/single': [DocQueryChecker],
             '/document/add_comment': [AuthChecker],
+            '/subgraph/add/node': [],
+            '/subgraph/add/document': [],
             '/user/login': [],
             '/user/register': [],
             '/user/send_message': [],
@@ -30,6 +32,8 @@ class AuthMiddleware:
                 uuid = request.GET.get('uuid')
                 if not uuid:
                     uuid = request.POST.get('uuid')
+                if not uuid:
+                    uuid = ''
                 request_info = self.get_user_auth(request)
                 for _check in _checkers:
                     result = result and _check(user_id=request_info.user_id,

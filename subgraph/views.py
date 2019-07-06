@@ -37,6 +37,10 @@ def add_node(request):
     data = json.loads(request.body, encoding='utf-8')['data']
     user = request.GET.get('user_id')
     node = BaseNode(collector=collector)
+    data.update({
+        "ImportMethod": "Web",
+        "CreateUser": user
+    })
     try:
         node.create(node=data, user=user)
         node.collector.tx.commit()
