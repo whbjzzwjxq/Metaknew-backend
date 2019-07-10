@@ -17,7 +17,7 @@ class DocInfo(models.Model):
     CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
     CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
     UpdateTime = models.DateTimeField(db_column='UPDATE_TIME', auto_now=True)  # 最后更新的时间
-    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now_add=True)  # 最后统计的时间
+    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
     Size = models.IntegerField(db_column='SIZE', default=0)  # 节点数量
 
     HardLevel = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
@@ -53,7 +53,7 @@ class Comment(models.Model):
     BaseTarget = models.UUIDField(db_column='TARGET')  # 注意是回复的专题的id
     Target = models.UUIDField(db_column='')
     Owner = models.IntegerField(db_column='USER', default='0')  # 发表用户id
-    Time = models.DateTimeField(db_column='TIME', default=now)  # 评论时间
+    Time = models.DateTimeField(db_column='TIME', auto_now_add=True)  # 评论时间
     Content = models.TextField(db_column='CONTENT', default='')  # 评论内容
     Is_Delete = models.BooleanField(db_column='DELETED', default=False)
 

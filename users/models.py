@@ -14,7 +14,7 @@ class User(models.Model):
     UserPw = models.TextField(db_column='USER_PASSWORD')  # 用户密码
     UserEmail = models.TextField(db_column='USER_EMAIL')  # 用户邮箱
     UserPhone = models.CharField(db_column='USER_PHONE', max_length=11, unique=True)  # 用户手机号（用于登录的账号）
-    DateTime = models.DateTimeField(db_column='USER_TIME', default=now)  # 注册时间
+    DateTime = models.DateTimeField(db_column='USER_TIME', auto_now_add=True)  # 注册时间
     Is_Superuser = models.BooleanField(db_column='ROOT', default=False)  # 是否是管理员
     Is_Active = models.BooleanField(db_column='ACTIVE', default=True)
     Is_Banned = models.BooleanField(db_column='BANNED', default=False)

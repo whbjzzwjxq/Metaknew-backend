@@ -6,11 +6,14 @@ from media.models import *
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from document.models import DocInfo
 
+re_for_uuid = re.compile(r'\w{8}(-\w{4}){3}-\w{12}')
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 
 # Neo4j Node用到的key
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language']
+
+
 # Neo4j Relationship用到的key
 
 
@@ -62,7 +65,7 @@ def get_uuid(name, label, device):
 
 
 def rel_uuid():
-    return uuid.uuid1()
+    return str(uuid.uuid1())
 
 
 def get_dict(node):
@@ -75,14 +78,16 @@ def get_dict(node):
     return keylist
 
 
-def delete_by_uuid(target, element, *args):
-    i = 0
-    length = len(target)
-    while i < length:
-        for name in args:
-            if name in target[i]:
-                if target[i][name] == element:
-                    target.pop(i)
-                    i = length
-        i += 1
-    return target
+def uuid_matcher(string):
+    if re_for_uuid.match(string):
+        return True
+    else:
+        return False
+
+
+def dict_dryer(node: dict):
+    dry_prop = ['uuid', 'Labels', 'type', 'PrimaryLabel']
+    for key in dry_prop:
+        if key in node:
+            node.pop(key)
+    return node

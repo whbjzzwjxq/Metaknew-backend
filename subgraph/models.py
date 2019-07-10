@@ -18,7 +18,7 @@ class Node(models.Model):
     StrLevel = models.FloatField(db_column='STR', default=0)
     ClaLevel = models.IntegerField(db_column='CLA', default=0)
     ImportMethod = models.CharField(db_column='IMPORT_METHOD', max_length=30)
-    ImportTime = models.DateTimeField(db_column='IMPORT_TIME', default=now)
+    ImportTime = models.DateTimeField(db_column='IMPORT_TIME', auto_now_add=True)
     IncludedMedia = ArrayField(models.UUIDField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
     FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
     CreateUser = models.IntegerField(db_column='USER', default='0')  # 创建用户

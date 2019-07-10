@@ -10,7 +10,7 @@ class MediaNode(models.Model):
     Format = models.TextField(db_column='FORMAT')
     Url = models.URLField(db_column='URL', default='')
     UploadUser = models.IntegerField(db_column='UPLOAD_USER')
-    UploadTime = models.DateTimeField(db_column='UPLOAD_TIME', default=now)
+    UploadTime = models.DateTimeField(db_column='UPLOAD_TIME', auto_now_add=True)
     Description = models.TextField(db_column='DESCRIPTION', default='None')
     AbbrPic = models.URLField(db_column='CONTENT', default='')
 

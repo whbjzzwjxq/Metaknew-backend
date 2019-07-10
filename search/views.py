@@ -80,8 +80,8 @@ def criteria_query(request):
         criteria = json.loads(request.body, encoding='utf-8')['criteria']
         limit = int(request.GET.get('limit', 100))
         args = criteria["labels"]
-        kwargs = criteria["propertys"]
-        propertys = {}
+        kwargs = criteria["props"]
+        props = {}
         for prop in kwargs:
             name = prop["name"]
             query_type = prop["query_type"]
@@ -89,18 +89,17 @@ def criteria_query(request):
             max_range = prop["max_range"]
             # todo 这里是不是可能有数据库注入
             if query_type == 'equal':
-                propertys.update({name + '__exact': min_range})
+                props.update({name + '__exact': min_range})
             if query_type == 'not_equal':
-                propertys.update({name + '__not': min_range})
+                props.update({name + '__not': min_range})
             if query_type == 'range':
-                propertys.update({name + '__gte': min_range})
-                propertys.update({name + '__lte': max_range})
+                props.update({name + '__gte': min_range})
+                props.update({name + '__lte': max_range})
             if query_type == 'more':
-                propertys.update({name + '__gte': min_range})
+                props.update({name + '__gte': min_range})
             if query_type == 'less':
-                propertys.update({name + '__lte': max_range})
-            result = search_by_dict(*args, **propertys).limit(limit)
-            results = list(map(get_node, result.__iter__()))
+                props.update({name + '__lte': max_range})
+            result
             return HttpResponse(json.dumps(results, ensure_ascii=False))
 
 

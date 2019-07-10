@@ -23,7 +23,7 @@ class BaseDoc:
         self.Graph = DocGraph()
         self.nodes = []
         self.links = []
-        self.NeoNode = BaseNode()
+        self.NeoNode = BaseNode
         self.comments = []
 
         self.origin = ''
@@ -228,7 +228,7 @@ class BaseComment:
             self.comment = comment
         return self
 
-    def add(self, base, target, user, content, time):
+    def add(self, base, target, user, content, update_time):
         content = str(content)
         uuid = base_tools.get_uuid(name=content[0]+'comment',
                                    label='Comment',
@@ -238,7 +238,7 @@ class BaseComment:
                                Target=target,
                                UserId=user,
                                Content=content,
-                               Time=time)
+                               Time=update_time)
         self.comment.save()
 
     def delete(self):

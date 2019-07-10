@@ -137,3 +137,6 @@ class DocQueryChecker(AuthChecker):
         self.common_checker()
         self.user_status()
         return self.status
+
+
+class QueryMiddleware()
