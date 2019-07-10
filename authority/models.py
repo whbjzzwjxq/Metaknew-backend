@@ -26,4 +26,3 @@ class BaseAuthority(models.Model):
     class Meta:
 
         db_table = 'base_authority'
-

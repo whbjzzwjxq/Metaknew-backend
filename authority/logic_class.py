@@ -1,7 +1,6 @@
 from django.core.cache import cache
 from django.http import HttpResponse, HttpRequest
 from authority.models import BaseAuthority
-from django.db import models
 from users.models import User
 
 
@@ -98,7 +97,7 @@ class AuthChecker:
 
     def user_status(self):
         record = User.objects.get(pk=self.user_id)
-        if record.Is_Superuser:
+        if record.Is_Superusero or record.Is_Developer:
             self.status = True
         elif record.Is_Banned:
             self.status = False
@@ -139,4 +138,9 @@ class DocQueryChecker(AuthChecker):
         return self.status
 
 
-class QueryMiddleware()
+class QueryRecord(AuthChecker):
+
+    def check(self):
+        self.status = False
+        self.user_status()
+        return self.status
