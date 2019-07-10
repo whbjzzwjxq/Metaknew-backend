@@ -1,50 +1,5 @@
-# # 上传文件        已测试---4.18-----ZXN
-#
-# def upload_file(request):
-#     response = HttpResponse()
-#     uuid = request.POST.get("uuid")
-#     user_id = request.GET.get('user_id')
-#     data = json.loads(request.body)['data']
-#     file_name = data['file_name']
-#     format = data['format']
-#
-#     my_file = request.FILES.get("my_file", None)
-#     if not my_file:
-#         respData = {'status': '0', 'ret': '没有上传文件！！！'}
-#     else:
-#         if os.sep in my_file.name:
-#             respData = {'status': '1', 'ret': r"""请注意文件命名格式，'\ / " * ? < > '符号文件不允许上传。"""}
-#         else:
-#             url = settings.BASE_DIR + os.sep + "files" + os.sep + "upload" + os.sep + my_file.name
-#
-#             doc = BaseDoc.query_info(uuid=uuid)
-#             for doc in docs:
-#                 names = doc.included_media
-#                 print(names)
-#                 if names != None:
-#                     if my_file.name in names:
-#                         respData = {'status': '2', 'ret': '该文件已存在,请勿重复上传'}
-#                     else:
-#                         with open(myfilepath, 'wb+') as f:
-#                             for chunk in my_file.chunks():  # 分块写入文件
-#                                 f.write(chunk)
-#                         names.append(my_file.name)
-#                         document_info.updateURLById(uuid, names)
-#                         respData = {'status': '3', 'ret': '上传成功！！！'}
-#                 else:
-#                     with open(myfilepath, 'wb+') as f:
-#                         for chunk in my_file.chunks():  # 分块写入文件
-#                             f.write(chunk)
-#                     names = []
-#                     print(str(my_file.name))
-#                     names.append(str(my_file.name))
-#                     print(names)
-#                     document_info.updateURLById(uuid, names)
-#                     respData = {'status': '3', 'ret': '上传成功！！！'}
-#     resp.content = json.dumps(respData)
-#     return HttpResponse(resp, content_type="application/json")
-#
-#
+
+
 # # 下载文件                         已测试------4.18-----ZXN
 # def download_file(request):
 #     resp = HttpResponse()

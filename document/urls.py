@@ -18,5 +18,10 @@ from django.conf.urls import url
 from document import views
 
 urlpatterns = [
+    url('getPersonalByDoc', views.get_personal_by_doc),
+    url('addComment', views.add_comment),
+
+
+
 
 ]

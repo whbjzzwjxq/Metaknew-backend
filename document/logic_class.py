@@ -65,7 +65,7 @@ class BaseDoc:
     def query_info(self, uuid):
         self.origin = uuid
         try:
-            self.Info = DocInfo.objects.get(pk=uuid)
+            self.Info = DocInfo.objects.get(uuid=uuid)
             return self
         except ObjectDoesNotExist:
             return self
@@ -174,6 +174,10 @@ class BaseDoc:
 
     def upload_media(self, uuid_list):
         self.Info.IncludedMedia.extend(uuid_list)
+
+    def update_media_by_uuid(self, uuid, include_media):
+        self.Info = DocInfo.objects.filter(uuid=uuid).update(IncludedMedia=include_media)
+        return self
 
     def remove_media(self, uuid_list):
         for uuid in uuid_list:

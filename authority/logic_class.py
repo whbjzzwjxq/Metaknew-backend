@@ -18,7 +18,10 @@ class AuthMiddleware:
             '/user/login': [],
             '/user/register': [],
             '/user/send_message': [],
-            '/search/es_ask/': []
+            '/search/es_ask/': [],
+            '/document/getPersonalByDoc': [],
+            '/document/addComment': [],
+            '/mediaNode/upload': [],
         }
 
     def __call__(self, request: HttpRequest()):
