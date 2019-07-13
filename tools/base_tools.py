@@ -5,6 +5,7 @@ from subgraph.models import *
 from media.models import *
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from document.models import DocInfo
+from functools import reduce
 
 re_for_uuid = re.compile(r'\w{8}(-\w{4}){3}-\w{12}')
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
@@ -91,3 +92,15 @@ def dict_dryer(node: dict):
         if key in node:
             node.pop(key)
     return node
+
+
+def merge_list(lists):
+
+    def merge(list1: list, list2: list):
+        temp = [ele for ele in list2 if ele not in list1]
+        list1.extend(temp)
+        return list1
+
+    result = reduce(merge, lists)
+
+    return result

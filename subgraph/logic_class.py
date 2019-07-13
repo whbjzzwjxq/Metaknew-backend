@@ -2,6 +2,8 @@ from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
 from subgraph.models import Node as NodeInfo
+from es_module.logic_class import add_node_index
+import asyncio
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
@@ -75,6 +77,18 @@ class BaseNode(object):
         # 启动Neo4j连接
         self.collector.tx.create(self.root)
         self.save()
+        asyncio.run(add_node_index(uuid=self.origin,
+                                   name=node['Name'],
+                                   language=node['Language'],
+                                   p_label=node['PrimaryLabel'],
+                                   name_zh=node['Name_zh'],
+                                   name_en=node['Name_en'],
+                                   description=node['Description'],
+                                   alias=node['Alias'],
+                                   labels=node['Labels'],
+                                   keywords=node['keywords'])
+                    )
+
         # 返回self对象
         return self
 
@@ -125,7 +139,11 @@ class BaseNode(object):
 
     def handle_for_frontend(self):
         assert self.already
-        pass
+        labels = self.root.labels
+        props_neo4j = dict(self.root)
+        props_postgre = self.info.__dict__
+        props = props_neo4j.update(props_postgre)
+        return {"labels": labels, "props": props}
 
 
 class BaseLink(object):
