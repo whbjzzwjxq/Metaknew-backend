@@ -6,6 +6,7 @@ from django.contrib.postgres.fields import ArrayField
 
 
 class BaseAuthority(models.Model):
+
     uuid = models.UUIDField(db_column='uuid', primary_key=True)  # 资源uuid
     Owner = models.IntegerField(db_column='createUser')  # 专题所有人的id
     ChangeState = ArrayField(models.IntegerField(), db_column='changeStatePrivilege', default=list)  # 拥有修改状态权限的用户
