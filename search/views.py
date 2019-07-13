@@ -6,6 +6,7 @@ from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from django.forms.models import model_to_dict
 from tools import base_tools
 from document.logic_class import BaseDoc
+from history.logic_class import AddRecord
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 
@@ -177,3 +178,39 @@ def search_doc_by_node(node):
         end_node = rel.end_node
         result.append(end_node['uuid'])
     return result
+
+
+source_list = {
+    "record": AddRecord
+}
+
+
+def criteria_query(request):
+    if request.method == 'GET':
+        criteria = json.loads(request.body, encoding='utf-8')['criteria']
+        limit = int(request.GET.get('limit', 100))
+        props = {}
+        for prop in criteria["props"]:
+            name = prop["name"]
+            query_type = prop["query_type"]
+            min_range = prop["min_range"]
+            max_range = prop["max_range"]
+
+            if query_type == 'equal':
+                props.update({name + '__exact': min_range})
+            if query_type == 'not_equal':
+                props.update({name + '__not': min_range})
+            if query_type == 'range':
+                props.update({name + '__gte': min_range})
+                props.update({name + '__lte': max_range})
+            if query_type == 'more':
+                props.update({name + '__gte': min_range})
+            if query_type == 'less':
+                props.update({name + '__lte': max_range})
+            criteria = {
+                "limit": limit,
+                "labels": criteria["labels"],
+                "props": props,
+            }
+            result = source_list[criteria["source"]]().query_by_criteria(criteria)
+            return result
