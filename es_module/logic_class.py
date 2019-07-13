@@ -15,7 +15,7 @@ class EsQuery:
     def get_uuid_from_result(es_result):
         if es_result:
             nodes = es_result['hits']['hits']
-            result = [node['uuid'] for node in nodes if 'uuid' in node]
+            result = [node['_source']['uuid'] for node in nodes if 'uuid' in node['_source']]
             return result
         else:
             return []
@@ -29,14 +29,14 @@ class EsQuery:
         return self.es.search(index="nodes", body=body)
 
     def fuzzy_name(self, keyword, language):
-        target_name = {"name": {
-            language: {
+        target = "name." + language
+        target_name = {
+            target: {
                 "value": keyword,
                 "fuzziness": 3,
                 "prefix_length": 3,
                 "max_expansions": 20
             }
-        }
         }
         return self.get_uuid_from_result(self.fuzzy_query(target=target_name))
 
@@ -68,8 +68,8 @@ class EsQuery:
         }
         return self.es.search(index="nodes", body=body)
 
-    def auto_name(self, keyword):
-        target = {"name": keyword}
+    def auto_name(self, keyword, language):
+        target = {"name." + language: keyword}
         return self.get_uuid_from_result(self.auto_complete(target=target))
 
 

@@ -3,6 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
 from subgraph.models import Node as NodeInfo
 from es_module.logic_class import add_node_index
+from copy import deepcopy
 import asyncio
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
@@ -81,12 +82,12 @@ class BaseNode(object):
                                    name=node['Name'],
                                    language=node['Language'],
                                    p_label=node['PrimaryLabel'],
-                                   name_zh=node['Name_zh'],
-                                   name_en=node['Name_en'],
+                                   name_zh=self.root['Name_zh'],
+                                   name_en=self.root['Name_en'],
                                    description=node['Description'],
                                    alias=node['Alias'],
                                    labels=node['Labels'],
-                                   keywords=node['keywords'])
+                                   keywords=node['Keywords'])
                     )
 
         # 返回self对象
@@ -95,7 +96,10 @@ class BaseNode(object):
     def language_setter(self, language_to, language_from):
         name_tran = 'Name_{}'.format(language_to)
         if name_tran not in self.root:
-            self.root[name_tran] = translate.translate(self.root['Name'], language_to, language_from)
+            if not language_to == language_from:
+                self.root[name_tran] = translate.translate(self.root['Name'], language_to, language_from)
+            else:
+                self.root[name_tran] = self.root['Name']
 
     def update_labels(self, node):
         assert self.already
@@ -104,7 +108,7 @@ class BaseNode(object):
 
     def update_prop(self, node):
         assert self.already
-        temp = node
+        temp = deepcopy(node)
         temp = base_tools.dict_dryer(temp)
         # 存入postgreSQL固定属性
         for key in base_tools.get_dict(self.info).keys():
@@ -139,11 +143,14 @@ class BaseNode(object):
 
     def handle_for_frontend(self):
         assert self.already
-        labels = self.root.labels
-        props_neo4j = dict(self.root)
-        props_postgre = self.info.__dict__
-        props = props_neo4j.update(props_postgre)
-        return {"labels": labels, "props": props}
+        labels = list(self.root.labels)
+        props = dict(self.root)
+        props_postgre = base_tools.get_dict(self.info)
+        props.update(props_postgre)
+        props['uuid'] = str(props['uuid'])
+        props['ImportTime'] = str(props['ImportTime'])
+        # todo 更加详细的前端数据格式
+        return {"Labels": labels, "Props": props}
 
 
 class BaseLink(object):

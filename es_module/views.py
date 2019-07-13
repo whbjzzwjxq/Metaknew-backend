@@ -19,7 +19,7 @@ def es_ask_node(request):
         results = []
         if keyword:
             if auto:
-                results.append(es_query.auto_name(keyword=keyword))
+                results.append(es_query.auto_name(keyword=keyword, language=language))
             if fuzzy:
                 results.append(es_query.fuzzy_alias(keyword=keyword))
                 results.append(es_query.fuzzy_keyword(keyword=keyword))

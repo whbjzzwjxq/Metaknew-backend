@@ -41,7 +41,7 @@ def add_comment(request):
             target=data['target'],
             user=user_id,
             content=str(data['content']),
-            time=dt.datetime.now()
+            update_time=dt.datetime.now()
         )
 
     return HttpResponse("回复成功")
