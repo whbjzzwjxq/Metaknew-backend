@@ -12,16 +12,18 @@ class Node(models.Model):
     # 在postgresql里储存的属性
     uuid = models.UUIDField(db_column='UUID', primary_key=True, editable=False)
     Name = models.TextField(db_column='NAME')
+    Alias = ArrayField(models.TextField(), db_column='ALIAS', default=list)
+    ImportMethod = models.CharField(db_column='IMPORT_METHOD', max_length=30, editable=False)
+    CreateUser = models.IntegerField(db_column='USER', default='0', editable=False)  # 创建用户
+    Description = models.TextField(db_column='DESCRIPTION', default='')
 
     Imp = models.IntegerField(db_column='IMP', default=0)
     Hot = models.IntegerField(db_column='HOT', default=0)
     StrLevel = models.FloatField(db_column='STR', default=0)
     ClaLevel = models.IntegerField(db_column='CLA', default=0)
-    ImportMethod = models.CharField(db_column='IMPORT_METHOD', max_length=30)
     ImportTime = models.DateTimeField(db_column='IMPORT_TIME', auto_now_add=True)
     IncludedMedia = ArrayField(models.UUIDField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
     FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
-    CreateUser = models.IntegerField(db_column='USER', default='0')  # 创建用户
     Is_Common = models.BooleanField(db_column='COMMON', default=True)
     Is_Used = models.BooleanField(db_column='USED', default=True)
 
@@ -53,10 +55,19 @@ class Project(Node):
 
 class ArchProject(Project):
     Location = models.TextField(db_column='LOCATION', default='Beijing')
-    Longitude = models.FloatField(db_column='LONGITUDE', default=tool.getLocation(Location)[0])
-    Latitude = models.FloatField(db_column='LATITUDE', default=tool.getLocation(Location)[1])
     WorkTeam = ArrayField(models.TextField(), db_column='WORK_TEAM', default=list)
 
     class Meta:
         db_table = 'arch_project'
 
+
+class LocationDoc(models.Model):
+
+    id = models.AutoField(db_column='ID', primary_key=True)
+    Name = models.TextField(db_column='NAME', default='Beijing')
+    LocId = models.TextField(db_column='LOC_ID', default='ChIJ58KMhbNLzJQRwfhoMaMlugA')
+    Alias = ArrayField(models.TextField(), db_column='ALIAS', default=list)
+    Doc = JSONField(db_column='DOC', default=dict)
+
+    class Meta:
+        db_table = 'loc_doc'

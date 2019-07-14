@@ -1,6 +1,5 @@
 # -*-coding=utf-8 -*-
 # APP内定义
-from tools.base_tools import get_dict
 from document.logic_class import BaseComment, BaseNote, BaseDoc
 # django定义与工具包
 import datetime as dt

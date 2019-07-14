@@ -1,8 +1,9 @@
 from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
+from tools.base_tools import get_label_special_attr as get_special
 from subgraph.models import Node as NodeInfo
-from es_module.logic_class import add_node_index
+from es_module.logic_class import add_node_index, add_doc_index
 from copy import deepcopy
 import asyncio
 
@@ -42,6 +43,9 @@ class BaseNode(object):
         assert 'type' in node
         assert 'Name' in node
         assert 'PrimaryLabel' in node
+        assert 'Area' in node
+        if 'Language' not in node:
+            node['Language'] = 'auto'
         self.already = True
         # 初始化
         self.root = Node(node['type'])
@@ -51,14 +55,16 @@ class BaseNode(object):
         self.label = node['PrimaryLabel']
 
         self.info = base_tools.init(self.label)()
-        self.info.uuid = self.origin
 
         # Neo4j主标签主键设定
         self.root.update({
             "uuid": self.origin,
-            "Name": node["Name"]
+            "Name": node["Name"],
+            "PrimaryLabel": self.label,
+            "Language": node["Language"]
         })
         self.root.add_label(self.label)
+        self.root.add_label(node['Area'])
         self.root.__primarylabel__ = self.label
         self.root.__primarykey__ = "uuid"
         self.root.__primaryvalue__ = self.origin
@@ -66,9 +72,7 @@ class BaseNode(object):
         # 处理Label类信息
         self.update_labels(node)
 
-        # 翻译名字
-        if 'Language' not in node:
-            node['Language'] = 'auto'
+        # 翻译名字 todo 异步
         self.language_setter('zh', node['Language'])
         self.language_setter('en', node['Language'])
 
@@ -78,18 +82,16 @@ class BaseNode(object):
         # 启动Neo4j连接
         self.collector.tx.create(self.root)
         self.save()
-        asyncio.run(add_node_index(uuid=self.origin,
-                                   name=node['Name'],
-                                   language=node['Language'],
-                                   p_label=node['PrimaryLabel'],
-                                   name_zh=self.root['Name_zh'],
-                                   name_en=self.root['Name_en'],
-                                   description=node['Description'],
-                                   alias=node['Alias'],
-                                   labels=node['Labels'],
-                                   keywords=node['Keywords'])
-                    )
+        if 'Description' not in node:
+            node['Description'] = ''
+        if 'Alias' not in node:
+            node['Alias'] = []
 
+        # es索引记录 异步
+        if self.label == 'Document':
+            asyncio.run(add_doc_index(self))
+        else:
+            asyncio.run(add_node_index(self))
         # 返回self对象
         return self
 
@@ -110,8 +112,10 @@ class BaseNode(object):
         assert self.already
         temp = deepcopy(node)
         temp = base_tools.dict_dryer(temp)
-        # 存入postgreSQL固定属性
-        for key in base_tools.get_dict(self.info).keys():
+        # 存入class Node下的非默认数据以及标签代表的特殊属性
+        self.info.uuid = self.origin
+        key_list = get_special(self.label)
+        for key in key_list:
             if key in temp:
                 setattr(self.info, key, temp[key])
                 temp.pop(key)
@@ -145,10 +149,10 @@ class BaseNode(object):
         assert self.already
         labels = list(self.root.labels)
         props = dict(self.root)
-        props_postgre = base_tools.get_dict(self.info)
-        props.update(props_postgre)
+
+        for key in get_special(self.label):
+            props.update({key: self.info.__getattribute__(key)})
         props['uuid'] = str(props['uuid'])
-        props['ImportTime'] = str(props['ImportTime'])
         # todo 更加详细的前端数据格式
         return {"Labels": labels, "Props": props}
 

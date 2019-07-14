@@ -40,8 +40,7 @@ def add_node(request):
     data.update({
         "ImportMethod": "Web",
         "CreateUser": user,
-        "type": "StrNode",
-        "ImportTime": datetime.datetime.now()
+        "type": "StrNode"
     })
     try:
         node.create(node=data)
@@ -73,7 +72,6 @@ def add_document(request):
             node['info'].update({
                 "ImportMethod": "Web",
                 "CreateUser": user,
-                "ImportTime": datetime.datetime.now(),
                 "type": "StrNode"
             })
         new_node = check_node_exist(node=node['info'],

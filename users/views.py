@@ -13,7 +13,7 @@ from aliyunsdkcore.request import CommonRequest
 from tools.location import getHttpResponse
 from django.core.cache import cache
 from users.models import User
-from tools.token import make_token, week
+from tools.get_token import make_token, week
 from users.models import UserCollection, UserRole
 # Create your views here.
 

@@ -1,7 +1,7 @@
 from document.models import Comment, Note
 from document.models import DocGraph, DocInfo, StudyNet
 from django.core.exceptions import ObjectDoesNotExist
-from tools import base_tools, token
+from tools import base_tools, get_token
 from subgraph.logic_class import BaseNode
 from django.core.cache import cache
 from time import time
@@ -39,7 +39,7 @@ class BaseDoc:
         else:
             self.NeoNode = cache_doc["NeoNode"]
             self.Graph = cache_doc["Graph"]
-            timeout = cache.ttl(key) + token.hour
+            timeout = cache.ttl(key) + get_token.hour
             cache.expire(key, timeout=timeout)
 
         self.Info = self.NeoNode.info
@@ -83,7 +83,7 @@ class BaseDoc:
         key = "abbr_" + self.origin[-17:]
         abbr_doc = cache.get(key)
         if abbr_doc:
-            cache.expire(key, timeout=token.week)
+            cache.expire(key, timeout=get_token.week)
             return abbr_doc
         else:
             abbr_doc = {
@@ -95,7 +95,7 @@ class BaseDoc:
                 'hard_level': self.Info.HardLevel,
                 'size': self.Info.Size
             }
-            cache.add(key, abbr_doc, timeout=token.week)
+            cache.add(key, abbr_doc, timeout=get_token.week)
             return abbr_doc
 
     def query_comment(self):
@@ -153,7 +153,7 @@ class BaseDoc:
             self.Graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
-        if time() - self.Info.CountCacheTime.timestamp() > token.week:
+        if time() - self.Info.CountCacheTime.timestamp() > get_token.week:
             self.re_count()
             self.Info.CountCacheTime = datetime.datetime.now()
         self.Info.UpdateTime = datetime.datetime.now()
@@ -186,7 +186,7 @@ class BaseDoc:
             "NeoNode": self.NeoNode,
             "Graph": self.Graph
         }
-        cache.add(key, cache_doc, timeout=token.hour * 2)
+        cache.add(key, cache_doc, timeout=get_token.hour * 2)
 
     def clear_cache(self):
         key = "cache_doc_" + self.origin[-17:]
