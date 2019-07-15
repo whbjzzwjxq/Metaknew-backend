@@ -1,4 +1,7 @@
 from elasticsearch import Elasticsearch
+from history.logic_class import AddRecord
+
+import json
 
 es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
 
@@ -90,4 +93,9 @@ async def add_node_index(uuid, name, language, p_label, name_zh='', name_en='', 
         return True
     else:
         # todo record
+        a = AddRecord()
+        content = {'result': result,
+                   'status': 'Failed',
+                   'type': 'es_upload'}
+        a.add_record(False, True, uuid, p_label, json.dumps(content))
         return False
