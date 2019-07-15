@@ -3,6 +3,8 @@ from history.logic_class import AddRecord
 
 import json
 
+from subgraph.logic_class import BaseNode
+
 es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
 
 
@@ -18,32 +20,31 @@ class EsQuery:
     def get_uuid_from_result(es_result):
         if es_result:
             nodes = es_result['hits']['hits']
-            result = [node['uuid'] for node in nodes if 'uuid' in node]
+            result = [node['_source']['uuid'] for node in nodes if 'uuid' in node['_source']]
             return result
         else:
             return []
 
-    def fuzzy_query(self, target):
+    def fuzzy_query(self, target, index):
         body = {
             "query": {
                 "fuzzy": target
             }
         }
-        return self.es.search(index="nodes", body=body)
+        return self.es.search(index=index, body=body)
 
-    def fuzzy_name(self, keyword, language):
-        target_name = {"name": {
-            language: {
+    def fuzzy_name_nodes(self, keyword, language):
+        target_name = {
+            "name.%s" % language: {
                 "value": keyword,
                 "fuzziness": 3,
                 "prefix_length": 3,
-                "max_expansions": 20
-            }
+                "max_expansions": 20}
         }
-        }
-        return self.get_uuid_from_result(self.fuzzy_query(target=target_name))
 
-    def fuzzy_alias(self, keyword):
+        return self.get_uuid_from_result(self.fuzzy_query(target=target_name, index="nodes"))
+
+    def fuzzy_alias_nodes(self, keyword):
         target_alias = {"alias": {
             "value": keyword,
             "fuzziness": 3,
@@ -51,42 +52,51 @@ class EsQuery:
             "max_expansions": 20
         }
         }
-        return self.get_uuid_from_result(self.fuzzy_query(target=target_alias))
+        return self.get_uuid_from_result(self.fuzzy_query(target=target_alias, index="nodes"))
 
-    def fuzzy_keyword(self, keyword):
+    def fuzzy_keyword_documents(self, keywords):
         target_keywords = {"keywords": {
-            "value": keyword,
+            "value": keywords,
             "fuzziness": 3,
             "prefix_length": 3,
             "max_expansions": 20
         }
         }
-        return self.get_uuid_from_result(self.fuzzy_query(target=target_keywords))
+        return self.get_uuid_from_result(self.fuzzy_query(target=target_keywords, index="documents"))
 
-    def auto_complete(self, target):
+    def auto_complete(self, target, index):
         body = {
             "query": {
                 "match": target
             }
         }
-        return self.es.search(index="nodes", body=body)
+        return self.es.search(index=index, body=body)
 
-    def auto_name(self, keyword):
-        target = {"name": keyword}
-        return self.get_uuid_from_result(self.auto_complete(target=target))
+    def auto_name_nodes(self, keyword, language):
+        target = {"name.%s" % language: keyword}
+        return self.get_uuid_from_result(self.auto_complete(target=target, index="nodes"))
+
+    def auto_title_documents(self, keywords, language):
+        target = {"name.%s" % language: keywords}
+        return self.get_uuid_from_result(self.auto_complete(target=target, index="documents"))
 
 
-async def add_node_index(uuid, name, language, p_label, name_zh='', name_en='', description='', alias='', keywords='',
-                         labels=''):
+# todo 消息队列处理
+async def add_node_index(node: BaseNode):
+    assert node.already
+    root = node.root
+    info = node.info
+    target = "content.%s" % root["Language"]
     body = {
-        "alias": alias,
-        "content": {language: description},
-        "keywords": keywords,
-        "labels": labels,
-        "language": language,
-        "name": {'auto': name, 'zh': name_zh, 'en': name_en},
-        "p_label": p_label,
-        "uuid": uuid
+        "alias": info["Alias"],
+        target: info["Description"],
+        "labels": list(root.labels),
+        "language": root["Language"],
+        "name": {'auto': root["name"],
+                 'zh': root["name_zh"],
+                 'en': root["name_en"]},
+        "p_label": root["PrimaryLabel"],
+        "uuid": root["uuid"]
     }
     result = es.index(index='nodes', body=body, doc_type='_doc')
     if result['_shards']['successful'] == 1:
@@ -99,3 +109,5 @@ async def add_node_index(uuid, name, language, p_label, name_zh='', name_en='', 
                    'type': 'es_upload'}
         a.add_record(False, True, uuid, p_label, json.dumps(content))
         return False
+
+async def add_doc_index(doc):

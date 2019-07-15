@@ -1,6 +1,5 @@
 # -*-coding=utf-8 -*-
 # APP内定义
-from tools.base_tools import get_dict
 from document.logic_class import BaseComment, BaseNote, BaseDoc
 # django定义与工具包
 import datetime as dt
@@ -41,7 +40,7 @@ def add_comment(request):
             target=data['target'],
             user=user_id,
             content=str(data['content']),
-            time=dt.datetime.now()
+            update_time=dt.datetime.now()
         )
 
     return HttpResponse("回复成功")

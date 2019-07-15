@@ -1,7 +1,6 @@
 import jwt
 from django.core.cache import cache
-import random
-import string
+
 
 second = 1
 minute = 60

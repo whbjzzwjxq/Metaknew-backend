@@ -40,8 +40,7 @@ def add_node(request):
     data.update({
         "ImportMethod": "Web",
         "CreateUser": user,
-        "type": "StrNode",
-        "ImportTime": datetime.datetime.now()
+        "type": "StrNode"
     })
     try:
         node.create(node=data)
@@ -73,7 +72,6 @@ def add_document(request):
             node['info'].update({
                 "ImportMethod": "Web",
                 "CreateUser": user,
-                "ImportTime": datetime.datetime.now(),
                 "type": "StrNode"
             })
         new_node = check_node_exist(node=node['info'],
@@ -91,8 +89,8 @@ def add_document(request):
 
     for relationship in relationships:
         # 从node_index里访问提交后的Node对象
-        relationship["info"]['source'] = node_index[relationship["info"]['source']]
-        relationship["info"]['target'] = node_index[relationship["info"]['target']]
+        relationship["info"]['source'] = node_index[str(relationship["info"]['source'])]
+        relationship["info"]['target'] = node_index[str(relationship["info"]['target'])]
         relationship["info"].update({
             "ImportMethod": "Web",
             "CreateUser": user,
@@ -100,7 +98,9 @@ def add_document(request):
         })
         # 注意这里是传一个Node对象过去
         new_rel = check_link_exist(relationship=relationship['info'],
-                                   collector=collector).root
+                                   collector=collector)
+        if new_rel:
+            new_rel = new_rel.root
         conf = {'uuid': new_rel['uuid'], 'conf': relationship['conf']}
         doc.Graph.IncludedLinks.append(conf)
 
@@ -111,7 +111,9 @@ def add_document(request):
                     'type': "Document",
                     'Title': info['title'],
                     'Description': info['description'],
-                    'Labels': info['Labels']
+                    'Labels': info['Labels'],
+                    "Keywords": info['keywords'],
+                    "Alias": []
                     }
     new_document = doc.NeoNode(collector=collector).create(node=new_document)
 
@@ -130,8 +132,10 @@ def add_document(request):
             collector.tx.create(result)
 
     # DocumentInformation部分
-    doc.Info.uuid = new_document.uuid
-    doc.Graph.uuid = new_document.uuid
+    doc.Info.uuid = new_document.origin
+    doc.Graph.uuid = new_document.origin
+    doc.Info.CountCacheTime = datetime.datetime.now()
+    doc.Info.CreateTime = datetime.datetime.now()
     doc.save()
     collector.tx.commit()
     return HttpResponse('Create Document Success')

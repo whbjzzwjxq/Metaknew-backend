@@ -1,7 +1,7 @@
 from django.conf.urls import url
 
-from search import views
+from es_module import views
 
 urlpatterns = [
-    url('index/', views.get_node_uuid),
+    url('index', views.es_ask_node),
 ]

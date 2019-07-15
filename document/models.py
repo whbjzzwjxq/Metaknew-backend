@@ -13,8 +13,11 @@ class DocInfo(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题id
     Title = models.TextField(db_column='TITLE', default=uuid)  # 标题
     MainPic = models.URLField(db_column='MAIN_PICTURE', default='')  # 缩略图
-    Area = models.TextField(db_column='AREA', default='None')  # 领域
+    Area = ArrayField(models.TextField(), db_column='AREA', default=list)  # 领域
     CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
+    Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
+    Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 关键词
+
     CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
     UpdateTime = models.DateTimeField(db_column='UPDATE_TIME', auto_now=True)  # 最后更新的时间
     CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
@@ -24,8 +27,6 @@ class DocInfo(models.Model):
     Imp = models.IntegerField(db_column='IMP', default=0)  # 重要度
     Useful = models.IntegerField(db_column='USEFUL', default=0)  # 有用的程度
     Hot = models.IntegerField(db_column='HOT', default=0)  # 热度
-
-    Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
     IncludedMedia = ArrayField(models.UUIDField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
     FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
 
@@ -38,9 +39,9 @@ class DocInfo(models.Model):
 class DocGraph(models.Model):
     uuid = models.UUIDField(db_column='UUID', primary_key=True)  # 专题ID
     MainNodes = ArrayField(models.UUIDField(), db_column='MAIN_NODES', default=list)   # 主要节点的uuid
-    Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)
     IncludedNodes = ArrayField(JSONField(), db_column='NODES', default=list)  # json里包含节点在该专题下的设置
     IncludedLinks = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=list)  # json里包含关系在该专题下的设置
+    Conf = ArrayField(JSONField(), db_column='CONF', default=list)  # json里包含专题本身的设置
 
     class Meta:
 

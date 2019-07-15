@@ -6,7 +6,7 @@ class AddRecord:
     def __init__(self):
         self.record = SourceAddRecord.objects.all()
 
-    def query(self, criteria_query):
+    def query_by_criteria(self, criteria_query):
         assert criteria_query["source_type"] == 'AddRecord'
         if criteria_query["labels"] is not []:
             for label in criteria_query["labels"]:

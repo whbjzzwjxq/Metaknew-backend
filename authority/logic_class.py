@@ -13,11 +13,13 @@ class AuthMiddleware:
             '/document/add_comment': [AuthChecker],
             '/subgraph/add/node': [],
             '/subgraph/add/document': [],
-            '/subgraph/run/script': [],
+            '/subgraph/run/script_latin': [],
+            '/subgraph/run/script_add_loc': [],
             '/user/login': [],
             '/user/register': [],
             '/user/send_message': [],
-            '/search/es_ask/': []
+            '/es_query/index': [],
+            '/search/criteria_query': []
         }
 
     def __call__(self, request: HttpRequest()):

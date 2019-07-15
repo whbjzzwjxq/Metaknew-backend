@@ -74,8 +74,7 @@ INSTALLED_APPS = [
     'search',
     'group',
     'media',
-    'history',
-
+    'history'
 ]
 
 SITE_ID = 1
