@@ -72,9 +72,9 @@ INSTALLED_APPS = [
     'subgraph',
     'document',
     'search',
-    'group',
     'media',
-    'history'
+    'history',
+    'tools'
 ]
 
 SITE_ID = 1
@@ -119,9 +119,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'Metaknew',
         'USER': 'postgres',
-        'PASSWORD': '123456',
+        'PASSWORD': 'ay67cla910',
         'HOST': '39.96.10.154',
-        'PORT': '5432',
+        'PORT': '7011',
     }
 }
 

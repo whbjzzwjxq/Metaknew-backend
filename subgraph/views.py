@@ -1,7 +1,7 @@
 from document.logic_class import BaseDoc
 from django.http import HttpResponse
 from subgraph.logic_class import BaseNode, BaseLink
-from tools import base_tools
+from tools.base_tools import NeoSet, uuid_matcher
 from py2neo import Relationship
 import json
 import datetime
@@ -24,7 +24,7 @@ def check_link_exist(relationship, collector):
     if 'uuid' in relationship:
         remote = BaseLink(collector=collector)
 
-        if remote.query(uuid=relationship['uuid']) is not None:
+        if remote.query(uuid=relationship['uuid']):
             return remote
         else:
             return remote.create(link=relationship)
@@ -33,7 +33,7 @@ def check_link_exist(relationship, collector):
 
 
 def add_node(request):
-    collector = base_tools.NeoSet()
+    collector = NeoSet()
     data = json.loads(request.body, encoding='utf-8')['data']
     user = request.GET.get('user_id')
     node = BaseNode(collector=collector)
@@ -50,14 +50,39 @@ def add_node(request):
         return HttpResponse("bad information")
 
 
+def add_relationship(request):
+    collector = NeoSet()
+    data = json.loads(request.body, encoding='utf-8')['data']
+    user = request.GET.get('user_id')
+    link = BaseLink(collector=collector)
+    data.update({
+        "ImportMethod": "Web",
+        "CreateUser": user,
+        "type": data['Label'],
+        "Is_Used": True
+    })
+    source = NeoSet().Nmatcher.match(uuid=data['source'])
+    target = NeoSet().Nmatcher.match(uuid=data['target'])
+    if source is not None and target is not None:
+        try:
+            data['source'] = source
+            data['target'] = target
+            link.create(link=data)
+            link.collector.tx.commit()
+            return HttpResponse("add link success")
+        except AssertionError:
+            return HttpResponse("bad information")
+
+
 def add_document(request):
-    collector = base_tools.NeoSet()
+    collector = NeoSet()
     data = json.loads(request.body, encoding='utf-8')['data']
     user = request.GET.get('user_id')
     # 专题节点与关系
     nodes = data['nodes']
     relationships = data['relationships']
     info = data['info']
+    conf = data['conf']
     # 专题信息
     doc = BaseDoc()
 
@@ -68,7 +93,7 @@ def add_document(request):
         # 记录新建节点自动赋予的uuid
 
         old_id = str(node['info']['uuid'])
-        if not base_tools.uuid_matcher(old_id):
+        if not uuid_matcher(old_id):
             node['info'].update({
                 "ImportMethod": "Web",
                 "CreateUser": user,
@@ -83,7 +108,7 @@ def add_document(request):
         doc.Graph.IncludedNodes.append(conf)
 
         # 记录下主要节点
-        if new_node['Name'] in info['keywords']:
+        if new_node['Name'] in info['Keywords']:
             main_node_links.append({'type': 'doc_main_node', 'source': new_node, 'count': 1})
             doc.Graph.MainNodes.append(new_node['uuid'])
 

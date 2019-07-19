@@ -1,35 +1,51 @@
 from django.contrib.postgres.fields import *
 from django.db import models
 from django.utils.timezone import now
-import tools.location as tool
 from users.models import User
 
 
 # 不要在模型中写字段以外的属性或方法， 这里是储存用的
-
-# 基本控制属性, 不修改
-class Node(models.Model):
-    # 在postgresql里储存的属性
-    uuid = models.UUIDField(db_column='UUID', primary_key=True, editable=False)
-    Name = models.TextField(db_column='NAME')
-    Alias = ArrayField(models.TextField(), db_column='ALIAS', default=list)
+# Node的控制属性
+class NodeCtrl(models.Model):
+    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)
     ImportMethod = models.CharField(db_column='IMPORT_METHOD', max_length=30, editable=False)
-    CreateUser = models.IntegerField(db_column='USER', default='0', editable=False)  # 创建用户
-    Description = models.TextField(db_column='DESCRIPTION', default='')
-
-    Imp = models.IntegerField(db_column='IMP', default=0)
-    Hot = models.IntegerField(db_column='HOT', default=0)
-    StrLevel = models.FloatField(db_column='STR', default=0)
-    ClaLevel = models.IntegerField(db_column='CLA', default=0)
     ImportTime = models.DateTimeField(db_column='IMPORT_TIME', auto_now_add=True)
-    IncludedMedia = ArrayField(models.UUIDField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
-    FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
+    CreateUser = models.IntegerField(db_column='USER', default='0', editable=False)  # 创建用户
     Is_Common = models.BooleanField(db_column='COMMON', default=True)
     Is_Used = models.BooleanField(db_column='USED', default=True)
 
     class Meta:
+        abstract = True
 
-        db_table = 'base_node'
+# Node后端修改的属性
+
+
+class NodeBackend(NodeCtrl):
+    Imp = models.IntegerField(db_column='IMP', default=0)
+    Hot = models.IntegerField(db_column='HOT', default=0)
+    StrLevel = models.FloatField(db_column='STR', default=0)
+    ClaLevel = models.IntegerField(db_column='CLA', default=0)
+    FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
+    IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件uuid
+    History = models.IntegerField(db_column='HISTORY')
+    Contributor = ArrayField(models.IntegerField(), db_column='CONTRIBUTOR')
+
+    class Meta:
+
+        abstract = True
+
+
+class Node(NodeBackend):
+    # 在postgresql里储存的属性
+    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)
+    Name = models.TextField(db_column='NAME')
+    PrimaryLabel = models.TextField(db_column='P_LABEL', editable=False)
+    Alias = ArrayField(models.TextField(), db_column='ALIAS', default=list)
+    Description = models.TextField(db_column='DESCRIPTION', default='')
+
+    class Meta:
+
+        db_table = 'node_base'
 
 
 class Person(Node):
@@ -39,7 +55,7 @@ class Person(Node):
     Nation = models.CharField(db_column='NATION', max_length=30, default='None')
 
     class Meta:
-        db_table = 'person'
+        db_table = 'node_person'
 
 
 class Project(Node):
@@ -50,7 +66,7 @@ class Project(Node):
     Leader = ArrayField(models.TextField(), db_column='LEADER', default=list)  # 领头人
 
     class Meta:
-        db_table = 'project'
+        db_table = 'node_project'
 
 
 class ArchProject(Project):
@@ -58,7 +74,7 @@ class ArchProject(Project):
     WorkTeam = ArrayField(models.TextField(), db_column='WORK_TEAM', default=list)
 
     class Meta:
-        db_table = 'arch_project'
+        db_table = 'node_arch_project'
 
 
 class LocationDoc(models.Model):
@@ -70,4 +86,4 @@ class LocationDoc(models.Model):
     Doc = JSONField(db_column='DOC', default=dict)
 
     class Meta:
-        db_table = 'loc_doc'
+        db_table = 'location_doc'

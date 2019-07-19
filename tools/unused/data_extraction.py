@@ -1,6 +1,6 @@
 from tools.translate import connect
 import re
-import tools.location as tool
+import tools.unused.baidu_map as tool
 
 zhPattern = re.compile(u'[\u4e00-\u9fa5]+')
 

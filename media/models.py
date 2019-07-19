@@ -1,11 +1,10 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
-from django.utils.timezone import now
 # Create your models here.
 
 
 class MediaNode(models.Model):
-    uuid = models.UUIDField(db_column='UUID', primary_key=True)
+    id = models.Field(db_column='ID', primary_key=True)
     FileName = models.TextField(db_column='NAME')
     Format = models.TextField(db_column='FORMAT')
     Url = models.URLField(db_column='URL', default='')
@@ -16,7 +15,7 @@ class MediaNode(models.Model):
 
     class Meta:
 
-        db_table = 'normal_media'
+        db_table = 'media_base'
 
 
 class Paper(MediaNode):

@@ -66,6 +66,7 @@ def get_uuid(name, label, device):
     return md5 + '-' + a + '-' + b + '-' + origin_uuid
 
 
+# todo 合理的uuid生成方式
 def rel_uuid():
     return str(uuid.uuid1())
 

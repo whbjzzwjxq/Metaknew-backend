@@ -2,6 +2,7 @@ from django.http import HttpResponse
 import json
 from history.logic_class import AddRecord
 from tools.base_tools import class_table, NeoSet
+from subgraph.logic_class import BaseNode
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 
 
@@ -45,3 +46,11 @@ def query_label_dict(request):
     p_label = request.GET.get('PrimaryLabel')
     nodes = NeoSet().Nmatcher.match()
     return HttpResponse()
+
+
+def get_single_node(request):
+
+    uuid = request.GET.get('uuid')
+    node = BaseNode().query(uuid=uuid).handle_for_frontend()
+
+    return HttpResponse(json.dumps(node))

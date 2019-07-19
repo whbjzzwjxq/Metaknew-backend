@@ -1,6 +1,6 @@
 from subgraph.models import LocationDoc
 from django.core.exceptions import ObjectDoesNotExist
-from tools.redis_conf import red
+from tools.redis_conf import redis
 import json
 import googlemaps
 
@@ -34,6 +34,6 @@ def get_location(locations):
                         if not loc_info["formatted_address"] == loc:
                             new.Alias.append(loc)
                         new.save()
-            red.srem('loc_query_queue', loc)
+            redis.srem('loc_query_queue', loc)
         except json.decoder.JSONDecodeError:
             pass

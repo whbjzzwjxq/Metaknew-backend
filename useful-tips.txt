@@ -16,7 +16,7 @@ MATCH (n) where n.PrimaryLabel = "Document" delete n
 				"y": 0.72
 					}
 		},
-		
+
 		{	"info":	{
 				"uuid": "42437790-2049-11e9-8395-00163e2ebf28",
 				"Name": "Rafael Moneo",
@@ -51,3 +51,13 @@ MATCH (n) where n.PrimaryLabel = "Document" delete n
 //es的mapping设置:
 index 级别设置analyzer即可
 
+//postgre安装设置
+Ver Cluster Port Status Owner    Data directory              Log file
+11  main    5432 down   postgres /var/lib/postgresql/11/main /var/log/postgresql/postgresql-11-main.log
+postgres密码 ay67cla910
+
+//
+es : 7000
+kibana : 7001
+aliyun: 7010
+postgre: 7011

@@ -1,5 +1,5 @@
 from elasticsearch import Elasticsearch
-from subgraph.logic_class import BaseNode
+
 es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
 
 
@@ -74,30 +74,3 @@ class EsQuery:
     def auto_title_documents(self, keywords, language):
         target = {"name.%s" % language: keywords}
         return self.get_uuid_from_result(self.auto_complete(target=target, index="documents"))
-
-
-# todo 消息队列处理
-async def add_node_index(node: BaseNode):
-    assert node.already
-    root = node.root
-    info = node.info
-    target = "content.%s" % root["Language"]
-    body = {
-        "alias": info["Alias"],
-        target: info["Description"],
-        "labels": list(root.labels),
-        "language": root["Language"],
-        "name": {'auto': root["name"],
-                 'zh': root["name_zh"],
-                 'en': root["name_en"]},
-        "p_label": root["PrimaryLabel"],
-        "uuid": root["uuid"]
-    }
-    result = es.index(index='nodes', body=body, doc_type='_doc')
-    if result['_shards']['successful'] == 1:
-        return True
-    else:
-        # todo record
-        return False
-
-async def add_doc_index(doc):

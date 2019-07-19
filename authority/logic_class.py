@@ -19,7 +19,9 @@ class AuthMiddleware:
             '/user/register': [],
             '/user/send_message': [],
             '/es_query/index': [],
-            '/search/criteria_query': []
+            '/search/criteria_query': [],
+            '/search/get_single_node': [],
+            '/tools/generate': []
         }
 
     def __call__(self, request: HttpRequest()):

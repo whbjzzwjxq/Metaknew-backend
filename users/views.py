@@ -10,10 +10,10 @@ from django.contrib.auth.hashers import make_password
 import numpy as np
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from tools.location import getHttpResponse
+from tools.Meta_Response import get_http_response as getHttpResponse
 from django.core.cache import cache
 from users.models import User
-from tools.get_token import make_token, week
+from tools.login_token import make_token, week
 from users.models import UserCollection, UserRole
 # Create your views here.
 

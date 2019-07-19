@@ -1,9 +1,7 @@
 from __future__ import unicode_literals
 
 from django.db import models
-from django.utils.timezone import now
 from django.contrib.postgres.fields import ArrayField
-import uuid
 # Create your models here.
 
 
@@ -39,9 +37,9 @@ class UserRole(models.Model):
 class UserCollection(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
-    Star = ArrayField(models.UUIDField(), db_column='STAR', default=list)
-    CreateDoc = ArrayField(models.UUIDField(), db_column='CREATE', default=list)
-    UploadSource = ArrayField(models.UUIDField(), db_column='UPLOAD', default=list)
+    Star = ArrayField(models.BigIntegerField(), db_column='STAR', default=list)
+    CreateDoc = ArrayField(models.BigIntegerField(), db_column='CREATE', default=list)
+    UploadSource = ArrayField(models.BigIntegerField(), db_column='UPLOAD', default=list)
 
     class Meta:
 
@@ -51,7 +49,7 @@ class UserCollection(models.Model):
 class UserConcern(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
-    SourceId = models.UUIDField(db_column='SOURCE_ID')  # 用户打标签的内容
+    SourceId = models.BigIntegerField(db_column='SOURCE_ID')  # 用户打标签的内容
     Labels = ArrayField(models.TextField(), db_column='LABELS', default=list)  # 用户打的标签
     Imp = models.IntegerField(db_column='IMP', default=-1)
     HardLevel = models.IntegerField(db_column='HARD_LEVEL', default=-1)
@@ -61,3 +59,15 @@ class UserConcern(models.Model):
 
         db_table = 'user_labels'
 
+
+class Group(models.Model):
+    GroupId = models.BigIntegerField(db_column='GROUP_ID', primary_key=True)
+    GroupName = models.TextField(db_column='GROUP_NAME', unique=True)
+    CreateUser = models.IntegerField(db_column='GROUP_CREATOR')
+    Owner = models.IntegerField(db_column='OWNER')
+    Manager = ArrayField(models.IntegerField(), db_column='MANAGER')
+    Member = ArrayField(models.IntegerField(), db_column='Member')
+
+    class Meta:
+
+        db_table = 'user_group_info_base'

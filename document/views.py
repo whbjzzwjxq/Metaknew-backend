@@ -10,7 +10,7 @@ from demo import settings
 from django.views.decorators.csrf import csrf_exempt
 import json
 import os
-from tools.location import getHttpResponse
+from tools.Meta_Response import get_http_response as getHttpResponse
 from django.forms.models import model_to_dict
 from django.core.cache import cache
 from document.logic_class import PersonalDoc

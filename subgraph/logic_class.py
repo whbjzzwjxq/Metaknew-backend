@@ -3,7 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
 from tools.base_tools import get_label_special_attr as get_special
 from subgraph.models import Node as NodeInfo
-from es_module.logic_class import add_node_index, add_doc_index
+from es_module.logic_class import es
 from copy import deepcopy
 import asyncio
 
@@ -88,9 +88,7 @@ class BaseNode(object):
             node['Alias'] = []
 
         # es索引记录 异步
-        if self.label == 'Document':
-            asyncio.run(add_doc_index(self))
-        else:
+        if not self.label == 'Document':
             asyncio.run(add_node_index(self))
         # 返回self对象
         return self
@@ -193,3 +191,59 @@ class BaseLink(object):
 
     def save(self):
         self.collector.tx.push(self.root)
+
+
+# todo 消息队列处理
+async def add_node_index(node: BaseNode()):
+    assert node.already
+    root = node.root
+    info = node.info
+    target = "content.%s" % root["Language"]
+    body = {
+        "alias": info["Alias"],
+        target: info["Description"],
+        "labels": list(root.labels),
+        "language": root["Language"],
+        "name": {'auto': root["name"],
+                 'zh': root["name_zh"],
+                 'en': root["name_en"]},
+        "p_label": root["PrimaryLabel"],
+        "uuid": root["uuid"]
+    }
+    result = es.index(index='nodes', body=body, doc_type='_doc')
+    if result['_shards']['successful'] == 1:
+        return True
+    else:
+        # todo record
+        return False
+
+
+async def add_doc_index(doc):
+    assert doc.already
+    root = doc.NeoNode
+    info = doc.Info
+    target = "content.%s" % root["Language"]
+    updatetime = info.UpdateTime.date()
+    body = {
+        "area": info.Area,
+        target: info.Description,
+        "hard_level": info.HardLevel,
+        "hot": info.Hot,
+        "imp": info.Imp,
+        "keyword": info.Keywords,
+        "labels": list(root.labels),
+        "language": root["Language"],
+        "size": info.Size,
+        "title": {'auto': root["name"],
+                  'zh': root["name_zh"],
+                  'en': root["name_en"]},
+        "updatetime": updatetime,
+        "useful": info.Useful,
+        "uuid": root["uuid"]
+    }
+    result = es.index(index='documents', body=body, doc_type='_doc')
+    if result['_shards']['successful'] == 1:
+        return True
+    else:
+        # todo record
+        return False
