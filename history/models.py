@@ -17,7 +17,7 @@ class ExcelRecord(models.Model):
         db_table = 'history_excel_upload'
 
 
-# 这个是方便查找缺漏使用的
+# 这个是方便查找缺漏使用的 内部使用
 class SourceAddRecord(models.Model):
 
     id = models.AutoField(db_column='ID', primary_key=True)
@@ -33,6 +33,7 @@ class SourceAddRecord(models.Model):
 
 
 class UserEditRecord(models.Model):
+
     id = models.AutoField(db_column='ID', primary_key=True)
     EditTarget = models.BigIntegerField(db_column='')
     EditTime = models.DateTimeField(db_column='TIME', auto_now_add=True)

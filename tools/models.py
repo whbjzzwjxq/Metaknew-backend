@@ -17,7 +17,7 @@ class GlobalWordIndex(models.Model):
 class GlobalLabelBlock(models.Model):
 
     id = models.AutoField(db_column='ID', primary_key=True)
-    PrimaryLabel = models.TextField(db_column='LabelContent')
+    PrimaryLabel = models.TextField(db_column='LabelContent', db_index=True)
     RegisterTime = models.DateTimeField(db_column='RegisterTime', auto_now_add=True)
 
     class Meta:
@@ -37,7 +37,7 @@ class LabelBlockId(models.Model):
 class GlobalDeviceBlock(models.Model):
 
     id = models.AutoField(db_column='ID', primary_key=True)
-    DeviceId = models.SmallIntegerField(db_column='LabelId')
+    DeviceId = models.SmallIntegerField(db_column='DeviceId', db_index=True)
     RegisterTime = models.DateTimeField(db_column='RegisterTime', auto_now_add=True)
 
     class Meta:
@@ -50,4 +50,4 @@ class DeviceBlockId(models.Model):
     OutId = models.BigIntegerField(db_column='OUT_ID', primary_key=True)
 
     class Meta:
-        db_table = 'global_doc_id'
+        db_table = 'global_device_id'
