@@ -1,11 +1,15 @@
 from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
+from history.logic_class import AddRecord
 from tools.base_tools import get_label_special_attr as get_special
 from subgraph.models import Node as NodeInfo
 from es_module.logic_class import es
 from copy import deepcopy
 import asyncio
+
+import json
+from datetime import datetime
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
@@ -93,6 +97,20 @@ class BaseNode(object):
         # 返回self对象
         return self
 
+    # 增加多个节点
+    def add_nodes(self, nodes):
+        for node in nodes:
+            try:
+                b = BaseNode()
+                b.create(node)
+            except(Exception):
+                a = AddRecord()
+                content = {'name': node['name'],
+                           'error_type': 'CreateFailed',
+                           'time': datetime.now()}
+                a.add_record(True, False, '', node['PrimaryLabel'], json.dumps(content))
+
+
     def language_setter(self, language_to, language_from):
         name_tran = 'Name_{}'.format(language_to)
         if name_tran not in self.root:
@@ -105,6 +123,7 @@ class BaseNode(object):
         assert self.already
         if "Labels" in node:
             self.root.update_labels(node['Labels'])
+
 
     def update_prop(self, node):
         assert self.already
@@ -121,6 +140,17 @@ class BaseNode(object):
         # 存入不定的Neo4j属性
         if self.root:
             self.root.update(temp)
+
+        # 记录warn数据
+        a = AddRecord()
+        names = self.info._meta.fields
+        null_group = []
+        for name in names:
+            if node[name] == '':
+                null_group.append(node[name])
+        content = {'null_group': null_group}
+        a.add_record(False, True, self.origin, node['PrimaryLabel'], json.dumps(content))
+
 
     def update_all(self, node):
         assert self.already
