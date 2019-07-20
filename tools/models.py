@@ -1,11 +1,10 @@
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 
 class GlobalWordIndex(models.Model):
 
     id = models.AutoField(db_column='INDEX', primary_key=True)
-    Word = models.TextField(db_column='WORD', db_index=True)
+    Word = models.TextField(db_column='WORD', db_index=True, unique=True)
 
     class Meta:
         db_table = 'global_word_index'

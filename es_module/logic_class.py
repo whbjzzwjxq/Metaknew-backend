@@ -6,7 +6,7 @@ import json
 es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
 
 
-#  todo 加入评分
+#  todo 加入评分 level :2
 class EsQuery:
 
     def __init__(self, index):
@@ -79,7 +79,7 @@ class EsQuery:
         return self.get_uuid_from_result(self.auto_complete(target=target, index="documents"))
 
 
-# # todo 消息队列处理
+# # todo 消息队列处理 level :1
 # async def add_node_index(node: BaseNode):
 #     assert node.already
 #     root = node.root
@@ -100,7 +100,6 @@ class EsQuery:
 #     if result['_shards']['successful'] == 1:
 #         return True
 #     else:
-#         # todo record
 #         a = AddRecord()
 #         content = {'result': result,
 #                    'status': 'Failed',

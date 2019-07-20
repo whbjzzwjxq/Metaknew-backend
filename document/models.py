@@ -3,22 +3,23 @@ from __future__ import unicode_literals
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from users.models import User
-# Create your models here.
-# 专题的信息 也就是在cache_doc里面请求的内容
+
+
+class DocCtrl(models.Model):
+    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)  # 专题id
+    CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
+    CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
+    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
 
 
 class DocInfo(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True)  # 专题id
     Title = models.TextField(db_column='TITLE', default=id)  # 标题
     MainPic = models.URLField(db_column='MAIN_PICTURE', default='')  # 缩略图
     Area = ArrayField(models.TextField(), db_column='AREA', default=list)  # 领域
-    CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
     Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
     Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 关键词
 
-    CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
     UpdateTime = models.DateTimeField(db_column='UPDATE_TIME', auto_now=True)  # 最后更新的时间
-    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
     Size = models.IntegerField(db_column='SIZE', default=0)  # 节点数量
 
     HardLevel = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
@@ -35,7 +36,7 @@ class DocInfo(models.Model):
 
 # 专题的Graph相关的内容 也就是在svg绘制的时候请求的内容
 class DocGraph(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True)  # 专题ID
+    id = models.BigIntegerField(db_column='ID', primary_key=True,editable=False)  # 专题ID
     MainNodes = ArrayField(models.BigIntegerField(), db_column='MAIN_NODES', default=list)   # 主要节点的uuid
     IncludedNodes = ArrayField(JSONField(), db_column='NODES', default=list)  # json里包含节点在该专题下的设置
     IncludedLinks = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=list)  # json里包含关系在该专题下的设置

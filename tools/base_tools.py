@@ -66,12 +66,11 @@ def get_uuid(name, label, device):
     return md5 + '-' + a + '-' + b + '-' + origin_uuid
 
 
-# todo 合理的uuid生成方式
 def rel_uuid():
     return str(uuid.uuid1())
 
 
-def get_label_special_attr(p_label: str):
+def get_props_for_user_ctrl(p_label: str):
     """
     :param p_label: PrimaryLabel
     :return: 不包含BaseNode字段信息的列表
@@ -79,11 +78,12 @@ def get_label_special_attr(p_label: str):
     """
     if not p_label == 'Document':
         try:
+            # 目标包含的域
             target = class_table[p_label]._meta.get_fields()
             result = [field.name for field in target
-                      if not field.model == Node and not re_for_ptr.match(field.name)]
-            base_prop = ['Name', 'Alias', 'ImportMethod', 'CreateUser', 'Description']
-            result.extend(base_prop)
+                      if not field.model == NodeShow
+                      and not field.model == NodeCtrl
+                      and not re_for_ptr.match(field.name)]
             return result
         except AttributeError('没有这种标签: %s' % p_label):
             return []
@@ -99,7 +99,7 @@ def uuid_matcher(string):
 
 
 def dict_dryer(node: dict):
-    dry_prop = ['uuid', 'Labels', 'type', 'PrimaryLabel', 'Language']
+    dry_prop = ['id', 'Labels', 'type', 'PrimaryLabel']
     for key in dry_prop:
         if key in node:
             node.pop(key)
@@ -115,3 +115,5 @@ def merge_list(lists):
     result = reduce(merge, lists)
 
     return result
+
+

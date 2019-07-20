@@ -3,6 +3,7 @@ import regex
 import random
 import time
 import random
+from tools.redis_conf import redis
 from functools import reduce
 import gzip
 
@@ -198,24 +199,3 @@ class JsonChangedCompress:
 #
 # c = JsonChangedCompress([], [], def_replace="|")
 # print(c.compare(a, b))
-def add(x, y):
-    return x + y
-
-a = time.time()
-
-
-def ordered_sample(_range, jump, _min, _max: 65535):
-    link = _min
-    _list = []
-    for i in range(0, _range):
-        if link + (_range - i) < _max:
-            delta = random.randint(1, jump)
-        else:
-            delta = 1
-        link += delta
-        _list.append(link)
-    return _list
-
-print(ordered_sample(_range=65534, jump=2, _min=0, _max=65535))
-
-print(time.time()-a)

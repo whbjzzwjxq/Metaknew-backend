@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                 ('FeatureVec', models.TextField(db_column='FEATURE_VECTOR', default='0')),
                 ('IncludedMedia', django.contrib.postgres.fields.ArrayField(base_field=models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list, size=None)),
                 ('History', models.IntegerField(db_column='HISTORY')),
-                ('Contributor', django.contrib.postgres.fields.ArrayField(base_field=models.IntegerField(), db_column='CONTRIBUTOR', size=None)),
+                ('Contributor', django.contrib.postgres.fields.JSONField(db_column='CONTRIBUTOR')),
                 ('id', models.BigIntegerField(db_column='ID', editable=False, primary_key=True, serialize=False)),
                 ('Name', models.TextField(db_column='NAME')),
                 ('PrimaryLabel', models.TextField(db_column='P_LABEL', editable=False)),

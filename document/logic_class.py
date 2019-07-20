@@ -12,10 +12,7 @@ types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
 
-# input item类的实例
-# output dict
-
-
+# todo doc重新定义 level: 0
 class BaseDoc:
 
     def __init__(self):
@@ -33,7 +30,7 @@ class BaseDoc:
         cache_doc = cache.get(key)
         self.origin = uuid
         if not cache_doc:
-            self.NeoNode = BaseNode().query(uuid=uuid)
+            self.NeoNode = BaseNode().query(_id=uuid)
             self.Graph = self.query_graph(uuid)
             self.save_cache()
         else:
