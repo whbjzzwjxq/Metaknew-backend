@@ -1,10 +1,10 @@
-from __future__ import unicode_literals
-
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, HStoreField
+
 # Create your models here.
 
 
+# todo 角色整理 level : 2
 class User(models.Model):
 
     UserId = models.BigIntegerField(db_column='USER_ID', primary_key=True)  # 用户id
@@ -17,44 +17,36 @@ class User(models.Model):
     # 状态部分
     Is_Superuser = models.BooleanField(db_column='ROOT', default=False)  # 是否是管理员
     Is_Developer = models.BooleanField(db_column='DEV', default=False)  # 开发账号
+    Is_Publisher = models.BooleanField(db_column='PUBLISH', default=False)  # 是否是发布者
     Is_Vip = models.BooleanField(db_column='VIP', default=False)
     Is_high_vip = models.BooleanField(db_column='HighVIP', default=False)
 
-    # Group部分
-    # key: GroupId value: 0-Owner 1-Manager 2-Member
+    # 兴趣部分
+    # key: GroupId value: 0-Owner 1-Manager 2-Member 3-Applying
     Joint_Group = HStoreField(db_column='JOINT_GROUP')
+    Area = ArrayField(models.TextField(), db_column='AREA', default=list)
 
     class Meta:
 
         db_table = 'user_info_base'
 
 
-class Group(models.Model):
+class GroupCtrl(models.Model):
 
     GroupId = models.BigIntegerField(db_column='Group_Id', primary_key=True)
     GroupName = models.TextField(db_column='Group_Name', unique=True)
     CreateUser = models.BigIntegerField(db_column='Create_User')
-
     Owner = models.BigIntegerField(db_column='Owner')
     Manager = ArrayField(models.BigIntegerField(), db_column='Manager')
     Member = ArrayField(models.BigIntegerField(), db_column='Member')
-
-    Is_Auto = models.BooleanField(db_column='Auto')
+    Area = ArrayField(models.TextField(), default=list)
+    Labels = ArrayField(models.TextField(), default=list)
+    Is_Auto = models.BooleanField(db_column='Auto', default=False)
+    Is_Open = models.BooleanField(db_column='Open', default=True)
 
     class Meta:
 
         db_table = 'user_group_info_base'
-
-
-class UserRole(models.Model):
-
-    UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
-    Is_Member = models.BooleanField(db_column='MEMBER', default=False)
-    Is_Organizer = models.BooleanField(db_column='ORGANIZER', default=False)
-
-    class Meta:
-
-        db_table = 'user_info_role'
 
 
 class Privilege(models.Model):
@@ -66,7 +58,7 @@ class Privilege(models.Model):
     # 系统控制
     Is_Banned = models.BooleanField(db_column='BANNED', default=False)
     # 是拥有者的资源
-    Is_Owner = ArrayField(models.BigIntegerField(), db_column='Owner')
+    Is_Owner = ArrayField(models.BigIntegerField(), db_column='Owner', default=list)
     # 拥有修改状态权限的资源
     Is_Manager = ArrayField(models.BigIntegerField(), db_column='Manager', default=list)
     # 拥有完整权限的资源
@@ -82,6 +74,7 @@ class Privilege(models.Model):
         db_table = 'user_authority_count'
 
 
+# 用户私有仓库
 class UserRepository(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
@@ -101,7 +94,7 @@ class UserConcern(models.Model):
     UserId = models.BigIntegerField(db_column='USER_ID', db_index=True)
     # 用户关心的Source
     SourceId = models.BigIntegerField(db_column='SOURCE_ID', db_index=True)
-
+    SourceType = models.TextField(db_column='SOURCE_TYPE', db_index=True)
     # 用户打的标签
     Labels = ArrayField(models.TextField(), db_column='LABELS', default=list)
     Imp = models.SmallIntegerField(db_column='IMP', default=-1)
@@ -110,6 +103,8 @@ class UserConcern(models.Model):
     Is_Star = models.BooleanField(db_column='STAR', default=False)
 
     class Meta:
-
+        indexes = [
+            models.Index(fields=['SourceId', 'SourceType'])
+        ]
         db_table = 'user_labels'
 

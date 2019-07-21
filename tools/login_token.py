@@ -1,4 +1,6 @@
 import jwt
+import random
+import string
 
 
 def make_token(user_name, user_id):

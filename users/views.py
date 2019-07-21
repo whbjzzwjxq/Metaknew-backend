@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.contrib.auth.hashers import check_password
 # import datetime as dt
 from django.utils import timezone
-from django.contrib.auth.hashers import make_password
+from tools.Id_Generator import id_generator
 from tools.redis_process import redis
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
@@ -17,56 +17,6 @@ from tools.login_token import make_token
 from users.models import UserRole
 from tools.redis_process import minute
 import random
-
-
-# 注册
-def register(request):
-    """
-        "data":{
-        "user_name":
-        "user_pw":
-        "user_email":
-        "user_phone":
-    }
-    :param request:
-    :return:
-    """
-    response = HttpResponse()
-    param = json.loads(request.body)['data']
-    if param['user_name'] == '':
-        param['user_name'] = param['user_phone']
-    # redis中读取验证码信息
-    message_code = cache.get(param['user_phone'])  # 用户session
-    if message_code is None:
-        return HttpResponse(getHttpResponse('0', '验证码失效，请重新发送验证码', ''), content_type='application/json')
-    elif message_code != param['code']:
-        return HttpResponse(getHttpResponse('0', '验证码有误，请重新输入', ''), content_type='application/json')
-    else:
-        # 把数据写进数据库
-        try:
-            user_info = User.objects.get(UserPhone=param['user_phone'])
-            if user_info:
-                return HttpResponse(getHttpResponse('0', '该手机号已注册', ''), content_type='application/json')
-            else:
-                user_info = User.objects.create(
-                    UserPhone=param['user_phone'],
-                    UserEmail=param['user_email'],
-                    UserName=param['user_name'],
-                    UserPw=make_password(param['user_pw']),
-                    DateTime=timezone.now()
-                )
-                token = make_token(user_info.UserName, user_info.UserId)
-                UserCollection.objects.create(UserId=user_info).save()
-                UserRole.objects.create(UserId=user_info).save()
-                user_info.save()
-                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
-                response.set_cookie(key='user_name', value=user_info.UserName, max_age=week)
-                respData = {'status': 1, 'ret': '注册成功!'}
-        except BaseException as e:
-            print(e)
-            respData = {'status': 0, 'ret': '输入信息有误!'}
-        response.content = json.dumps(respData)
-        return response
 
 
 # 发送验证码短信
