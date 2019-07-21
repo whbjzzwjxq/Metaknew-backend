@@ -65,7 +65,7 @@ class Privilege(models.Model):
     Is_Active = models.BooleanField(db_column='ACTIVE', default=True)
     # 系统控制
     Is_Banned = models.BooleanField(db_column='BANNED', default=False)
-    # 是拥有者的资源  
+    # 是拥有者的资源
     Is_Owner = ArrayField(models.BigIntegerField(), db_column='Owner')
     # 拥有修改状态权限的资源
     Is_Manager = ArrayField(models.BigIntegerField(), db_column='Manager', default=list)
@@ -85,7 +85,10 @@ class Privilege(models.Model):
 class UserRepository(models.Model):
 
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
-    CreateDoc = ArrayField(models.BigIntegerField(), db_column='CREATE', default=list)
+    CreateDoc = ArrayField(models.BigIntegerField(), db_column='CreateDoc', default=list)
+    CreateNode = ArrayField(models.BigIntegerField(), db_column='CreateNode', default=list)
+    UpdateDoc = ArrayField(models.BigIntegerField(), default=list)
+    UpdateNode = ArrayField(models.BigIntegerField(), default=list)
     UploadFile = ArrayField(models.BigIntegerField(), db_column='UPLOAD', default=list)
 
     class Meta:
@@ -96,7 +99,6 @@ class UserRepository(models.Model):
 class UserConcern(models.Model):
 
     UserId = models.BigIntegerField(db_column='USER_ID', db_index=True)
-
     # 用户关心的Source
     SourceId = models.BigIntegerField(db_column='SOURCE_ID', db_index=True)
 

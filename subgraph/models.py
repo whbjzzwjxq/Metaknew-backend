@@ -34,6 +34,7 @@ class NodeCtrl(models.Model):
 class NodeShow(NodeCtrl):
 
     Imp = models.IntegerField(db_column='IMP', default=0)
+
     Hot = models.IntegerField(db_column='HOT', default=0)
     Favorite = models.IntegerField(db_column='FAVORITE', default=0)
     StrLevel = models.FloatField(db_column='STR', default=0)

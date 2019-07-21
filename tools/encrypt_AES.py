@@ -16,7 +16,7 @@ def padding(text, char):
     return bytes(text, encoding='utf-8') + padding_text
 
 
-def encode(label, auto_id):
+def encode_id(label, auto_id):
     cipher = AES.new(key=key_for_id,
                      mode=AES.MODE_CBC,
                      iv=iv)
@@ -25,7 +25,7 @@ def encode(label, auto_id):
     return result
 
 
-def decode(content):
+def decode_id(content):
     cipher = AES.new(key=key_for_id,
                      mode=AES.MODE_CBC,
                      iv=iv)
@@ -34,3 +34,14 @@ def decode(content):
     result = str(decrypt, encoding='utf-8')
     result = regex.match(re_label_id, result).groups()
     return result[0], result[2]
+
+
+def decode(content, length):
+    cipher = AES.new(key=key_for_id,
+                     mode=AES.MODE_CBC,
+                     iv=iv)
+
+    encrypt = b64decode(content)
+    decrypt = cipher.decrypt(encrypt)
+    result = str(decrypt, encoding='utf-8')[0:length]
+    return result

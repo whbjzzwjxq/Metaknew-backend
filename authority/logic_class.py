@@ -13,8 +13,8 @@ class AuthMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.url_auth_list = {
-            '/search/single': [DocQueryChecker],
-            '/document/add_comment': [AuthChecker],
+            '/search/single': [],
+            '/document/add_comment': [],
             '/subgraph/add/node': [],
             '/subgraph/add/document': [],
             '/subgraph/run/script_latin': [],
