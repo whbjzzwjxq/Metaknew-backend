@@ -15,14 +15,14 @@ from django.core.cache import cache
 from users.models import User
 from tools.login_token import make_token, week
 from users.models import UserCollection, UserRole
+from tools.redis_process import user_login
 # Create your views here.
 
 
 # 修改用户资料     未测
 def update_user(request):
     response = HttpResponse()
-    file_data = {'UserId': request.POST.get('user_id', None),
-                 'UserName': request.POST.get('user_name', None),
+    file_data = {'UserName': request.POST.get('user_name', None),
                  'UserEmail': request.POST.get('user_email', None)}
     User.objects.update(file_data)
     resp_data = {'status': '1', 'ret': '资料修改成功！！'}
@@ -30,7 +30,7 @@ def update_user(request):
     return HttpResponse(response, content_type="application/json")
 
 
-# 登录
+# todo 登录类 level: 3
 def login_by_phone_pw(request):
     # 获取用户输入的手机号、密码
     response = HttpResponse()
@@ -43,15 +43,11 @@ def login_by_phone_pw(request):
     else:
         # 检查密码是否匹配
         if check_password(password, user.UserPw):
-            try:
-                token = make_token(user.UserName, user.UserId)
-                resp_data = {'status': '1', 'ret': '登录成功!'}
-                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
-                response.set_cookie(key='user_name', value=user.UserName, max_age=week)
-                print(token)
-            except BaseException as e:
-                print(e)
-                resp_data = {'status': '0', 'ret': '登录失败，请与管理员联系'}
+            token = make_token(user.UserName, user.UserId)
+            user_login(user_name=user.UserName, user_id=user.UserId, token=token)
+            resp_data = {'status': '1', 'ret': '登录成功!'}
+            response.set_cookie(key='token', value=token, max_age=week, httponly=True)
+            response.set_cookie(key='user_name', value=user.UserName, max_age=week)
         else:
             resp_data = {'status': '0', 'ret': '登录失败，账号或密码不正确'}
     response.content = json.dumps(resp_data)

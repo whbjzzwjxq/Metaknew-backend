@@ -3,7 +3,7 @@ from tools.google_map import get_location
 from tools.base_tools import NeoSet
 from subgraph.logic_class import BaseNode
 from django.shortcuts import HttpResponse
-from tools.redis_conf import redis
+from tools.redis_process import redis
 import os
 
 

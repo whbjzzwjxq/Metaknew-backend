@@ -49,7 +49,7 @@ class DocGraph(models.Model):
 
 # 专题评论
 class Comment(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True)  # 评论id
+    id = models.BigAutoField(db_column='ID', primary_key=True)  # 评论id
     BaseTarget = models.BigIntegerField(db_column='TARGET')  # 注意是回复的专题的id
     Target = models.BigIntegerField(db_column='')
     Owner = models.IntegerField(db_column='USER', default='0')  # 发表用户id
@@ -62,8 +62,8 @@ class Comment(models.Model):
         db_table = 'document_comment'
 
 
-# 学习网
-class StudyNet(DocGraph):
+# 课程
+class Course(DocGraph):
 
     LinksInfo = ArrayField(JSONField(), db_column='LINKS_INFO')  # 学习网连接的信息
     NodesInfo = ArrayField(JSONField(), db_column='NODES_INFO')  # 学习网
@@ -76,6 +76,7 @@ class StudyNet(DocGraph):
 
 # 便签
 class Note(models.Model):
+
     id = models.BigIntegerField(db_column="ID", primary_key=True)  # 便签id
     CreateUser = models.IntegerField(db_column="USER_ID", default='1')  # 用户id
     TagType = models.TextField(db_column="TAGS_TYPE")  # 便签类型

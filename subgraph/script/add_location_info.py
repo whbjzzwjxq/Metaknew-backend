@@ -1,4 +1,4 @@
-from tools.redis_conf import redis
+from tools.redis_process import redis
 from tools.google_map import get_location
 from django.shortcuts import HttpResponse
 

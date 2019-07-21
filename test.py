@@ -3,7 +3,7 @@ import regex
 import random
 import time
 import random
-from tools.redis_conf import redis
+from tools.redis_process import redis
 from functools import reduce
 import gzip
 

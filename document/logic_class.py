@@ -1,5 +1,5 @@
 from document.models import Comment, Note
-from document.models import DocGraph, DocInfo, StudyNet
+from document.models import DocGraph, DocInfo
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, login_token
 from subgraph.logic_class import BaseNode

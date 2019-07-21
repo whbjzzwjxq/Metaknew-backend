@@ -1,4 +1,4 @@
-from tools.redis_conf import redis
+from tools.redis_process import redis
 from tools.models import GlobalWordIndex
 from django.shortcuts import HttpResponse
 
