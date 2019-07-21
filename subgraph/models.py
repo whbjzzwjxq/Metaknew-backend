@@ -12,8 +12,7 @@ def feature_vector():
 
     return {"group_vector": [],
             "word_embedding": [],
-            "label_embedding": [],
-            "extra_space": {}}
+            "label_embedding": []}
 
 
 # Node的控制属性而且不直接传回前端
@@ -24,26 +23,26 @@ class NodeCtrl(models.Model):
     CreateTime = models.DateTimeField(db_column='TIME', auto_now_add=True, editable=False)
     CreateUser = models.IntegerField(db_column='USER', default='0', editable=False)  # 创建用户
     History = models.BigIntegerField(db_column='HISTORY', editable=False)  # 历史记录的编号
+    UpdateTime = models.DateTimeField(db_column='Update_Time', auto_now=True)  # 最后更新时间
     CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
 
     class Meta:
         abstract = True
 
 
-# Node前端会用 但是不是简单获得的属性
+# Node前端会用 但是不是简单获得的属性/需要统计
 class NodeShow(NodeCtrl):
 
     Imp = models.IntegerField(db_column='IMP', default=0)
+    HardLevel = models.IntegerField(db_column='HARD_LEVEL', default=0)  # 难易度
+    Useful = models.IntegerField(db_column='USEFUL', default=0)  # 有用的程度
 
-    Hot = models.IntegerField(db_column='HOT', default=0)
-    Favorite = models.IntegerField(db_column='FAVORITE', default=0)
-    StrLevel = models.FloatField(db_column='STR', default=0)
-    ClaLevel = models.IntegerField(db_column='CLA', default=0)
+    Hot = models.IntegerField(db_column='HOT', default=0)  # 热度统计
+    Star = models.IntegerField(db_column='STAR', default=0)  # 收藏数量
+
+    Structure = models.IntegerField(db_column='STR', default=0)  # 结构化的程度
     Contributor = ArrayField(JSONField, db_column='CONTRIBUTOR', default=contributor())
-
-    ExtraProps = JSONField(db_column='EXTRA_PROPS', default=dict)
     UserLabels = ArrayField(models.TextField(), db_column='USER_LABELS', default=list)
-    Labels = ArrayField(models.TextField(), db_column='LABELS', default=list)
 
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件uuid
     FeatureVec = JSONField(db_column='FEATURE_VECTOR', default=feature_vector())  # 特征值
@@ -53,17 +52,18 @@ class NodeShow(NodeCtrl):
         db_table = 'node_frontend'
 
 
-# Node直接简单抛出的属性
+# Node直接简单写入/传回的属性
 class Node(NodeShow):
 
     Name = models.TextField(db_column='NAME')
-    Name_zh = models.TextField(db_column='NAME_ZH')
-    Name_en = models.TextField(db_column='NAME_EN')
     Language = models.TextField(db_column='LANG', default='auto')
-    Area = models.TextField(db_column='AREA')
+    Area = ArrayField(models.TextField(), db_column='AREA')
     PrimaryLabel = models.TextField(db_column='P_LABEL', db_index=True)
     Alias = ArrayField(models.TextField(), db_column='ALIAS', default=list)
     Description = models.TextField(db_column='DESCRIPTION', default='')
+    Labels = ArrayField(models.TextField(), db_column='LABELS', default=list)
+    IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件uuid
+    ExtraProps = JSONField(db_column='EXTRA_PROPS', default=dict)
 
     class Meta:
 
@@ -110,4 +110,17 @@ class LocationDoc(models.Model):
     Doc = JSONField(db_column='DOC', default=dict)
 
     class Meta:
-        db_table = 'location_doc'
+        db_table = 'source_location_doc'
+
+
+class Translate(models.Model):
+
+    id = models.BigIntegerField(db_column='id', primary_key=True)
+    Name = HStoreField()
+
+    class Meta:
+        db_table = 'source_translate'
+
+
+class Description(models.Model):
+

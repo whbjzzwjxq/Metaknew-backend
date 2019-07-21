@@ -24,6 +24,7 @@ class User(models.Model):
     # 兴趣部分
     # key: GroupId value: 0-Owner 1-Manager 2-Member 3-Applying
     Joint_Group = HStoreField(db_column='JOINT_GROUP')
+    # 用户感兴趣的领域
     Area = ArrayField(models.TextField(), db_column='AREA', default=list)
 
     class Meta:
@@ -51,7 +52,7 @@ class GroupCtrl(models.Model):
 
 class Privilege(models.Model):
 
-    # 注意GroupId和UserId不能重复
+    # 注意GroupId和UserId不能重复 因此生成的时候使用同一个IdBlock
     Id = models.BigIntegerField(primary_key=True, db_index=True)
     # 用户控制
     Is_Active = models.BooleanField(db_column='ACTIVE', default=True)

@@ -2,20 +2,6 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.fields import JSONField
 
-# Create your models here.
-
-
-class ExcelRecord(models.Model):
-
-    uuid = models.BigIntegerField(db_column='UUID', primary_key=True)
-    ExcelURL = models.URLField(db_column='URL')
-    UserId = models.IntegerField(db_column='USER_ID')
-    Nodes = ArrayField(models.BigIntegerField(), db_column='NODES')
-
-    class Meta:
-
-        db_table = 'history_excel_upload'
-
 
 # 这个是方便查找缺漏使用的 内部使用
 class SourceAddRecord(models.Model):

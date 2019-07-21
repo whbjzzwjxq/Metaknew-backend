@@ -1,20 +1,10 @@
 # -*-coding=utf-8 -*-
 from django.http import HttpResponse
-import json
 import time
 from django.http import JsonResponse
-from django.contrib.auth.hashers import check_password
-# import datetime as dt
-from django.utils import timezone
-from tools.Id_Generator import id_generator
 from tools.redis_process import redis
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from tools.Meta_Response import get_http_response as getHttpResponse
-from django.core.cache import cache
-from users.models import User
-from tools.login_token import make_token
-from users.models import UserRole
 from tools.redis_process import minute
 import random
 

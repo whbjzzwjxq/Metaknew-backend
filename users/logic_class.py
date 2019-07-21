@@ -93,7 +93,7 @@ class BaseUser:
         }
         cache_info.update(self.user.Joint_Group)
         redis.hmset('info_' + str(_id), cache_info)
-        # todo 分析一下缓存什么内容比较合适
+        # todo 分析一下缓存什么内容比较合适 level: 2
         response = HttpResponse(content='登录成功', status=200)
         response.set_cookie(key='token', value=cache_info['token'], max_age=week, httponly=True)
         response.set_cookie(key='user_name', value=self.user.UserName, max_age=week)

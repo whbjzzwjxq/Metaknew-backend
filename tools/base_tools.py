@@ -58,18 +58,6 @@ def init(label):
         return Node
 
 
-def get_uuid(name, label, device):
-    origin_uuid = str(uuid.uuid1())[-17:]
-    md5 = hashlib.md5(name.encode(encoding='UTF-8')).hexdigest()[0:8]
-    a = label_hash.get(label, '0000')
-    b = device_hash.get(device, '0000')
-    return md5 + '-' + a + '-' + b + '-' + origin_uuid
-
-
-def rel_uuid():
-    return str(uuid.uuid1())
-
-
 def get_props_for_user_ctrl(p_label: str):
     """
     :param p_label: PrimaryLabel
@@ -89,13 +77,6 @@ def get_props_for_user_ctrl(p_label: str):
             return []
     else:
         return ["Title", "MainPic", "Area", "CreateUser", "Description", "Keywords"]
-
-
-def uuid_matcher(string):
-    if re_for_uuid.match(string):
-        return True
-    else:
-        return False
 
 
 def dict_dryer(node: dict):
