@@ -9,80 +9,74 @@ def contributor():
 
 
 def feature_vector():
-
     return {"group_vector": [],
             "word_embedding": [],
             "label_embedding": []}
 
 
-# Node的控制属性而且不直接传回前端
+# 控制属性 不会直接update done
 class NodeCtrl(models.Model):
-
     id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)
-    CreateMethod = models.CharField(db_column='METHOD', max_length=30, editable=False)
-    CreateTime = models.DateTimeField(db_column='TIME', auto_now_add=True, editable=False)
-    CreateUser = models.IntegerField(db_column='USER', default='0', editable=False)  # 创建用户
+    # 不传回的控制性内容
     History = models.BigIntegerField(db_column='HISTORY', editable=False)  # 历史记录的编号
+    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME')  # 最后统计的时间
+    NameTrans = models.BigIntegerField(db_column='Name_Trans')  # 名字翻译文件
+    DescriptionTrans = models.BigIntegerField(db_column='Description_Trans')  # 名字翻译文件
+
+    # 直接传回的内容
+    CreateTime = models.DateField(db_column='TIME', auto_now_add=True, editable=False)
+    CreateUser = models.BigIntegerField(db_column='USER', default='0', editable=False)  # 创建用户
     UpdateTime = models.DateTimeField(db_column='Update_Time', auto_now=True)  # 最后更新时间
-    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
+    PrimaryLabel = models.IntegerField(db_column='P_LABEL', db_index=True)  # 主标签 # global_word
 
-    class Meta:
-        abstract = True
-
-
-# Node前端会用 但是不是简单获得的属性/需要统计
-class NodeShow(NodeCtrl):
-
+    # 从用户(UserConcern)那里统计的内容 更新频率 高
     Imp = models.IntegerField(db_column='IMP', default=0)
     HardLevel = models.IntegerField(db_column='HARD_LEVEL', default=0)  # 难易度
     Useful = models.IntegerField(db_column='USEFUL', default=0)  # 有用的程度
-
-    Hot = models.IntegerField(db_column='HOT', default=0)  # 热度统计
     Star = models.IntegerField(db_column='STAR', default=0)  # 收藏数量
-
-    Structure = models.IntegerField(db_column='STR', default=0)  # 结构化的程度
     Contributor = ArrayField(JSONField, db_column='CONTRIBUTOR', default=contributor())
     UserLabels = ArrayField(models.TextField(), db_column='USER_LABELS', default=list)
 
-    IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件uuid
+    # 从数据分析统计的内容 更新频率 低
+    Hot = models.IntegerField(db_column='HOT', default=0)  # 热度统计
+    Structure = models.IntegerField(db_column='STR', default=0)  # 结构化的程度
     FeatureVec = JSONField(db_column='FEATURE_VECTOR', default=feature_vector())  # 特征值
 
     class Meta:
+        db_table = 'node_ctrl'
 
-        db_table = 'node_frontend'
 
-
-# Node直接简单写入/传回的属性
-class Node(NodeShow):
-
+# Node直接允许简单写入/传回的属性 done
+class Node(models.Model):
+    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)
     Name = models.TextField(db_column='NAME')
-    Language = models.TextField(db_column='LANG', default='auto')
-    Area = ArrayField(models.TextField(), db_column='AREA')
-    PrimaryLabel = models.TextField(db_column='P_LABEL', db_index=True)
+    PrimaryLabel = models.IntegerField(db_column='P_LABEL', db_index=True)  # 主标签 注意干燥  # global_word
     Alias = ArrayField(models.TextField(), db_column='ALIAS', default=list)
-    Description = models.TextField(db_column='DESCRIPTION', default='')
-    Labels = ArrayField(models.TextField(), db_column='LABELS', default=list)
-    IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件uuid
-    ExtraProps = JSONField(db_column='EXTRA_PROPS', default=dict)
+    Language = models.IntegerField(db_column='LANG', default='auto')  # global_word
+    Area = ArrayField(models.IntegerField(), db_column='AREA')  # global_word
+    Labels = ArrayField(models.IntegerField(), db_column='LABELS', default=list, db_index=True)  # global_word
+    ExtraProps = JSONField(db_column='EXTRA_PROPS', default=dict)  # global_word
+
+    Description = models.TextField(db_column='DESCRIPTION')
+    IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件id
 
     class Meta:
-
         db_table = 'node_base'
 
 
+# todo 更多标签 level: 1
 class Person(Node):
 
     PeriodStart = models.TextField(db_column='PERIOD_START')
     PeriodEnd = models.TextField(db_column='PERIOD_END')
-    BirthPlace = models.CharField(db_column='BIRTHPLACE', max_length=30)
-    Nation = models.CharField(db_column='NATION', max_length=30, default='None')
+    BirthPlace = models.TextField(db_column='BIRTHPLACE', max_length=30)
+    Nation = models.IntegerField(db_column='NATION', max_length=30)  # global_word
 
     class Meta:
         db_table = 'node_person'
 
 
 class Project(Node):
-
     PeriodStart = models.TextField(db_column='PERIOD_START')
     PeriodEnd = models.TextField(db_column='PERIOD_END')
     Nation = models.TextField(db_column='NATION', max_length=30)
@@ -93,16 +87,36 @@ class Project(Node):
 
 
 class ArchProject(Project):
-
-    Location = models.TextField(db_column='LOCATION', default='Beijing')
+    Location = models.IntegerField(db_column='LOCATION', default='Beijing')  # global_word
     WorkTeam = ArrayField(models.TextField(), db_column='WORK_TEAM', default=list)
 
     class Meta:
         db_table = 'node_arch_project'
 
 
-class LocationDoc(models.Model):
+class MediaNode(models.Model):
+    id = models.BigIntegerField(db_column='ID', primary_key=True)
+    FileName = models.TextField(db_column='NAME')
+    Format = models.IntegerField(db_column='FORMAT')  # global_word
+    Url = models.URLField(db_column='URL', default='')
+    UploadUser = models.BigIntegerField(db_column='UPLOAD_USER')
+    UploadTime = models.DateTimeField(db_column='UPLOAD_TIME', auto_now_add=True)
+    Description = models.TextField(db_column='DESCRIPTION', default='None')
 
+    class Meta:
+        db_table = 'media_base'
+
+
+class Paper(MediaNode):
+    Tags = ArrayField(JSONField(), db_column='TAGS', default=list)
+    Rels = ArrayField(JSONField(), db_column='RELS', default=list)
+
+    class Meta:
+        db_table = 'media_paper'
+
+
+# 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录
+class LocationDoc(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True)
     Name = models.TextField(db_column='NAME', default='Beijing')
     LocId = models.TextField(db_column='LOC_ID', default='ChIJ58KMhbNLzJQRwfhoMaMlugA')
@@ -114,9 +128,11 @@ class LocationDoc(models.Model):
 
 
 class Translate(models.Model):
-
     id = models.BigIntegerField(db_column='id', primary_key=True)
-    Name = HStoreField()
+    auto = models.TextField(db_column='name', db_index=True)
+    zh = models.TextField(db_column='name_zh')
+    en = models.TextField(db_column='name_en')
+    names = HStoreField(db_column='name_more')
 
     class Meta:
         db_table = 'source_translate'
@@ -124,3 +140,12 @@ class Translate(models.Model):
 
 class Description(models.Model):
 
+    id = models.BigIntegerField(db_column='id', primary_key=True)
+    auto = models.TextField(db_column='description', db_index=True)
+    zh = models.TextField(db_column='description_zh')
+    en = models.TextField(db_column='description_en')
+    names = HStoreField(db_column='description_more')
+
+    class Meta:
+
+        db_table = 'source_description'

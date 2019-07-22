@@ -102,6 +102,7 @@ class UserConcern(models.Model):
     HardLevel = models.SmallIntegerField(db_column='HARD_LEVEL', default=-1)
     Useful = models.SmallIntegerField(db_column='USEFUL', default=-1)
     Is_Star = models.BooleanField(db_column='STAR', default=False)
+    Is_Edit = models.BooleanField(db_column='EDIT', default=False)
 
     class Meta:
         indexes = [

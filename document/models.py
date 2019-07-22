@@ -2,40 +2,29 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from users.models import User
+from subgraph.models import Node
 
 
-class DocCtrl(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)  # 专题id
-    CreateUser = models.IntegerField(db_column='USER', default='0')  # 发表用户id
-    CreateTime = models.DateTimeField(db_column='CREATE_TIME', auto_now_add=True)  # 创建的时间
-    CountCacheTime = models.DateTimeField(db_column='CACHE_TIME', auto_now=True)  # 最后统计的时间
+def node_setting():
 
+    return 
 
-class DocInfo(models.Model):
-    Title = models.TextField(db_column='TITLE', default=id)  # 标题
-    MainPic = models.URLField(db_column='MAIN_PICTURE', default='')  # 缩略图
-    Area = ArrayField(models.TextField(), db_column='AREA', default=list)  # 领域
-    Description = models.TextField(db_column='DESCRIPTION', default='None')  # 描述
+# todo 专题可能还有一些别的信息?
+class _Doc(Node):
+
+    MainPic = models.BigIntegerField(db_column='MAIN')  # 缩略图
+    Size = models.IntegerField(db_column='SIZE', default=0)
     Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 关键词
-
-    UpdateTime = models.DateTimeField(db_column='UPDATE_TIME', auto_now=True)  # 最后更新的时间
-    Size = models.IntegerField(db_column='SIZE', default=0)  # 节点数量
-
-    HardLevel = models.FloatField(db_column='HARD_LEVEL', default=0)  # 难易度
-    Imp = models.IntegerField(db_column='IMP', default=0)  # 重要度
-    Useful = models.IntegerField(db_column='USEFUL', default=0)  # 有用的程度
-    Hot = models.IntegerField(db_column='HOT', default=0)  # 热度
-    IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件url
-    FeatureVec = models.TextField(db_column='FEATURE_VECTOR', default='0')  # 特征值
+    Total_Time = models.IntegerField(db_column='TOTAL_TIME', default=1000)
 
     class Meta:
-
         db_table = 'document_info'
 
 
 # 专题的Graph相关的内容 也就是在svg绘制的时候请求的内容
 class DocGraph(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True,editable=False)  # 专题ID
+
+    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)  # 专题ID
     MainNodes = ArrayField(models.BigIntegerField(), db_column='MAIN_NODES', default=list)   # 主要节点的uuid
     IncludedNodes = ArrayField(JSONField(), db_column='NODES', default=list)  # json里包含节点在该专题下的设置
     IncludedLinks = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=list)  # json里包含关系在该专题下的设置
