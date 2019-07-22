@@ -25,7 +25,11 @@ class AuthMiddleware:
             '/es_query/index': [],
             '/search/criteria_query': [],
             '/search/get_single_node': [],
-            '/tools/generate': []
+            '/tools/generate': []，
+            '/search/es_ask/': [],
+            '/document/getPersonalByDoc': [],
+            '/document/addComment': [],
+            '/mediaNode/upload': [],
         }
 
     def __call__(self, request: HttpRequest()):

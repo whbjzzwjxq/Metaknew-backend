@@ -22,8 +22,10 @@ from document.logic_class import PersonalDoc
 def get_personal_by_doc(request):
     doc_id = request.GET.get('uuid')
     user = request.GET.get('user_id')
+    print(user)
     result = PersonalDoc(uuid=doc_id, user=user).query_all()
-    return HttpResponse(json.dumps(result), content_type="application/json")
+    print(result.__dict__)
+    return HttpResponse(json.dumps(result.__dict__), content_type="application/json")
 
 
 # 添加评论
