@@ -56,7 +56,7 @@ class Node(models.Model):
     Area = ArrayField(models.IntegerField(), db_column='AREA')  # global_word
     Labels = ArrayField(models.IntegerField(), db_column='LABELS', default=list, db_index=True)  # global_word
     ExtraProps = JSONField(db_column='EXTRA_PROPS', default=dict)  # global_word
-
+    MainPic = models.BigIntegerField(db_column='MAIN')  # 缩略图/主要图片
     Description = models.TextField(db_column='DESCRIPTION')
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件id
 

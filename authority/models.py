@@ -58,7 +58,7 @@ class PaymentManager(models.Model):
         db_table = 'authority_payment'
 
 
-# 注意这个表单只做统计信息用 权限检测在User下实现
+# 注意这个表单只做统计信息用 权限检测在User下实现 done
 class AuthorityCount(models.Model):
     id = models.BigIntegerField(db_column='id', primary_key=True)  # 资源uuid
     Owner = models.IntegerField(db_column='Owner', db_index=True)  # 专题所有人的id
