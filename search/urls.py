@@ -1,10 +1,9 @@
 from django.conf.urls import url
 
-from search import views, es_search
+from search import views
 
 urlpatterns = [
-    url('single/', views.get_node_uuid),
-    url('es_ask/', es_search.es_ask),
     url('criteria_query', views.criteria_query),
-    url('searchByCondition', views.search_by_condition),
+    url('get_single_node', views.get_single_node)
+    # url('get_prop_dict', views.get_dict)
 ]

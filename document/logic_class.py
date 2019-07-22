@@ -1,7 +1,7 @@
 from document.models import Comment, Note
-from document.models import DocGraph, DocInfo, StudyNet
+from document.models import DocGraph, DocInfo
 from django.core.exceptions import ObjectDoesNotExist
-from tools import base_tools, token
+from tools import base_tools, login_token
 from subgraph.logic_class import BaseNode
 from django.core.cache import cache
 from time import time
@@ -12,10 +12,7 @@ types = ['StrNode', 'InfNode', 'Media', 'Document']
 NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
 
-# input item类的实例
-# output dict
-
-
+# todo doc重新定义 level: 0
 class BaseDoc:
 
     def __init__(self):
@@ -25,7 +22,7 @@ class BaseDoc:
         self.links = []
         self.NeoNode = BaseNode()
         self.comments = []
-
+        self.already = False
         self.origin = ''
 
     def query(self, uuid):
@@ -33,18 +30,19 @@ class BaseDoc:
         cache_doc = cache.get(key)
         self.origin = uuid
         if not cache_doc:
-            self.NeoNode = BaseNode().query(uuid=uuid)
+            self.NeoNode = BaseNode().query(_id=uuid)
             self.Graph = self.query_graph(uuid)
             self.save_cache()
         else:
             self.NeoNode = cache_doc["NeoNode"]
             self.Graph = cache_doc["Graph"]
-            timeout = cache.ttl(key) + token.hour
+            timeout = cache.ttl(key) + login_token.hour
             cache.expire(key, timeout=timeout)
 
         self.Info = self.NeoNode.info
         self.nodes = [node['uuid'] for node in self.nodes]
         self.links = [link['uuid'] for link in self.links]
+        self.already = True
         return self
 
     def create(self, data):
@@ -83,7 +81,7 @@ class BaseDoc:
         key = "abbr_" + self.origin[-17:]
         abbr_doc = cache.get(key)
         if abbr_doc:
-            cache.expire(key, timeout=token.week)
+            cache.expire(key, timeout=login_token.week)
             return abbr_doc
         else:
             abbr_doc = {
@@ -95,7 +93,7 @@ class BaseDoc:
                 'hard_level': self.Info.HardLevel,
                 'size': self.Info.Size
             }
-            cache.add(key, abbr_doc, timeout=token.week)
+            cache.add(key, abbr_doc, timeout=login_token.week)
             return abbr_doc
 
     def query_comment(self):
@@ -153,7 +151,7 @@ class BaseDoc:
             self.Graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
-        if time() - self.Info.CountCacheTime.timestamp() > token.week:
+        if time() - self.Info.CountCacheTime.timestamp() > login_token.week:
             self.re_count()
             self.Info.CountCacheTime = datetime.datetime.now()
         self.Info.UpdateTime = datetime.datetime.now()
@@ -190,7 +188,7 @@ class BaseDoc:
             "NeoNode": self.NeoNode,
             "Graph": self.Graph
         }
-        cache.add(key, cache_doc, timeout=token.hour * 2)
+        cache.add(key, cache_doc, timeout=login_token.hour * 2)
 
     def clear_cache(self):
         key = "cache_doc_" + self.origin[-17:]
@@ -232,7 +230,7 @@ class BaseComment:
             self.comment = comment
         return self
 
-    def add(self, base, target, user, content, time):
+    def add(self, base, target, user, content, update_time):
         content = str(content)
         uuid = base_tools.get_uuid(name=content[0]+'comment',
                                    label='Comment',
@@ -242,7 +240,7 @@ class BaseComment:
                                Target=target,
                                UserId=user,
                                Content=content,
-                               Time=time)
+                               Time=update_time)
         self.comment.save()
 
     def delete(self):
@@ -302,3 +300,4 @@ class BasePath(BaseDoc):
 
     def set_prop_node(self):
         pass
+

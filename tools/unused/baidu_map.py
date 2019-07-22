@@ -6,13 +6,6 @@ import requests
 map_base_url = 'http://api.map.baidu.com/geocoder/v2/?output=json&ak=I2H9uTTdMe4ARhoMrGzHIWZylZywIiim&address={}'
 
 
-def getHttpResponse(status, ret, data=''):
-    resp = HttpResponse()
-    respData = {'status': status, 'ret': ret, 'data': data}
-    resp.content = json.dumps(respData)
-    return resp
-
-
 def getLocation(address):
     res = requests.get(map_base_url.format(address))
     json_data = json.loads(res.text)

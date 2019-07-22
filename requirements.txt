@@ -1,3 +1,5 @@
+googlemaps
+redis
 PyJWT
 celery
 aliyunsdkcore
@@ -17,7 +19,7 @@ cryptography==2.4.2
 decorator==4.3.0
 Django==2.2
 django-cors-headers==2.4.0
-elasticsearch==6.3.1
+elasticsearch==7.0.2
 idna==2.8
 ipykernel==5.1.0
 ipython==7.1.1
@@ -62,3 +64,4 @@ urllib3==1.22
 wcwidth==0.1.7
 wrapt==1.11.0
 psycopg2==2.8.2
+pycryptodome==3.8.2

@@ -1,14 +1,15 @@
 import json
-from tools.location import getLocation
+from tools.google_map import get_location
 from tools.base_tools import NeoSet
 from subgraph.logic_class import BaseNode
 from django.shortcuts import HttpResponse
+from tools.redis_process import redis
 import os
 
 
 def handle_data(line, user):
     data = line
-    loc = getLocation(data["Location"])
+    redis.sadd("loc_query_queue", data["Location"])
     Leader = data["Architect"].split(";")
     Leader = [element for element in Leader if element]
     node = data
@@ -16,10 +17,10 @@ def handle_data(line, user):
         "type": "StrNode",
         "PrimaryLabel": "ArchProject",
         "Labels": ["Latin_America", "20century"],
+        "Area": "Architecture",
         "Leader": Leader,
         "WorkTeam": Leader,
-        "Longitude": loc[0],
-        "Latitude": loc[1],
+        "Location": data["Location"],
         "ImportMethod": "Handle",
         "CreateUser": user
     })
@@ -37,4 +38,6 @@ def script_latin(request):
     nodes = [handle_data(line, user=user) for line in lines]
     results = [BaseNode(collector=collector).create(node=node) for node in nodes]
     collector.tx.commit()
+    locations = list(redis.smembers("loc_query_queue"))
+    get_location(locations)
     return HttpResponse("Success")

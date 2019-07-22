@@ -1,111 +1,12 @@
 # -*-coding=utf-8 -*-
 from django.http import HttpResponse
-import json
 import time
 from django.http import JsonResponse
-from django.contrib.auth.hashers import check_password
-# import datetime as dt
-from django.utils import timezone
-from django.contrib.auth.hashers import make_password
-import numpy as np
+from tools.redis_process import redis
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from tools.location import getHttpResponse
-from django.core.cache import cache
-from users.models import User
-from tools.token import make_token, week
-from users.models import UserCollection, UserRole
-# Create your views here.
-
-
-# 修改用户资料     未测
-def update_user(request):
-    response = HttpResponse()
-    file_data = {'UserId': request.POST.get('user_id', None),
-                 'UserName': request.POST.get('user_name', None),
-                 'UserEmail': request.POST.get('user_email', None)}
-    User.objects.update(file_data)
-    resp_data = {'status': '1', 'ret': '资料修改成功！！'}
-    response.content = json.dumps(resp_data)
-    return HttpResponse(response, content_type="application/json")
-
-
-# 登录
-def login_by_phone_pw(request):
-    # 获取用户输入的手机号、密码
-    response = HttpResponse()
-    param = json.loads(request.body)['data']
-    phone = param['user_phone']
-    password = param['user_pw']
-    user = User.objects.get(UserPhone=phone)
-    if not user:
-        resp_data = {'status': '0', 'ret': '用户不存在!!!'}
-    else:
-        # 检查密码是否匹配
-        if check_password(password, user.UserPw):
-            try:
-                token = make_token(user.UserName, user.UserId)
-                resp_data = {'status': '1', 'ret': '登录成功!'}
-                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
-                response.set_cookie(key='user_name', value=user.UserName, max_age=week)
-                print(token)
-            except BaseException as e:
-                print(e)
-                resp_data = {'status': '0', 'ret': '登录失败，请与管理员联系'}
-        else:
-            resp_data = {'status': '0', 'ret': '登录失败，账号或密码不正确'}
-    response.content = json.dumps(resp_data)
-    return response
-
-
-# 注册
-def register(request):
-    """
-        "data":{
-        "user_name":
-        "user_pw":
-        "user_email":
-        "user_phone":
-    }
-    :param request:
-    :return:
-    """
-    response = HttpResponse()
-    param = json.loads(request.body)['data']
-    if param['user_name'] == '':
-        param['user_name'] = param['user_phone']
-    # redis中读取验证码信息
-    message_code = cache.get(param['user_phone'])  # 用户session
-    if message_code is None:
-        return HttpResponse(getHttpResponse('0', '验证码失效，请重新发送验证码', ''), content_type='application/json')
-    elif message_code != param['code']:
-        return HttpResponse(getHttpResponse('0', '验证码有误，请重新输入', ''), content_type='application/json')
-    else:
-        # 把数据写进数据库
-        try:
-            user_info = User.objects.get(UserPhone=param['user_phone'])
-            if user_info:
-                return HttpResponse(getHttpResponse('0', '该手机号已注册', ''), content_type='application/json')
-            else:
-                user_info = User.objects.create(
-                    UserPhone=param['user_phone'],
-                    UserEmail=param['user_email'],
-                    UserName=param['user_name'],
-                    UserPw=make_password(param['user_pw']),
-                    DateTime=timezone.now()
-                )
-                token = make_token(user_info.UserName, user_info.UserId)
-                UserCollection.objects.create(UserId=user_info).save()
-                UserRole.objects.create(UserId=user_info).save()
-                user_info.save()
-                response.set_cookie(key='token', value=token, max_age=week, httponly=True)
-                response.set_cookie(key='user_name', value=user_info.UserName, max_age=week)
-                respData = {'status': 1, 'ret': '注册成功!'}
-        except BaseException as e:
-            print(e)
-            respData = {'status': 0, 'ret': '输入信息有误!'}
-        response.content = json.dumps(respData)
-        return response
+from tools.redis_process import minute
+import random
 
 
 # 发送验证码短信
@@ -120,28 +21,20 @@ def send_message(request):
     """
 
     # 模版变量对应参数值
-    TemplateParam = {}
-    message_code = ''
-    for i in range(6):
-        i = np.random.randint(0, 9)
-        message_code += str(i)
-    TemplateParam['code'] = message_code
-    print(message_code)
-
-    # session = json.loads(request.body)['data']['session']     #用户session   一分钟后验证码发送
-    # cache.set(session,message_code)  #设置缓存
-
-    mobile = json.loads(request.body)['data']['mobile']
-    cache.set(mobile, message_code)  # 根据手机号设置缓存
-    client = AcsClient('LTAITKweDYoqN2cH', 'jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB', 'default')
-    alirequest = requestAPI('SendSms', 'MetaKnew', 'SMS_163847373')
-    alirequest.add_query_param('TemplateParam', TemplateParam)
-    alirequest.add_query_param('PhoneNumbers', mobile)
-    response = client.do_action_with_exception(alirequest)
-    print(str(response, encoding='utf-8'))
-
-    return HttpResponse(getHttpResponse('1', '发送成功', json.loads(str(response, encoding='utf-8'))),
-                        content_type="application/json")
+    phone = request.GET.get('phone')
+    current = redis.get(phone)
+    message_code = random.randint(123456, 898998)
+    if current:
+        return HttpResponse(content='请隔1分钟再请求验证码')
+    else:
+        redis.set(phone, message_code, ex=minute)
+        params = {'code': str(message_code)}
+        client = AcsClient('LTAITKweDYoqN2cH', 'jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB', 'default')
+        ali_request = ali_dayu_api('SendSms', 'MetaKnew', 'SMS_163847373')
+        ali_request.add_query_param('TemplateParam', params)
+        ali_request.add_query_param('PhoneNumbers', phone)
+        client.do_action_with_exception(ali_request)
+        return HttpResponse(content='发送成功', content_type="application/json")
 
 
 # 查询发送记录
@@ -185,7 +78,7 @@ def query_send_detail(biz_id, mobile, page_size=10, current_page=1):
         """
 
     client = AcsClient('LTAITKweDYoqN2cH', 'jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB', 'default')
-    alirequest = requestAPI('QuerySendDetails', 'MetaKnew', 'SMS_163847373')
+    alirequest = ali_dayu_api('QuerySendDetails', 'MetaKnew', 'SMS_163847373')
     alirequest.add_query_param('PhoneNumbers', mobile)
     alirequest.add_query_param('CurrentPage', current_page)
     alirequest.add_query_param('SendDate', time.strftime("%Y%m%d", time.localtime(int(time.time()))))
@@ -198,7 +91,7 @@ def query_send_detail(biz_id, mobile, page_size=10, current_page=1):
 
 
 # 阿里大于查询公共请求信息封装接口
-def requestAPI(actionName, signName, templateCode):
+def ali_dayu_api(actionName, signName, templateCode):
     alirequest = CommonRequest()
     alirequest.set_accept_format('json')
     alirequest.set_domain('dysmsapi.aliyuncs.com')

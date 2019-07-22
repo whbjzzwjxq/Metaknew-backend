@@ -1,6 +1,5 @@
 # -*-coding=utf-8 -*-
 # APP内定义
-from tools.base_tools import get_dict
 from document.logic_class import BaseComment, BaseNote, BaseDoc
 # django定义与工具包
 import datetime as dt
@@ -11,7 +10,7 @@ from demo import settings
 from django.views.decorators.csrf import csrf_exempt
 import json
 import os
-from tools.location import getHttpResponse
+from tools.Meta_Response import get_http_response as getHttpResponse
 from django.forms.models import model_to_dict
 from django.core.cache import cache
 from document.logic_class import PersonalDoc
@@ -43,7 +42,7 @@ def add_comment(request):
             target=data['target'],
             user=user_id,
             content=str(data['content']),
-            time=dt.datetime.now()
+            update_time=dt.datetime.now()
         )
 
     return HttpResponse("回复成功")

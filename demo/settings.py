@@ -72,10 +72,9 @@ INSTALLED_APPS = [
     'subgraph',
     'document',
     'search',
-    'group',
     'media',
     'history',
-
+    'tools'
 ]
 
 SITE_ID = 1
@@ -89,7 +88,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'authority.logic_class.AuthMiddleware'
+    # 'authority.logic_class.AuthMiddleware'
 ]
 
 ROOT_URLCONF = 'demo.urls'
@@ -120,9 +119,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'Metaknew',
         'USER': 'postgres',
-        'PASSWORD': '123456',
+        'PASSWORD': 'ay67cla910',
         'HOST': '39.96.10.154',
-        'PORT': '5432',
+        'PORT': '7011',
     }
 }
 
