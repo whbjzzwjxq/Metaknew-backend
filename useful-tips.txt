@@ -4,48 +4,8 @@ MATCH (n) where n.PrimaryLabel = "Document" delete n
 
 
 //测试专题用格式
-{"data":{
-	"nodes":[
-		{	"info": {
-				"uuid": "45f5f2a3-14a0-11e9-a154-00163e2ebf28",
-				"Name": "Walter Gropius",
-				"PrimaryLabel": "Architect"
-					},
-			"conf": {
-				"x": 0.65,
-				"y": 0.72
-					}
-		},
 
-		{	"info":	{
-				"uuid": "42437790-2049-11e9-8395-00163e2ebf28",
-				"Name": "Rafael Moneo",
-				"PrimaryLabel": "Architect"
-					},
-			"conf": {
-				"x": 0.65,
-				"y": 0.88
-			}
-		}
-	],
-	"relationships":[
-		{
-			"info":	{"type":"Structure", "Property": "Research", "source":"45f5f2a3-14a0-11e9-a154-00163e2ebf28", "target":"42437790-2049-11e9-8395-00163e2ebf28"},
-			"conf": {"test": "cache"}
-	}
-	],
-	"info":{
-		"title": "test",
-		"area": "test",
-		"main_nodes":["42437790-2049-11e9-8395-00163e2ebf28"],
-		"keywords":["Rafael Moneo"],
-		"create_user":0
-	}
-  }
-}
-
-
-// es 的 命令需要到home/yu/elasticsearch-6.5.2目录下执行
+// es 的 命令需要到 cd $ES_PATH -> ./bin/elasticsearch
 
 
 //es的mapping设置:
@@ -56,8 +16,13 @@ Ver Cluster Port Status Owner    Data directory              Log file
 11  main    5432 down   postgres /var/lib/postgresql/11/main /var/log/postgresql/postgresql-11-main.log
 postgres密码 ay67cla910
 
-//
+//服务端口配置
 es : 7000
 kibana : 7001
 aliyun: 7010
 postgre: 7011
+
+
+//redis
+直接使用redis-python 连接
+有关redis的操作写在了tools -> redis_process

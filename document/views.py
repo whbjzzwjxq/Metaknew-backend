@@ -12,7 +12,6 @@ import json
 import os
 from tools.Meta_Response import get_http_response as getHttpResponse
 from django.forms.models import model_to_dict
-from django.core.cache import cache
 from document.logic_class import PersonalDoc
 
 

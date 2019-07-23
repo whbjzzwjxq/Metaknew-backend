@@ -9,44 +9,59 @@ class GlobalWordIndex(models.Model):
     class Meta:
         db_table = 'global_word_index'
 
+
 # block_size = 65535
-
-
-# Node使用PrimaryLabel作为block划分依据
-class GlobalLabelBlock(models.Model):
+# BlockManager: 一个体系的全局管理
+# Node, Media使用PrimaryLabel的index作为划分依据
+# Document, Comment之类的功能内容使用device作为划分依据
+# Record之类的事务内容使用time作为划分依据
+class BaseBlockManager(models.Model):
 
     id = models.AutoField(db_column='ID', primary_key=True)
-    PrimaryLabel = models.TextField(db_column='LabelContent', db_index=True)
+    Classifier = models.IntegerField(db_column='LabelContent', db_index=True)
     RegisterTime = models.DateTimeField(db_column='RegisterTime', auto_now_add=True)
 
     class Meta:
-        db_table = 'global_label_block'
+        abstract = True
 
 
-class LabelBlockId(models.Model):
+class NodeBlockManager(BaseBlockManager):
+    class Meta:
+        db_table = 'global_node_block'
+
+
+class DeviceBlockManager(BaseBlockManager):
+    class Meta:
+        db_table = 'global_media_block'
+
+
+class RecordBlockManager(BaseBlockManager):
+    class Meta:
+        db_table = 'global_private_block'
+
+
+# 每个Block的管理记录
+class BlockIdRecord(models.Model):
 
     BlockId = models.IntegerField(db_column='BLOCK_ID', db_index=True)
     OutId = models.BigIntegerField(db_column='OUT_ID', primary_key=True)
 
     class Meta:
-        db_table = 'global_node_id'
+        abstract = True
 
 
-# Document, Note之类的内容使用device作为划分依据
-class GlobalDeviceBlock(models.Model):
+class NodeBlockIdRecord(BlockIdRecord):
+    class Meta:
+        db_table = 'global_node_block'
 
-    id = models.AutoField(db_column='ID', primary_key=True)
-    DeviceId = models.SmallIntegerField(db_column='DeviceId', db_index=True)
-    RegisterTime = models.DateTimeField(db_column='RegisterTime', auto_now_add=True)
+
+class DeviceBlockIdRecord(models.Model):
 
     class Meta:
         db_table = 'global_device_block'
 
 
-class DeviceBlockId(models.Model):
-
-    BlockId = models.IntegerField(db_column='BLOCK_ID', db_index=True)
-    OutId = models.BigIntegerField(db_column='OUT_ID', primary_key=True)
+class RecordBlockIdRecord(models.Model):
 
     class Meta:
-        db_table = 'global_device_id'
+        db_table = 'global_time_block'

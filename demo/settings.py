@@ -72,7 +72,6 @@ INSTALLED_APPS = [
     'subgraph',
     'document',
     'search',
-    'media',
     'history',
     'tools'
 ]

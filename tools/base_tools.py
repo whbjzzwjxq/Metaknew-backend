@@ -1,22 +1,13 @@
-import hashlib
 import re
-import uuid
 from subgraph.models import *
-from media.models import *
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
-from document.models import DocInfo
+from document.models import DocGraph
 from functools import reduce
 
 re_for_uuid = re.compile(r'\w{8}(-\w{4}){3}-\w{12}')
 re_for_ptr = re.compile(r'.*_ptr')
 graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
 types = ['StrNode', 'InfNode', 'Media', 'Document']
-
-# Neo4j Node用到的key
-NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language']
-
-
-# Neo4j Relationship用到的key
 
 
 class NeoSet:
@@ -31,23 +22,8 @@ class_table = {
     'Person': Person,
     'Project': Project,
     'ArchProject': ArchProject,
-    'Document': DocInfo,
+    'Document': DocGraph,
     'Paper': Paper
-}
-
-label_hash = {
-    'Person': '000a',
-    'Project': '000b',
-    'ArchProject': '001b',
-    'Document': 'a000',
-    'Path': 'ab00',
-    'Rel': 'aa99',
-    'Comment': 'a0a0'
-}
-
-device_hash = {
-    '0': '000a',
-    '1': '000b'
 }
 
 
@@ -69,8 +45,7 @@ def get_props_for_user_ctrl(p_label: str):
             # 目标包含的域
             target = class_table[p_label]._meta.get_fields()
             result = [field.name for field in target
-                      if not field.model == NodeShow
-                      and not field.model == NodeCtrl
+                      if not field.model == NodeCtrl
                       and not re_for_ptr.match(field.name)]
             return result
         except AttributeError('没有这种标签: %s' % p_label):

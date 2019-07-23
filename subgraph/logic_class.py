@@ -12,11 +12,7 @@ import json
 from datetime import datetime
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
-NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
-
-# input item类的实例
-# output dict
 
 class BaseNode(object):
 
@@ -150,7 +146,7 @@ class BaseNode(object):
     # 这里的node1指另一个NeoNode
     def merge(self, node1):
         assert self.already
-        # todo
+        # todo level: 3
         pass
 
     # 这里Neo4j还没有commit
@@ -161,15 +157,16 @@ class BaseNode(object):
         self.info.save()
 
     def handle_for_frontend(self):
-        assert self.already
-        labels = list(self.root.labels)
-        props = dict(self.root)
-
-        for key in get_special(self.label):
-            props.update({key: self.info.__getattribute__(key)})
-        props['uuid'] = str(props['uuid'])
-        # todo 更加详细的前端数据格式
-        return {"Labels": labels, "Props": props}
+        pass
+        # assert self.already
+        # labels = list(self.root.labels)
+        # props = dict(self.root)
+        #
+        # for key in get_special(self.label):
+        #     props.update({key: self.info.__getattribute__(key)})
+        # props['uuid'] = str(props['uuid'])
+        # todo 更加详细的前端数据格式 level : 0
+        # return {"Labels": labels, "Props": props}
 
 
 class BaseLink(object):
@@ -210,7 +207,7 @@ class BaseLink(object):
         self.collector.tx.push(self.root)
 
 
-# todo 消息队列处理
+# todo 消息队列处理 level :3
 async def add_node_index(node: BaseNode()):
     assert node.already
     root = node.root

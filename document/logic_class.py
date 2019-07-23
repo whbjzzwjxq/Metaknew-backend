@@ -1,5 +1,5 @@
 from document.models import Comment, Note
-from document.models import DocGraph, DocInfo
+from document.models import DocGraph, _Doc
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, login_token
 from subgraph.logic_class import BaseNode
@@ -13,25 +13,30 @@ NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language',
 
 
 # todo doc重新定义 level: 0
+
+front_end_doc = {
+    
+}
+
+
 class BaseDoc:
 
     def __init__(self):
-        self.Info = DocInfo()
+        self.Info = _Doc()
         self.Graph = DocGraph()
         self.nodes = []
         self.links = []
-        self.NeoNode = BaseNode()
         self.comments = []
         self.already = False
         self.origin = ''
 
-    def query(self, uuid):
+    def query(self, doc_id):
         key = "cache_doc_" + self.origin[-17:]
         cache_doc = cache.get(key)
-        self.origin = uuid
+        self.origin = doc_id
         if not cache_doc:
-            self.NeoNode = BaseNode().query(_id=uuid)
-            self.Graph = self.query_graph(uuid)
+            self.NeoNode = BaseNode().query(_id=doc_id)
+            self.Graph = self.query_graph(doc_id)
             self.save_cache()
         else:
             self.NeoNode = cache_doc["NeoNode"]
@@ -40,8 +45,8 @@ class BaseDoc:
             cache.expire(key, timeout=timeout)
 
         self.Info = self.NeoNode.info
-        self.nodes = [node['uuid'] for node in self.nodes]
-        self.links = [link['uuid'] for link in self.links]
+        self.nodes = [node['doc_id'] for node in self.nodes]
+        self.links = [link['doc_id'] for link in self.links]
         self.already = True
         return self
 
@@ -60,24 +65,24 @@ class BaseDoc:
     def reference(self):
         pass
 
-    def query_info(self, uuid):
-        self.origin = uuid
+    def query_info(self, doc_id):
+        self.origin = doc_id
         try:
-            self.Info = DocInfo.objects.get(uuid=uuid)
+            self.Info = DocInfo.objects.get(doc_id=doc_id)
             return self
         except ObjectDoesNotExist:
             return self
 
-    def query_graph(self, uuid):
-        self.origin = uuid
+    def query_graph(self, doc_id):
+        self.origin = doc_id
         try:
-            self.Graph = DocGraph.objects.get(pk=uuid)
+            self.Graph = DocGraph.objects.get(pk=doc_id)
             return self
         except ObjectDoesNotExist:
             return self
 
-    def query_abbr_doc(self, uuid):
-        self.query_info(uuid)
+    def query_abbr_doc(self, doc_id):
+        self.query_info(doc_id)
         key = "abbr_" + self.origin[-17:]
         abbr_doc = cache.get(key)
         if abbr_doc:
@@ -85,7 +90,7 @@ class BaseDoc:
             return abbr_doc
         else:
             abbr_doc = {
-                'uuid': self.origin,
+                'doc_id': self.origin,
                 'title': self.Info.Title,
                 'area': self.Info.Area,
                 'main_pic': self.Info.MainPic,
@@ -101,38 +106,38 @@ class BaseDoc:
                                                Is_Delete=False)
         return self.comments
 
-    def add_node(self, uuid, conf):
-        self.nodes.append({'uuid': uuid, 'conf': conf})
+    def add_node(self, doc_id, conf):
+        self.nodes.append({'doc_id': doc_id, 'conf': conf})
 
-    def remove_node(self, uuid):
-        if uuid in self.nodes:
-            index = self.nodes.index(uuid)
+    def remove_node(self, doc_id):
+        if doc_id in self.nodes:
+            index = self.nodes.index(doc_id)
             self.Graph.IncludedNodes.pop(index)
 
-        self.remove_main_node(uuid=uuid)
-        self.remove_rel(node=uuid, link_uuid=None)
+        self.remove_main_node(doc_id=doc_id)
+        self.remove_rel(node=doc_id, link_doc_id=None)
 
-    def update_node(self, uuid, conf):
-        if uuid in self.nodes:
-            index = self.nodes.index(uuid)
+    def update_node(self, doc_id, conf):
+        if doc_id in self.nodes:
+            index = self.nodes.index(doc_id)
             self.Graph.IncludedNodes[index]['conf'] = conf
 
-    def set_main_node(self, uuid):
-        self.Graph.MainNodes.append(uuid)
+    def set_main_node(self, doc_id):
+        self.Graph.MainNodes.append(doc_id)
 
-    def remove_main_node(self, uuid):
-        self.Graph.MainNodes.remove(uuid)
+    def remove_main_node(self, doc_id):
+        self.Graph.MainNodes.remove(doc_id)
 
-    def add_rel(self, uuid, source, target, conf):
-        self.Graph.IncludedLinks.append({'uuid': uuid,
+    def add_rel(self, doc_id, source, target, conf):
+        self.Graph.IncludedLinks.append({'doc_id': doc_id,
                                          'source': source,
                                          'target': target,
                                          'conf': conf})
 
-    def remove_rel(self, link_uuid: None, node: None):
-        if link_uuid is not None:
-            if link_uuid in self.links:
-                index = self.links.index(link_uuid)
+    def remove_rel(self, link_doc_id: None, node: None):
+        if link_doc_id is not None:
+            if link_doc_id in self.links:
+                index = self.links.index(link_doc_id)
                 self.Graph.IncludedLinks.pop(index)
         elif node is not None:
             source = [link['source'] for link in self.Graph.IncludedLinks]
@@ -144,10 +149,10 @@ class BaseDoc:
                 index = target.index(node)
                 self.Graph.IncludedLinks.pop(index)
 
-    def update_rel(self, uuid, conf):
+    def update_rel(self, doc_id, conf):
 
-        if uuid in self.links:
-            index = self.links.index(uuid)
+        if doc_id in self.links:
+            index = self.links.index(doc_id)
             self.Graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
@@ -165,22 +170,22 @@ class BaseDoc:
         self.Info.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg('HardLevel'))
         self.Info.Imp = result.filter(Imp__gte=0).aggregate(Avg('Imp'))
         self.Info.CountCacheTime = time()
-        # todo hot_count
+        # todo hot_count level : 1
 
     def get_default_image(self):
         pass
 
-    def upload_media(self, uuid_list):
-        self.Info.IncludedMedia.extend(uuid_list)
+    def upload_media(self, doc_id_list):
+        self.Info.IncludedMedia.extend(doc_id_list)
 
-    def update_media_by_uuid(self, uuid, include_media):
-        self.Info = DocInfo.objects.filter(uuid=uuid).update(IncludedMedia=include_media)
+    def update_media_by_doc_id(self, doc_id, include_media):
+        self.Info = DocInfo.objects.filter(doc_id=doc_id).update(IncludedMedia=include_media)
         return self
 
-    def remove_media(self, uuid_list):
-        for uuid in uuid_list:
-            if uuid in self.Info.IncludedMedia:
-                self.Info.IncludedMedia.remove(uuid)
+    def remove_media(self, doc_id_list):
+        for doc_id in doc_id_list:
+            if doc_id in self.Info.IncludedMedia:
+                self.Info.IncludedMedia.remove(doc_id)
 
     def save_cache(self):
         key = "cache_doc_" + self.origin[-17:]
@@ -197,9 +202,9 @@ class BaseDoc:
 
 class PersonalDoc:
 
-    def __init__(self, uuid, user):
+    def __init__(self, doc_id, user):
         self.user = user
-        self.uuid = uuid
+        self.doc_id = doc_id
         self.concern = {}
         self.notes = []
 
@@ -210,12 +215,12 @@ class PersonalDoc:
 
     def query_note(self):
         self.notes = Note.objects.filter(CreateUser=self.user,
-                                         DocumentId=self.uuid)
+                                         DocumentId=self.doc_id)
         return self.notes
 
     def query_concern(self):
         self.concern = UserConcern.objects.filter(UserId=self.user,
-                                                  SourceId=self.uuid)
+                                                  SourceId=self.doc_id)
         return self.concern
 
 
@@ -224,18 +229,16 @@ class BaseComment:
     def __init__(self):
         self.comment = Comment()
 
-    def query(self, uuid):
-        comment = Comment.objects.get(uuid=uuid)
+    def query(self, doc_id):
+        comment = Comment.objects.filter(doc_id=doc_id)
         if not comment.Is_Delete:
             self.comment = comment
         return self
 
     def add(self, base, target, user, content, update_time):
         content = str(content)
-        uuid = base_tools.get_uuid(name=content[0]+'comment',
-                                   label='Comment',
-                                   device=0)
-        self.comment = Comment(uuid=uuid,
+
+        self.comment = Comment(doc_id=doc_id,
                                BaseTarget=base,
                                Target=target,
                                UserId=user,
@@ -259,23 +262,23 @@ class BaseNote:
     def __init__(self):
         self.note = Note()
 
-    def query(self, uuid):
+    def query(self, _id):
         try:
-            self.note = Note.objects.get(uuid=uuid)
+            self.note = Note.objects.get(id=_id)
             return self
         except ObjectDoesNotExist:
             return None
 
-    def add(self, user, note_type, content, doc_uuid):
+    def add(self, user, note_type, content, doc_doc_id):
         content = str(content)
-        uuid = base_tools.get_uuid(name=content[0]+'comment',
+        doc_id = base_tools.get_doc_id(name=content[0]+'comment',
                                    label='Note',
                                    device=0)
-        self.note = Note(uuid=uuid,
+        self.note = Note(doc_id=doc_id,
                          CreateUser=user,
                          TagType=note_type,
                          Content=content,
-                         DocumentId=doc_uuid)
+                         DocumentId=doc_doc_id)
         self.note.save()
 
     def delete(self):
@@ -286,18 +289,4 @@ class BaseNote:
         if new_type in self.tag_type:
             self.note.TagType = new_type
         self.note.save()
-
-
-class BasePath(BaseDoc):
-
-    def query_graph(self, uuid):
-        self.origin = uuid
-        try:
-            self.Graph = StudyNet.objects.get(pk=uuid)
-            return self
-        except ObjectDoesNotExist:
-            return self
-
-    def set_prop_node(self):
-        pass
 

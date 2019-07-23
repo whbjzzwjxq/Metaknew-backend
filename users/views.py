@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from tools.redis_process import redis
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from tools.redis_process import minute
+from tools.redis_process import check_message, set_message
 import random
 
 
@@ -22,12 +22,12 @@ def send_message(request):
 
     # 模版变量对应参数值
     phone = request.GET.get('phone')
-    current = redis.get(phone)
+    current = check_message(phone=phone)
     message_code = random.randint(123456, 898998)
     if current:
         return HttpResponse(content='请隔1分钟再请求验证码')
     else:
-        redis.set(phone, message_code, ex=minute)
+        set_message(phone, message_code)
         params = {'code': str(message_code)}
         client = AcsClient('LTAITKweDYoqN2cH', 'jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB', 'default')
         ali_request = ali_dayu_api('SendSms', 'MetaKnew', 'SMS_163847373')

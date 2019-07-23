@@ -1,8 +1,6 @@
-from django.core.cache import cache
 from django.http import HttpResponse, HttpRequest
 from authority.models import *
 from tools.redis_process import redis
-from users.models import User
 
 
 # method = ['delete', 'change_state', 'copy', 'query_total', 'query_abbr', 'write', 'export', 'reference', 'download']
@@ -25,7 +23,7 @@ class AuthMiddleware:
             '/es_query/index': [],
             '/search/criteria_query': [],
             '/search/get_single_node': [],
-            '/tools/generate': []，
+            '/tools/generate': [],
             '/search/es_ask/': [],
             '/document/getPersonalByDoc': [],
             '/document/addComment': [],

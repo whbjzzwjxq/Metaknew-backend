@@ -4,7 +4,7 @@ from django.contrib.postgres.fields import ArrayField, HStoreField
 # Create your models here.
 
 
-# todo 角色整理 level : 2
+# todo 角色整理 level : 3
 class User(models.Model):
 
     UserId = models.BigIntegerField(db_column='USER_ID', primary_key=True)  # 用户id
@@ -53,7 +53,7 @@ class GroupCtrl(models.Model):
 class Privilege(models.Model):
 
     # 注意GroupId和UserId不能重复 因此生成的时候使用同一个IdBlock
-    Id = models.BigIntegerField(primary_key=True, db_index=True)
+    UserId = models.BigIntegerField(primary_key=True, db_index=True)
     # 用户控制
     Is_Active = models.BooleanField(db_column='ACTIVE', default=True)
     # 系统控制

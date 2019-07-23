@@ -6,10 +6,8 @@ from django.http import JsonResponse
 from django.contrib.auth.hashers import check_password
 from users.models import User, GroupCtrl, UserConcern, UserRepository, Privilege
 from tools.login_token import make_token
-from tools.encrypt_AES import decode
 from tools.redis_process import week, redis
 from django.contrib.auth.hashers import make_password
-from users.views import send_message
 from tools.Id_Generator import id_generator
 
 device_id = 0
@@ -123,7 +121,7 @@ class BaseUser:
                 return response
 
     def __create(self, info, concern, status):
-        _id = id_generator(1, content=device_id, jump=3)[0]
+        _id = id_generator(number=1, method='device', content=device_id, jump=3)[0]
         password = info['password']
         # todo 前端密码加密 level: 3
         # password = decode(password, info['length'])
@@ -139,7 +137,7 @@ class BaseUser:
             groups = concern['group']
             self.user.Area = area
             self.user.Joint_Group = BaseGroup.apply(_id, groups)
-        self.privilege = Privilege.objects.create(Id=_id)
+        self.privilege = Privilege.objects.create(UserId=_id)
         self.repository = UserRepository.objects.create(UserId=_id)
         self.save()
 
@@ -167,7 +165,7 @@ class BaseGroup:
     @staticmethod
     def apply(user_id, group_ids):
 
-        # todo 改成list of group
+        # todo 改成list of group level: 3
         groups = GroupCtrl.objects.in_bulk(group_ids)
 
         def check(group):
