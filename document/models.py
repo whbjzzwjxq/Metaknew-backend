@@ -88,6 +88,16 @@ def graph_setting():
     return setting
 
 
+def base_path():
+
+    order = [
+        {
+            "_id": '',
+            "type": ''
+        }
+    ]
+
+
 # done in 07-22
 class _Doc(Node):
     Paper = models.URLField(db_column='PAPER')  # '真正'的文档 包含文字图片等等
@@ -101,7 +111,7 @@ class _Doc(Node):
 
 # 专题的Graph相关的内容 也就是在svg绘制的时候请求的内容 done in 07-22
 class DocGraph(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)  # 专题ID
+    DocId = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)  # 专题ID
     MainNodes = ArrayField(models.BigIntegerField(), db_column='MAIN_NODES', default=list)  # 主要节点的uuid
     IncludedNodes = ArrayField(JSONField(), db_column='NODES', default=node_setting())  # json里包含节点在该专题下的设置
     IncludedLinks = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=link_setting())  # json里包含关系在该专题下的设置
@@ -114,7 +124,7 @@ class DocGraph(models.Model):
 
 # 专题评论 done in 07-22
 class Comment(models.Model):
-    id = models.BigAutoField(db_column='ID', primary_key=True)  # 评论id
+    CommentId = models.BigAutoField(db_column='ID', primary_key=True)  # 评论id
     TargetId = models.BigIntegerField(db_column='TARGET', db_index=True)  # 回复的资源/评论的id
     TargetUser = models.BigIntegerField(db_column='TARGET_USER', db_index=True)  # 回复的用户的id
     Content = models.TextField(db_column='CONTENT', default='')  # 评论内容
@@ -132,7 +142,7 @@ class Comment(models.Model):
 
 # 便签 done in 07-22
 class Note(models.Model):
-    id = models.BigIntegerField(db_column="ID", primary_key=True)  # 便签id
+    NoteId = models.BigIntegerField(db_column="ID", primary_key=True)  # 便签id
     CreateUser = models.IntegerField(db_column="USER_ID", default='1', db_index=True)  # 用户id
     TagType = models.TextField(db_column="TAGS_TYPE")  # 便签类型
     Content = models.TextField(db_column="CONTENT")  # 便签内容
@@ -147,7 +157,7 @@ class Note(models.Model):
         db_table = 'document_note'
 
 
-# 课程 todo level : 3
+# todo 课程 level : 3
 # class Course(DocGraph):
 #     LinksInfo = ArrayField(JSONField(), db_column='LINKS_INFO')  # 学习网连接的信息
 #     NodesInfo = ArrayField(JSONField(), db_column='NODES_INFO')  # 学习网
@@ -155,3 +165,14 @@ class Note(models.Model):
 #
 #     class Meta:
 #         db_table = 'document_course'
+
+# todo Path level: 2
+# class Path(models.Model):
+#
+#     PathId = models.BigIntegerField(primary_key=True)
+#     CreateUser = models.IntegerField(db_column="USER_ID", db_index=True)  # 用户id
+#     Order = JSONField(default=base_path())
+#
+#     class Meta:
+#
+#         db_table = 'document_path'
