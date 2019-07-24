@@ -228,7 +228,7 @@ async def add_node_index(node: BaseNode()):
     if result['_shards']['successful'] == 1:
         return True
     else:
-        # todo record
+        # todo record 记录索引失败 level: 2
         return False
 
 
@@ -259,7 +259,6 @@ async def add_doc_index(doc):
     if result['_shards']['successful'] == 1:
         return True
     else:
-        # todo record
         return False
 
 

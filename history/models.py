@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 
 
-# 查找缺漏使用 只在内部生成的时候使用 todo level: 2
+# todo 查找缺漏使用 只在内部生成的时候使用 level: 2
 class SourceAddRecord(models.Model):
 
     id = models.AutoField(db_column='ID', primary_key=True)

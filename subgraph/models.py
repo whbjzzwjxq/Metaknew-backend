@@ -13,7 +13,7 @@ def feature_vector():
             "word_embedding": [],
             "label_embedding": []}
 
-# global_word 使用值去压缩常用并且能用常识推断的字符串 目前只使用了PrimaryLabel 键值应该也是可以的
+# global_word 使用值去压缩 常用且能用常识推断的字符串 目前只使用了PrimaryLabel LinkType 键值应该也是可以的
 
 
 # 控制属性 不会直接update done
@@ -24,7 +24,7 @@ class NodeCtrl(models.Model):
     CountCacheTime = models.DateTimeField(db_column='CACHE_TIME')  # 最后统计的时间
     NameTrans = models.BigIntegerField(db_column='Name_Trans')  # 名字翻译文件
     DescriptionTrans = models.BigIntegerField(db_column='Description_Trans')  # 名字翻译文件
-
+    Is_UserMade = models.BooleanField(db_column='UserMade', db_index=True)  # 是否是用户新建的
     # 直接传回的内容
     CreateTime = models.DateField(db_column='TIME', auto_now_add=True, editable=False)
     CreateUser = models.BigIntegerField(db_column='USER', default='0', editable=False)  # 创建用户
@@ -45,7 +45,7 @@ class NodeCtrl(models.Model):
     FeatureVec = JSONField(db_column='FEATURE_VECTOR', default=feature_vector())  # 特征值
 
     class Meta:
-        db_table = 'node_ctrl'
+        db_table = 'graph_node_ctrl'
 
 
 # Node直接允许简单写入/传回的属性 done
@@ -63,7 +63,7 @@ class Node(models.Model):
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column='INCLUDED_MEDIA', default=list)  # 包含的多媒体文件id
 
     class Meta:
-        db_table = 'node_base'
+        db_table = 'graph_node_base'
 
 
 # todo 更多标签 level: 1
@@ -73,9 +73,10 @@ class Person(Node):
     PeriodEnd = models.TextField(db_column='PERIOD_END')
     BirthPlace = models.TextField(db_column='BIRTHPLACE', max_length=30)
     Nation = models.TextField(db_column='NATION', max_length=30)
+    Chronology = models.BigIntegerField(db_column='Chronology')
 
     class Meta:
-        db_table = 'node_person'
+        db_table = 'graph_node_person'
 
 
 class Project(Node):
@@ -85,7 +86,7 @@ class Project(Node):
     Leader = ArrayField(models.TextField(), db_column='LEADER', default=list)  # 领头人
 
     class Meta:
-        db_table = 'node_project'
+        db_table = 'graph_node_project'
 
 
 class ArchProject(Project):
@@ -93,12 +94,12 @@ class ArchProject(Project):
     WorkTeam = ArrayField(models.TextField(), db_column='WORK_TEAM', default=list)
 
     class Meta:
-        db_table = 'node_arch_project'
+        db_table = 'graph_node_arch_project'
 
 
-# todo 更多media
+# todo 更多media  level: 2
 class MediaNode(models.Model):
-    id = models.BigIntegerField(db_column='ID', primary_key=True)
+    MediaId = models.BigIntegerField(db_column='ID', primary_key=True)
     FileName = models.TextField(db_column='NAME')
     Format = models.TextField(db_column='FORMAT')
     Url = models.URLField(db_column='URL', default='')
@@ -107,7 +108,7 @@ class MediaNode(models.Model):
     Description = models.TextField(db_column='DESCRIPTION', default='None')
 
     class Meta:
-        db_table = 'media_base'
+        db_table = 'graph_media_base'
 
 
 # class Paper(MediaNode):
@@ -157,6 +158,53 @@ class Description(models.Model):
         db_table = 'source_description'
 
 
+# 基准类 done
 class Relationship(models.Model):
 
-    
+    LinkId = models.BigIntegerField(db_column='id', primary_key=True)
+    Source = models.BigIntegerField(db_column='source', db_index=True)
+    Target = models.BigIntegerField(db_column='target', db_index=True)
+    CreateTime = models.DateTimeField(db_column='CreateTime')
+    Type = models.IntegerField(db_index=True)  # global_word
+
+    class Meta:
+
+        abstract = True
+
+
+# 系统生成的关系 Type = Doc2Node / SearchTogether / AfterVisit
+class SystemMade(Relationship):
+
+    Count = models.IntegerField(db_column='count', default=0)
+    # todo 历史记录分析 level: 2
+
+    class Meta:
+        db_table = 'graph_link_sys'
+
+
+# 图谱上的关系
+class KnowLedgeGraph(Relationship):
+
+    Time = models.TextField(db_column='Time', db_index=True)
+    Location = models.TextField(db_column='Loc', db_index=True)
+    PrimaryLabel = models.IntegerField(db_column='PLabel')  # global_word
+    Props = JSONField(db_column='props', default=dict)
+    Content = models.TextField(db_column='content')
+
+    indexes = [
+        models.Index(fields=['Time', 'Location'])
+    ]
+
+    class Meta:
+
+        db_table = 'graph_link_knowledge'
+
+
+class UserMade(KnowLedgeGraph):
+
+    CreateUser = models.BigIntegerField(db_column='CreateUser', db_index=True)
+    Confidence = models.SmallIntegerField(db_column='Confidence')
+
+    class Meta:
+
+        db_table = 'graph_link_user_made'
