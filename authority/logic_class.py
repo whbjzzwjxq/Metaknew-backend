@@ -1,6 +1,6 @@
 from django.http import HttpResponse, HttpRequest
 from authority.models import *
-from tools.redis_process import redis
+from tools.redis_process import *
 
 
 # method = ['delete', 'change_state', 'copy', 'query_total', 'query_abbr', 'write', 'export', 'reference', 'download']
@@ -66,8 +66,7 @@ class AuthMiddleware:
         if 'token' in request.COOKIES and 'user_name' in request.COOKIES:
             token = request.COOKIES['token']
             user_name = request.COOKIES['user_name']
-            user_id = redis.get(user_name)
-            saved_token = redis.get(user_id)
+            user_id, saved_token = query_user_by_name(user_name)
             if not saved_token:
                 request_info.content = '登录信息过期，请重新登录'
             elif not token == saved_token:
@@ -187,12 +186,13 @@ class AuthChecker:
         }
 
     def check(self):
-        record = self.sheet.objects.filter(id=self._id)
+        record = self.sheet.objects.filter(RecordId=self._id)
         if len(record) == 0:
             self.__anti_spider()
             return HttpResponse(status=404)
         else:
               pass
+
     def __anti_spider(self):
         pass
 

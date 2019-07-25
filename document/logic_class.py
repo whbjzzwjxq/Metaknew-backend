@@ -1,7 +1,7 @@
 from document.models import Comment, Note
 from document.models import DocGraph, _Doc
 from django.core.exceptions import ObjectDoesNotExist
-from tools import base_tools, login_token
+from tools import base_tools, encrypt
 from subgraph.logic_class import BaseNode
 from django.core.cache import cache
 from time import time
@@ -41,7 +41,7 @@ class BaseDoc:
         else:
             self.NeoNode = cache_doc["NeoNode"]
             self.Graph = cache_doc["Graph"]
-            timeout = cache.ttl(key) + login_token.hour
+            timeout = cache.ttl(key) + encrypt.hour
             cache.expire(key, timeout=timeout)
 
         self.Info = self.NeoNode.info
@@ -86,7 +86,7 @@ class BaseDoc:
         key = "abbr_" + self.origin[-17:]
         abbr_doc = cache.get(key)
         if abbr_doc:
-            cache.expire(key, timeout=login_token.week)
+            cache.expire(key, timeout=encrypt.week)
             return abbr_doc
         else:
             abbr_doc = {
@@ -98,7 +98,7 @@ class BaseDoc:
                 'hard_level': self.Info.HardLevel,
                 'size': self.Info.Size
             }
-            cache.add(key, abbr_doc, timeout=login_token.week)
+            cache.add(key, abbr_doc, timeout=encrypt.week)
             return abbr_doc
 
     def query_comment(self):
@@ -156,7 +156,7 @@ class BaseDoc:
             self.Graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
-        if time() - self.Info.CountCacheTime.timestamp() > login_token.week:
+        if time() - self.Info.CountCacheTime.timestamp() > encrypt.week:
             self.re_count()
             self.Info.CountCacheTime = datetime.datetime.now()
         self.Info.UpdateTime = datetime.datetime.now()
@@ -193,7 +193,7 @@ class BaseDoc:
             "NeoNode": self.NeoNode,
             "Graph": self.Graph
         }
-        cache.add(key, cache_doc, timeout=login_token.hour * 2)
+        cache.add(key, cache_doc, timeout=encrypt.hour * 2)
 
     def clear_cache(self):
         key = "cache_doc_" + self.origin[-17:]
@@ -264,7 +264,7 @@ class BaseNote:
 
     def query(self, _id):
         try:
-            self.note = Note.objects.get(id=_id)
+            self.note = Note.objects.get(NoteId=_id)
             return self
         except ObjectDoesNotExist:
             return None

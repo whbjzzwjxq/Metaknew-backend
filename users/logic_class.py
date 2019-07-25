@@ -1,14 +1,12 @@
 # -*-coding=utf-8 -*-
 from django.http import HttpResponse
 import json
-import time
-from django.http import JsonResponse
 from django.contrib.auth.hashers import check_password
 from users.models import User, GroupCtrl, UserConcern, UserRepository, Privilege
-from tools.login_token import make_token
-from tools.redis_process import week, redis
+from tools.encrypt import make_token
+from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
-from tools.Id_Generator import id_generator
+from tools.id_generator import id_generator
 
 device_id = 0
 salt = 'al76vdj895as12cq'
@@ -51,8 +49,7 @@ class BaseUser:
         if 'token' in request.COOKIES and 'user_name' in request.COOKIES:
             token = request.COOKIES['token']
             name = request.COOKIES['user_name']
-            _id = redis.get('user_' + name)
-            saved_token = redis.get(_id)
+            _id, saved_token = query_user_by_name(name)
             if not saved_token:
                 return HttpResponse(content='登录信息过期，请重新登录', status=401)
             elif not token == saved_token:
@@ -65,7 +62,7 @@ class BaseUser:
     def login_message(self, request):
         body = json.dumps(request.body)
         info = body['info']
-        message_code = redis.get(info['phone'])  # 用户session
+        message_code = query_message(info['phone'])  # 用户session
         if message_code is None:
             return HttpResponse(content='验证码失效，请重新发送验证码', status=400)
         elif message_code != info['code']:
@@ -81,19 +78,9 @@ class BaseUser:
         name = self.user.UserName
         _id = self.user.UserId
         token = make_token(name, _id)
-        redis.set(_id, token, ex=week)
-        redis.set('user_' + name, _id, ex=week)
-        cache_info = {
-            'root': self.user.Is_Superuser,
-            'dev': self.user.Is_Developer,
-            'vip': self.user.Is_Vip,
-            'high_vip': self.user.Is_high_vip
-        }
-        cache_info.update(self.user.Joint_Group)
-        redis.hmset('info_' + str(_id), cache_info)
-        # todo 分析一下缓存什么内容比较合适 level: 2
+        set_user_login(self.user, token)
         response = HttpResponse(content='登录成功', status=200)
-        response.set_cookie(key='token', value=cache_info['token'], max_age=week, httponly=True)
+        response.set_cookie(key='token', value=token, max_age=week, httponly=True)
         response.set_cookie(key='user_name', value=self.user.UserName, max_age=week)
         return response
 
@@ -105,7 +92,7 @@ class BaseUser:
         if info['name'] == '':
             info['name'] = info['phone']
         # redis中读取验证码信息
-        message_code = redis.get(info['phone'])  # 用户session
+        message_code = query_message(info['phone'])  # 用户session
         if message_code is None:
             return HttpResponse(content='验证码失效，请重新发送验证码', status=400)
         elif message_code != info['code']:
@@ -176,5 +163,5 @@ class BaseGroup:
                 # todo 申请 level : 3
                 return 3
 
-        output = {group.id: check(group) for group in groups}
+        output = {group.GroupId: check(group) for group in groups}
         return output

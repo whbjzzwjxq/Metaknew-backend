@@ -14,7 +14,7 @@ from django.contrib.postgres.fields import ArrayField
 # done in 07-22
 class BaseAuthority(models.Model):
 
-    id = models.BigIntegerField(db_column='id', primary_key=True, db_index=True)  # 资源uuid
+    RecordId = models.BigIntegerField(primary_key=True, db_index=True)  # 资源uuid
 
     # 状态
     Used = models.BooleanField(db_column='used', default=True)
@@ -48,7 +48,7 @@ class MediaAuthority(BaseAuthority):
 # todo 支付管理 level: 3
 # class PaymentManager(models.Model):
 #
-#     id = models.BigIntegerField(db_column='OrderId', primary_key=True)
+#     OrderId = models.BigIntegerField(db_column='OrderId', primary_key=True)
 #     SourceId = models.IntegerField(db_column='SourceId')
 #     Success = models.BooleanField(db_column='Success')
 #     Time = models.DateTimeField(db_column='Time', auto_now=True)
@@ -61,7 +61,7 @@ class MediaAuthority(BaseAuthority):
 
 # 注意这个表单只做统计信息用 权限检测在User下实现 done
 class AuthorityCount(models.Model):
-    id = models.BigIntegerField(db_column='id', primary_key=True)  # 资源uuid
+    SourceId = models.BigIntegerField(primary_key=True)  # 资源uuid
     Owner = models.BigIntegerField(db_column='Owner', db_index=True)  # 专题所有人的id
     # 拥有修改状态权限的用户
     Manager = ArrayField(models.BigIntegerField(), db_column='Manager', default=list)

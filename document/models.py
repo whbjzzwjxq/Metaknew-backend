@@ -2,7 +2,7 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from users.models import User
-from subgraph.models import Node
+from subgraph.models import NodeInfo
 
 
 def node_setting():
@@ -99,7 +99,7 @@ def base_path():
 
 
 # done in 07-22
-class _Doc(Node):
+class _Doc(NodeInfo):
     Paper = models.URLField(db_column='PAPER')  # '真正'的文档 包含文字图片等等
     Size = models.IntegerField(db_column='SIZE', default=0)
     Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 关键词

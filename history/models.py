@@ -1,26 +1,49 @@
 from django.db import models
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
+
+
+# BugType = {'lack_id': 1,  # 缺少id 生成器失效 error
+#            'lack_important': 2,  # 缺少重要属性 无法生成 error
+#            'error_attr': 3,  # 错误的属性 无法生成 error
+#            'lack_prop': 4,  # 缺少属性 warn
+#            'similar_name': 5,  # 相似的名字 warn
+#            'too_long_text': 6,  # 太长的文本 warn
+#            'media not exist': 7,  # 不存在的媒体 warn
+#            }
 
 
 # todo 查找缺漏使用 只在内部生成的时候使用 level: 2
 class SourceAddRecord(models.Model):
 
-    id = models.AutoField(db_column='ID', primary_key=True)
-    Is_Error = models.BooleanField(db_column='ERROR', default=False, db_index=True)
-    Is_Warn = models.BooleanField(db_column='WARN', default=False)
-    SourceId = models.BigIntegerField(db_column='ID', db_index=True)
-    SourceLabel = models.TextField(db_column='LABEL', db_index=True)
-    Content = JSONField(db_column='CONTENT', default=dict)
-    ContentType = models.TextField(db_column='TYPE')
-    Time = models.DateTimeField(db_column='TIME', auto_now_add=True)
-    Is_Solved = models.BooleanField(db_column='Solved', db_index=True)
+    RecordId = models.BigIntegerField(primary_key=True)
+    SourceId = models.BigIntegerField(db_column='SourceId', db_index=True)
+    SourceLabel = models.IntegerField(db_column='Label', db_index=True, default=0)
+    BugType = models.SmallIntegerField(db_column='Type')
+    CreateUser = models.BigIntegerField(db_column='User')
+    Time = models.DateTimeField(db_column='Time', auto_now_add=True)
+    Is_Solved = models.BooleanField(db_column='Solved', db_index=True, default=False)
 
     class Meta:
-        db_table = 'history_source_add_record'
+        abstract = True
+
+
+class ErrorRecord(SourceAddRecord):
+    OriginData = JSONField(db_column='CONTENT', default=dict)
+
+    class Meta:
+        db_table = 'history_error_record'
+
+
+class WarnRecord(SourceAddRecord):
+
+    WarnContent = ArrayField(JSONField, db_column='Content', default=list)
+
+    class Meta:
+        db_table = 'history_warn_record'
 
 
 class TransRecord(models.Model):
-    id = models.AutoField(db_column='ID', primary_key=True)
+    RecordId = models.AutoField(primary_key=True)
     Lang = models.TextField(db_column='TYPE', db_index=True)  # 语言类型
     Name = models.TextField(db_column='NAME')  # 基础内容 Name
     Is_Done = models.BooleanField(db_column='DONE')  # 是否完成
@@ -31,29 +54,29 @@ class TransRecord(models.Model):
 
 
 class LocationsRecord(models.Model):
-    id = models.AutoField(db_column='ID', primary_key=True)
+    RecordId = models.AutoField(primary_key=True)
     Location = models.TextField(db_column='NAME')  # 基础内容 Name
     Is_Done = models.BooleanField(db_column='DONE', default=False)  # 是否完成
 
-    # 是指从Name翻译到Lang的情况失败了
     class Meta:
-        db_table = 'history_trans_record'
+        db_table = 'history_loc_record'
 
 
-class UserEditRecord(models.Model):
-
-    id = models.AutoField(db_column='ID', primary_key=True)
-    EditTarget = models.BigIntegerField(db_column='')
-    EditTime = models.DateTimeField(db_column='TIME', auto_now_add=True)
-
-
-# todo version control level: 1
+# todo version branch level: 2 todo 压缩记录 level: 1
 class VersionRecord(models.Model):
+    RecordId = models.AutoField(primary_key=True)
+    CreateUser = models.BigIntegerField(db_column='User', editable=False)
+    CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
+    SourceId = models.BigIntegerField(db_column='SourceId', editable=False)
+    SourceType = models.TextField(db_column='Type', editable=False)
 
-    id = models.AutoField(db_column='ID', primary_key=True)
-    SourceId = models.BigIntegerField(db_column='UUID')
-    SourceType = models.TextField(db_column='TYPE')
-    Content = models.IntegerField(db_column='VERSION')
+    Name = models.TextField(db_column='Name')
+    LastRecord = models.IntegerField(db_column='Last')
+    Is_Draft = models.BooleanField(db_column='Draft', db_index=True)
+    Content = JSONField(db_column='Version')
 
     class Meta:
+        indexes = [
+            models.Index(fields=['RecordId', 'Is_Draft'])
+        ]
         db_table = 'history_version_record'

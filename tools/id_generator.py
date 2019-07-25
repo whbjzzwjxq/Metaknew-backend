@@ -4,12 +4,12 @@ import datetime
 
 from django.shortcuts import HttpResponse
 from tools.models import *
-from tools.redis_process import query_word_index
-
+from tools.base_tools import query_word_list
 batch_size = 256
 small_integer = 65535
 device_id = 0
 base_time = datetime.date(year=2019, month=7, day=23)
+
 methods = {
     'node': {
         'manager': NodeBlockManager,
@@ -41,11 +41,10 @@ def id_generator(number, method, content, jump=3):
             manager = methods[method]['manager']
             record = methods[method]['record']
             if method == 'node':
-                content = query_word_index([content])
-                if not content:
-                    raise TypeError('method node need label as content')
-                else:
-                    content = content[0]
+                try:
+                    content = query_word_list([content])[0]
+                except BaseException:
+                    content = 0
             if method == 'time':
                 try:
                     content -= base_time
@@ -91,7 +90,7 @@ def id_generator(number, method, content, jump=3):
 def new_block(manager, content):
     block = manager.objects.create(Classifier=content)
     block.save()
-    return block.id
+    return block.BlockId
 
 
 def ordered_sample(_num, jump, base, _min):

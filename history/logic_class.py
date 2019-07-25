@@ -1,4 +1,4 @@
-from history.models import SourceAddRecord
+from history.models import WarnRecord, ErrorRecord, SourceAddRecord, BugType
 
 
 class AddRecord:
@@ -27,15 +27,23 @@ class AddRecord:
         return self
 
     @staticmethod
-    def add_record(error, warn, source_id, source_type, content):
-
-        record = SourceAddRecord.objects.create(
-            Is_Error=error,
-            Is_Warn=warn,
+    def add_error_record(user, source_id, source_label, data, bug_type):
+        record = ErrorRecord(
             SourceId=source_id,
-            SourceType=source_type,
-            Content=content)
-
+            SourceLabel=source_label,
+            CreateUser=user,
+            OriginData=data,
+            BugType=bug_type)
+        # todo 消息队列 level: 1
         return record
 
+    @staticmethod
+    def add_warn_record(user, source_id, source_label, content):
+        record = WarnRecord(
+            SourceId=source_id,
+            SourceLabel=source_label,
+            CreateUser=user,
+            WarnContent=content
+        )
+        return record
 

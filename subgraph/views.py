@@ -1,7 +1,7 @@
 from document.logic_class import BaseDoc
 from django.http import HttpResponse
 from subgraph.logic_class import BaseNode, BaseLink
-from tools.base_tools import NeoSet, uuid_matcher
+from tools.base_tools import NeoSet, get_user_props
 from py2neo import Relationship
 import json
 import datetime
@@ -164,3 +164,9 @@ def add_document(request):
     doc.save()
     collector.tx.commit()
     return HttpResponse('Create Document Success')
+
+
+def query_needed_prop(request):
+    label = request.GET.get('Plabel')
+    result = get_user_props(p_label=label)
+    return HttpResponse(json.dumps(result))

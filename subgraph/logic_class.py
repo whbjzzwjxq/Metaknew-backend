@@ -2,98 +2,172 @@ from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, translate
 from history.logic_class import AddRecord
-from tools.base_tools import get_props_for_user_ctrl as get_props
-from subgraph.models import Node as NodeInfo
+from history.models import VersionRecord
+from subgraph.models import NodeCtrl, Translate
 from es_module.logic_class import es
-from copy import deepcopy
-import asyncio
-
-import json
 from datetime import datetime
+import asyncio
+import json
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
+node_format = {
+    "conf": {},  # 这是在专题里实现的
+    "ctrl": {},  # 控制类信息 不修改
+    "info": {
+        "_id": "111",
+        "type": "StrNode",
+        "user": "0",
+        "Name": {
+            "auto": "Test",
+            "zh": "测试"
+        },
+        "PrimaryLabel": "Person",
+        "Language": "en",  # 默认auto
+        "Alias": [],  # 默认[]
+        "Labels": [],  # 默认[]
+        "Description": {
+            "auto": "this is a test node",
+            "zh": "这是测试节点"
+        },
+        "Area": [],
+        "ExtraProps": {
+            "Livein": "New York"
+        },
+        "DateOfBirth": "1900-01-01",
+        "DateOfDeath": "2000-01-01",
+        "BirthPlace": "Beijing, China",
+        "Nation": "China",
+        "Chronology": [
+            {"start": "1901-02-09",
+             "end": "1915-04-06",
+             "content": "Live in YangZhou"
+             }
+        ]
+    },
+}
 
 
 class BaseNode(object):
 
-    def __init__(self, collector=base_tools.NeoSet()):
-        self.root = Node()
-        self.origin = ''
-        self.info = NodeInfo()
+    def __init__(self, user, collector=base_tools.NeoSet()):
+        self.node = None
+        self.info = None
+        self.ctrl = None
+        self.trans = None
+        self.history = None
+
         self.collector = collector
+        self._id = ''
         self.label = ''
-        self.keys = []
-        self.already = False
+        self.needed_props = []
+        self.lack = []  # element in lack : 'history' | 'trans' | 'node'
+        self.user = user
 
-    def query(self, _id):
-        self.root = self.collector.Nmatcher.match(id=_id).first()
-        self.origin = _id
-        if self.root:
-            try:
-                self.label = self.info.PrimaryLabel
-                self.info = base_tools.init(self.root['PrimaryLabel']).objects.get(pk=_id)
-                self.keys = get_props(self.label)
-                self.already = True
-                return self
-            except ObjectDoesNotExist:
-                return None
-        else:
+    # 只查询基础信息: info 和 ctrl
+    def query_base(self, _id):
+        try:
+            self.ctrl = NodeCtrl.objects.get(pk=_id)
+            self._id = _id
+            self.label = self.ctrl.PrimaryLabel
+            self.info = base_tools.init(self.label).objects.get(pk=_id)
+            self.needed_props = base_tools.get_user_props(self.label)
+            return self
+        except ObjectDoesNotExist:
             return None
-
-    def create(self, node):
-        assert 'type' in node
-        assert 'Name' in node
-        assert 'PrimaryLabel' in node
-        assert 'Area' in node
-        assert 'id' in node
-
-        if 'Labels' not in node:
-            node['Labels'] = []
-        if 'Description' not in node:
-            node['Description'] = ''
-        if 'Alias' not in node:
-            node['Alias'] = []
-        if 'Language' not in node:
-            node['Language'] = 'auto'
-
-        self.already = True
-        # 初始化
-        self.__neo4j_create(node=node)
-        self.origin = node['id']
-        self.label = node['PrimaryLabel']
-        self.info = base_tools.init(self.label)()
-        self.keys = get_props(self.label)
-        self.info.id = self.origin
-        self.info.ImportMethod = node['ImportMethod']
-        self.info.CreateUser = node['CreateUser']
-        # 翻译名字 todo 异步 level :2
-        self.__language_setter(node, 'zh', node['Language'])
-        self.__language_setter(node, 'en', node['Language'])
-        # 处理Label类信息
-        self.update_all(node=node)
-
-        # es索引记录 todo 异步 level :2
-        if not self.label == 'Document':
-            asyncio.run(add_node_index(self))
-        # 返回self对象
+            
+    # 查询完整信息
+    def query_all(self, _id):
+        success = self.query_base(_id)
+        if success:      
+            self.__query_node()
+            self.__query_translate()
+            self.__query_history()
         return self
 
-    # Neo4j主标签主键设定
+    # 查询翻译文件
+    def __query_translate(self):
+        try:
+            self.trans = Translate.objects.get(FileId=self._id)
+        except ObjectDoesNotExist:
+            self.lack.append('trans')
+            
+    # 查询历史 / 翻译 / 节点 todo 查询超时设置 level: 2  
+    def __query_history(self):
+        try:
+            self.history = VersionRecord.objects.get(SourceId=self._id)
+        except ObjectDoesNotExist:
+            self.lack.append('history')
+            
+    def __query_node(self):
+        try:
+            self.node = self.collector.Nmatcher.match(_id=self._id).first()
+        except ObjectDoesNotExist:
+            self.lack.append('node')
+            
+    @base_tools.error_check
+    def create(self, node):
+        # 注意这里id是从生成器取的！！
+        if '_id' not in node:
+            raise base_tools.IdGenerationError
+        else:
+            assert 'type' in node
+            assert 'Name' in node
+            assert 'PrimaryLabel' in node
+            self._id = node['_id']
+            self.label = node['PrimaryLabel']
+            self.needed_props = base_tools.get_user_props(self.label)
+
+            self.__neo4j_create(node=node)
+            self.__ctrl_create(node=node)
+            self.__info_create(node=node)
+
+            # 翻译名字 todo 异步 level :2
+            self.__language_setter(self, node, node['Language'])
+            # 处理Label类信息
+            self.update_all(node=node)
+
+            # es索引记录 todo 异步 level :2
+            if not self.label == 'Document':
+                asyncio.run(add_node_index(self))
+            # 返回self对象
+            return self
+
+    def __info_create(self, node):
+        self.info = base_tools.init(self.label)
+        
+     
+    # 设置控制信息 done
+    def __ctrl_create(self, node):
+        if self.user == 0:
+            user = False,
+            contributor = []
+        else:
+            user = True
+            contributor = [{"user_id":self.user, "level": 10}]
+        self.ctrl = NodeCtrl(
+            NodeId=self._id,
+            History=self._id,
+            CountCacheTime=datetime.now(),
+            Is_UserMade=user,  # 注意这里后台导入时user == 0
+            CreateUser=node["user"],
+            PrimaryLabel=self.label,
+            Contributor=contributor
+        )
+
+    # Neo4j创建 done
     def __neo4j_create(self, node):
-        assert 'type' in node
-        assert 'id' in node
-        assert 'PrimaryLabel' in node
-        self.root = Node(node['type'])
-        self.root.update({
-            "id": node['id'],
-            "Name": node["Name"]
+        self.node = Node(node['type'])
+        self.node.update({
+            "_id": self._id,
+            "Name": node["Name"]["auto"]
         })
-        self.root.add_label(node['PrimaryLabel'])
-        self.root.add_label(node['Area'])
-        self.root.__primarylabel__ = node['PrimaryLabel']
-        self.root.__primarykey__ = "id"
-        self.root.__primaryvalue__ = node['id']
-        self.collector.tx.create(self.root)
+        self.node.add_label(node['PrimaryLabel'])
+        self.node.add_label(node['Area'])
+        self.node.add_label(node['Labels'])
+        self.node.__primarylabel__ = node['PrimaryLabel']
+        self.node.__primarykey__ = "_id"
+        self.node.__primaryvalue__ = self._id
+        self.collector.tx.create(self.node)
 
     def __language_setter(self, node, language_to, language_from):
         name_tran = 'Name_{}'.format(language_to)
@@ -103,58 +177,42 @@ class BaseNode(object):
             else:
                 setattr(self.info, name_tran, node['Name'])
 
-    def update_labels(self, node):
-        assert self.already
-        if "Labels" in node:
-            self.root.update_labels(node['Labels'])
-            self.info.Labels = node["Labels"]
-
-    def update_props(self, node):
-        assert self.already
-        temp = deepcopy(node)
-        temp = base_tools.dict_dryer(temp)
-        # 存入class Node下的非默认数据以及标签代表的特殊属性
-        key_list = self.keys
-        null_group = []
-        print(key_list)
-        for key in key_list:
-            if key in temp and temp[key]:
-                setattr(self.info, key, temp[key])
-                temp.pop(key)
-            else:
-                null_group.append(key)
-        print(temp)
-        self.info.ExtraProps = temp
-
-        # 记录warn数据
-        if null_group is not []:
-            AddRecord.add_record(error=False,
-                                 warn=True,
-                                 source_id=self.origin,
-                                 source_type=self.label,
-                                 content={"lack_props": null_group})
+    def update_labels(self, labels):
+        pass
 
     def update_all(self, node):
-        assert self.already
-        self.update_labels(node=node)
-        self.update_props(node=node)
+        pass
+
+    def update_props(self, node):
+        key_list = self.needed_props
+        lack = False
+        for key in key_list:
+            if key in node:
+                if isinstance(node[key], list):
+                    setattr(self.info, key, node[key])
+            else:
+                lack = True
+        # 记录warn数据
+        if lack:
+            pass
 
     def delete(self):
         assert self.already
         pass
 
-    # 这里的node1指另一个NeoNode
+    # 这里的node1指另一个node
     def merge(self, node1):
         assert self.already
         # todo level: 3
         pass
 
-    # 这里Neo4j还没有commit
+    # 注意尽量不要使用单个保存
     def save(self):
         assert self.already
-        self.collector.tx.push(self.root)
+        self.collector.tx.push(self.node)
         self.collector.tx.commit()
         self.info.save()
+        self.ctrl.save()
 
     def handle_for_frontend(self):
         pass

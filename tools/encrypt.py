@@ -1,3 +1,6 @@
+import jwt
+import random
+import string
 from Crypto.Cipher import AES
 from base64 import b64decode, b64encode
 import regex
@@ -5,6 +8,18 @@ key_for_id = bytes('sZuaB4du1m3xiX6k', encoding='utf-8')
 iv = b'5612347654327898'
 block_size = 16
 re_label_id = regex.compile('(\w*)(\|)(\d*)(h{0,15})')
+
+
+def make_token(user_name, user_id):
+    secret = 'f0ba2016d24c545a' + ''.join(random.sample(string.ascii_letters + string.digits, 8))
+    # secret = 'f0ba2016d24c545a'
+    content = {
+        "name": user_name,
+        "_id": user_id
+    }
+    token = jwt.encode(content, secret, algorithm='HS256')
+    token = str(token)
+    return token
 
 
 def padding(text, char):
