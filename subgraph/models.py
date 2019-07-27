@@ -24,14 +24,17 @@ def chronology():
     ]
 
 
-# global_word 使用值去压缩 常用且能用常识推断的字符串 目前只使用了PrimaryLabel LinkType 键值应该也是可以的
+pictures = ['jpg', 'png', 'gif']
+# todo 媒体文件格式 level: 1
+
+# global_word 储存不使用 可以使用在前后端交互节约流量 level: 1
 
 
 # 控制属性 不会直接update done
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     # 不传回的控制性内容
-    History = models.BigIntegerField(db_column='HISTORY', editable=False)  # 历史记录的编号
+    History = models.BigIntegerField(db_column='History')  # 当前版本的history标号
     CountCacheTime = models.DateTimeField(db_column='CACHE_TIME')  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column='UserMade', db_index=True)  # 是否是用户新建的
     # 直接传回的内容
@@ -113,6 +116,7 @@ class MediaNode(models.Model):
     MediaId = models.BigIntegerField(primary_key=True)
     FileName = models.TextField(db_column='Name')
     Format = models.TextField(db_column='Format')
+    MediaType = models.TextField(db_column='Type')
     Url = models.URLField(db_column='URL', default='')
     UploadUser = models.BigIntegerField(db_column='UploadUser')
     UploadTime = models.DateTimeField(db_column='UploadTime', auto_now_add=True)
@@ -122,18 +126,10 @@ class MediaNode(models.Model):
         db_table = 'graph_media_base'
 
 
-# class Paper(MediaNode):
-#     Tags = ArrayField(JSONField(), db_column='TAGS', default=list)
-#     Rels = ArrayField(JSONField(), db_column='RELS', default=list)
-#
-#     class Meta:
-#         db_table = 'media_paper'
-
-
 # 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录
 # done
 class LocationDoc(models.Model):
-    FileId = models.AutoField(primary_key=True)
+    FileId = models.AutoField(db_column='LocationFile', primary_key=True)
     Name = models.TextField(db_column='Name', default='Beijing')
     LocId = models.TextField(db_column='LocId', default='ChIJ58KMhbNLzJQRwfhoMaMlugA', db_index=True)
     Alias = ArrayField(models.TextField(), db_column='Alias', default=list, db_index=True)
@@ -146,14 +142,14 @@ class LocationDoc(models.Model):
 # done
 class Translate(models.Model):
     FileId = models.BigIntegerField(primary_key=True)
-    auto = models.TextField(db_column='name', db_index=True)
-    zh = models.TextField(db_column='name_zh')
-    en = models.TextField(db_column='name_en')
-    names = HStoreField(db_column='name_more')
-    des_auto = models.TextField(db_column='description', db_index=True)
-    des_zh = models.TextField(db_column='description_zh')
-    des_en = models.TextField(db_column='description_en')
-    descriptions = HStoreField(db_column='description_more')
+    name_auto = models.TextField(db_column='name', db_index=True, default='')
+    name_zh = models.TextField(db_column='name_zh', default='')
+    name_en = models.TextField(db_column='name_en', default='')
+    names = HStoreField(db_column='name_more', default=dict)
+    des_auto = models.TextField(db_column='description', db_index=True, default='')
+    des_zh = models.TextField(db_column='description_zh', default='')
+    des_en = models.TextField(db_column='description_en', default='')
+    descriptions = HStoreField(db_column='description_more', default=dict)
 
     class Meta:
         db_table = 'source_translate'
@@ -184,7 +180,8 @@ class SystemMade(Relationship):
 # 图谱上的关系
 class KnowLedgeGraph(Relationship):
     Time = models.TextField(db_column='Time', db_index=True)
-    Location = models.TextField(db_column='Loc', db_index=True)
+    Location = models.TextField(db_column='Location', db_index=True)
+    # todo LocationField level: 2
     PrimaryLabel = models.TextField(db_column='Plabel', db_index=True)
     Props = JSONField(db_column='Props', default=dict)
     Content = models.TextField(db_column='Content')

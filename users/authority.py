@@ -1,6 +1,6 @@
 from django.http import HttpResponse, HttpRequest
-from authority.models import *
 from tools.redis_process import *
+from users.models import DocAuthority, NodeAuthority, MediaAuthority
 
 
 # method = ['delete', 'change_state', 'copy', 'query_total', 'query_abbr', 'write', 'export', 'reference', 'download']

@@ -33,7 +33,7 @@ def node_setting():
         },
         'group': 0,  # 组别
         'explode': False  # 是否炸开(仅限专题)
-        # todo 可能还有更多的设置 level : 3
+        # todo 可能还有更多的设置 level : 2
     }
     return [setting]
 
@@ -50,14 +50,17 @@ def link_setting():
 
 
 def note_setting():
-
     setting = {
-        '_id': 0,
-        'x': 0.5,
-        'y': 0.5,
-        'opacity': 0.5,
-        'type': 0,
-        'content': ''
+        '_id': "0",
+        'conf': {'x': 0.5,
+                 'y': 0.5,
+                 'opacity': 0.5,
+                 'background': '000000'
+                 },
+        'content': '',
+        'type': "normal",
+        "is_open": True,
+        "document": "0"
     }
     return [setting]
 
@@ -83,25 +86,56 @@ def graph_setting():
             {'_id': 0,
              'time': 10}
         ]
-        # todo 可能还有更多的设置 level : 3
+        # todo 可能还有更多的设置 level : 2
     }
     return setting
 
 
-def base_path():
+def paper_content():
+    setting = {
+        "content": [
+            {"type": "Text", "_id": "", "conf": {}},
+            {"type": "Video", "_id": "", "conf": {}},
+            {"type": "Image", "_id": "", "conf": {}},
+            {"type": "Person", "_id": "", "conf": {}}
+        ],
+        "header": {
 
-    order = [
-        {
-            "_id": '',
-            "type": ''
         }
-    ]
+    }
+
+    return setting
+
+
+def paper_setting():
+    setting = {
+        "base": {
+            "theme": 0,
+            "background": '',
+            "color": '000000',
+            "opacity": 0
+            # todo 可能还有更多的设置 level : 2
+        }
+    }
+    return setting
+
+
+# def base_path():
+#
+#     order = [
+#         {
+#             "_id": '',
+#             "type": ''
+#         }
+#     ]
 
 
 # done in 07-22
 class _Doc(NodeInfo):
-    Paper = models.URLField(db_column='PAPER')  # '真正'的文档 包含文字图片等等
-    Size = models.IntegerField(db_column='SIZE', default=0)
+    Has_Paper = models.BooleanField(db_column='Paper', default=True)
+    Has_Graph = models.BooleanField(db_column='Graph', default=True)
+    Size = models.IntegerField(db_column='SIZE', default=0)  # 计算得出
+    Complete = models.IntegerField(db_column='Complete', default=0)  # 计算得出
     Keywords = ArrayField(models.TextField(), db_column='KEYWORDS', default=list)  # 关键词
     Total_Time = models.IntegerField(db_column='TOTAL_TIME', default=1000)
 
@@ -111,53 +145,70 @@ class _Doc(NodeInfo):
 
 # 专题的Graph相关的内容 也就是在svg绘制的时候请求的内容 done in 07-22
 class DocGraph(models.Model):
-    DocId = models.BigIntegerField(db_column='ID', primary_key=True, editable=False)  # 专题ID
-    MainNodes = ArrayField(models.BigIntegerField(), db_column='MAIN_NODES', default=list)  # 主要节点的uuid
-    IncludedNodes = ArrayField(JSONField(), db_column='NODES', default=node_setting())  # json里包含节点在该专题下的设置
-    IncludedLinks = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=link_setting())  # json里包含关系在该专题下的设置
-    IncludedNotes = ArrayField(JSONField(), db_column='RELATIONSHIPS', default=note_setting())  # json里包含关系在该专题下的设置
+    DocId = models.BigIntegerField(primary_key=True, editable=False)  # 专题ID
+    MainNodes = ArrayField(models.BigIntegerField(), db_column='MainNodes', default=list)  # 主要节点的uuid
+    IncludedNodes = ArrayField(JSONField(), db_column='Nodes', default=node_setting())  # json里包含节点在该专题下的设置
+    IncludedLinks = ArrayField(JSONField(), db_column='Relationships', default=link_setting())  # json里包含关系在该专题下的设置
+    IncludedNotes = ArrayField(JSONField(), db_column='Notes', default=note_setting())  # json里包含便签在该专题下的设置
     Conf = JSONField(db_column='CONF', default=graph_setting())  # json里包含专题本身的设置
 
     class Meta:
         db_table = 'document_graph'
 
 
+# todo paper具体的产品形式 level: 1
+class DocPaper(models.Model):
+    DocId = models.BigIntegerField(primary_key=True, editable=False)  # 专题ID
+    MainNodes = ArrayField(models.SmallIntegerField(), db_column='MainSection')
+    IncludedNodes = ArrayField(JSONField(), db_column='Nodes', default=node_setting())  # json里包含节点在该专题下的设置
+    IncludedNotes = ArrayField(JSONField(), db_column='Notes', default=note_setting())  # json里包含便签在该专题下的设置
+    Content = JSONField(default=paper_content())  # 专题内容
+    Conf = JSONField(default=paper_setting())  # 设置
+
+    class Meta:
+        db_table = 'document_paper'
+
+
 # 专题评论 done in 07-22
 class Comment(models.Model):
-    CommentId = models.BigAutoField(db_column='ID', primary_key=True)  # 评论id
-    TargetId = models.BigIntegerField(db_column='TARGET', db_index=True)  # 回复的资源/评论的id
+    CommentId = models.BigIntegerField(db_column='ID', primary_key=True)  # 评论id
+    SourceId = models.BigIntegerField(db_column='Source', db_index=True)  # 回复的资源的id
+    TargetId = models.BigIntegerField(db_column='TARGET', db_index=True)  # 回复的目标的id
     TargetUser = models.BigIntegerField(db_column='TARGET_USER', db_index=True)  # 回复的用户的id
     Content = models.TextField(db_column='CONTENT', default='')  # 评论内容
     Owner = models.BigIntegerField(db_column='USER', default='0', db_index=True)  # 发表用户id
     Time = models.DateTimeField(db_column='TIME', auto_now_add=True)  # 评论时间
     Is_Delete = models.BooleanField(db_column='DELETED', default=False)
-    Is_Sub = models.BooleanField(db_column='SUB', default=False)  # 回复是否是二级回复
 
     class Meta:
         indexes = [
-            models.Index(fields=['Is_Sub', 'Is_Delete'], name='Count_SubComment'),  # 统计二级回复
+            models.Index(fields=['SourceId', 'Is_Delete'], name='Count_DocComment'),  # 统计资源回复
+            models.Index(fields=['TargetUser', 'Is_Delete'], name='Count_ReplyComment'),  # 统计回复给某用户的
+            models.Index(fields=['Owner', 'Is_Delete'], name='Count_ReplyComment'),  # 统计某用户回复的
         ]
         db_table = 'document_comment'
 
 
 # 便签 done in 07-22
 class Note(models.Model):
-    NoteId = models.BigIntegerField(db_column="ID", primary_key=True)  # 便签id
-    CreateUser = models.IntegerField(db_column="USER_ID", default='1', db_index=True)  # 用户id
-    TagType = models.TextField(db_column="TAGS_TYPE")  # 便签类型
-    Content = models.TextField(db_column="CONTENT")  # 便签内容
-    DocumentId = models.BigIntegerField(db_column="DOCUMENT_ID")  # 所属专题uuid
-    Is_Open = models.BooleanField(db_index=True)  # 是否是一个公共便签
+    NoteId = models.BigIntegerField(primary_key=True)  # 便签id
+    CreateUser = models.IntegerField(db_column="UserId", default='1', db_index=True)  # 用户id
+    DocumentId = models.BigIntegerField(db_column="DocumentId")  # 所属专题id
+    TagType = models.TextField(db_column="TagsType", default='normal')  # 便签类型
+    Content = models.TextField(db_column="Content", default='')  # 便签内容
+    Conf = JSONField(db_column='Configure')  # 设置
+    Is_Open = models.BooleanField(db_index=True, default=False)  # 是否是一个公共便签
+    Is_Delete = models.BooleanField(db_index=True, default=False)  # 是否删除了
 
     class Meta:
         indexes = [
-            models.Index(fields=['CreateUser', 'DocumentId'])  # 统计同一用户的Note
+            models.Index(fields=['CreateUser', 'DocumentId', 'Is_Delete']),  # 统计同一用户的Note
+            models.Index(fields=['CreateUser'])
         ]
 
         db_table = 'document_note'
 
-
-# todo 课程 level : 3
+# todo 课程 level: 3
 # class Course(DocGraph):
 #     LinksInfo = ArrayField(JSONField(), db_column='LINKS_INFO')  # 学习网连接的信息
 #     NodesInfo = ArrayField(JSONField(), db_column='NODES_INFO')  # 学习网
@@ -166,7 +217,7 @@ class Note(models.Model):
 #     class Meta:
 #         db_table = 'document_course'
 
-# todo Path level: 2
+# todo Path level: 3
 # class Path(models.Model):
 #
 #     PathId = models.BigIntegerField(primary_key=True)

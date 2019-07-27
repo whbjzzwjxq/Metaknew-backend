@@ -1,13 +1,13 @@
 from django.http import HttpResponse
 import json
-from history.logic_class import AddRecord
+from record.logic_class import ErrorRecord
 from tools.base_tools import class_table, NeoSet
 from subgraph.logic_class import BaseNode
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 
 
 source_list = {
-    "record": AddRecord
+    "record": ErrorRecord
 }
 
 

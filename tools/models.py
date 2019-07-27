@@ -3,8 +3,8 @@ from django.db import models
 
 class GlobalWordIndex(models.Model):
 
-    WordIndex = models.AutoField(db_column='INDEX', primary_key=True)
-    Word = models.TextField(db_column='WORD', db_index=True, unique=True, editable=False)
+    WordIndex = models.AutoField(db_column='Index', primary_key=True)
+    Word = models.TextField(db_column='Word', db_index=True, unique=True, editable=False)
 
     class Meta:
         db_table = 'global_word_index'
@@ -17,7 +17,7 @@ class GlobalWordIndex(models.Model):
 # Record之类的事务内容使用time作为划分依据
 class BaseBlockManager(models.Model):
 
-    BlockId = models.AutoField(db_column='ID', primary_key=True)
+    BlockId = models.AutoField(db_column='BlockId', primary_key=True)
     Classifier = models.IntegerField(db_column='LabelContent', db_index=True)
     RegisterTime = models.DateTimeField(db_column='RegisterTime', auto_now_add=True)
 

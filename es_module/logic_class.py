@@ -1,12 +1,12 @@
 from elasticsearch import Elasticsearch
-from history.logic_class import AddRecord
+from record.logic_class import ErrorRecord
 
 import json
 
 es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
 
 
-#  todo 加入评分 level :2
+#  todo 加入评分 level: 3
 class EsQuery:
 
     def __init__(self, index):

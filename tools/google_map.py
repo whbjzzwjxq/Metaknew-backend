@@ -1,7 +1,7 @@
 from subgraph.models import LocationDoc
 from django.core.exceptions import ObjectDoesNotExist
 from tools.redis_process import query_location_queue, remove_location_queue
-from history.models import LocationsRecord
+from record.models import LocationsRecord
 import googlemaps
 
 token = "AIzaSyAUdQoLyHvvyPaDExQ5gD_KtSvEeiQk0_k"

@@ -12,7 +12,7 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 #            }
 
 
-# todo 查找缺漏使用 只在内部生成的时候使用 level: 2
+# done in 07-25
 class SourceAddRecord(models.Model):
 
     RecordId = models.BigIntegerField(primary_key=True)
@@ -36,14 +36,14 @@ class ErrorRecord(SourceAddRecord):
 
 class WarnRecord(SourceAddRecord):
 
-    WarnContent = ArrayField(JSONField, db_column='Content', default=list)
+    WarnContent = ArrayField(JSONField(), db_column='Content', default=list)
 
     class Meta:
         db_table = 'history_warn_record'
 
 
 class TransRecord(models.Model):
-    RecordId = models.AutoField(primary_key=True)
+    RecordId = models.AutoField(db_column='Trans', primary_key=True)
     Lang = models.TextField(db_column='TYPE', db_index=True)  # 语言类型
     Name = models.TextField(db_column='NAME')  # 基础内容 Name
     Is_Done = models.BooleanField(db_column='DONE')  # 是否完成
@@ -54,7 +54,7 @@ class TransRecord(models.Model):
 
 
 class LocationsRecord(models.Model):
-    RecordId = models.AutoField(primary_key=True)
+    RecordId = models.AutoField(db_column='Locations', primary_key=True)
     Location = models.TextField(db_column='NAME')  # 基础内容 Name
     Is_Done = models.BooleanField(db_column='DONE', default=False)  # 是否完成
 
@@ -64,16 +64,16 @@ class LocationsRecord(models.Model):
 
 # todo version branch level: 2 todo 压缩记录 level: 1
 class VersionRecord(models.Model):
-    RecordId = models.AutoField(primary_key=True)
+    RecordId = models.BigIntegerField(primary_key=True)
     CreateUser = models.BigIntegerField(db_column='User', editable=False)
     CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
-    SourceId = models.BigIntegerField(db_column='SourceId', editable=False)
+    SourceId = models.BigIntegerField(db_column='SourceId', editable=False, db_index=True)
     SourceType = models.TextField(db_column='Type', editable=False)
 
     Name = models.TextField(db_column='Name')
-    LastRecord = models.IntegerField(db_column='Last')
+    FrontRecord = models.IntegerField(db_column='Last')
     Is_Draft = models.BooleanField(db_column='Draft', db_index=True)
-    Content = JSONField(db_column='Version')
+    Content = JSONField(db_column='Content')
 
     class Meta:
         indexes = [

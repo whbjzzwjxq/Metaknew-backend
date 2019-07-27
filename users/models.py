@@ -6,7 +6,6 @@ from django.contrib.postgres.fields import ArrayField, HStoreField
 
 # todo 角色整理 level : 3
 class User(models.Model):
-
     UserId = models.BigIntegerField(db_column='USER_ID', primary_key=True)  # 用户id
     UserName = models.TextField(db_column='USER_NAME', unique=True)  # 用户名
     UserPw = models.TextField(db_column='USER_PASSWORD')  # 用户密码
@@ -28,12 +27,10 @@ class User(models.Model):
     Area = ArrayField(models.TextField(), db_column='AREA', default=list)
 
     class Meta:
-
         db_table = 'user_info_base'
 
 
 class GroupCtrl(models.Model):
-
     GroupId = models.BigIntegerField(db_column='Group_Id', primary_key=True)
     GroupName = models.TextField(db_column='Group_Name', unique=True)
     CreateUser = models.BigIntegerField(db_column='Create_User')
@@ -46,12 +43,10 @@ class GroupCtrl(models.Model):
     Is_Open = models.BooleanField(db_column='Open', default=True)
 
     class Meta:
-
         db_table = 'user_group_info_base'
 
 
 class Privilege(models.Model):
-
     # 注意GroupId和UserId不能重复 因此生成的时候使用同一个IdBlock
     UserId = models.BigIntegerField(primary_key=True, db_index=True)
     # 用户控制
@@ -77,7 +72,6 @@ class Privilege(models.Model):
 
 # 用户私有仓库
 class UserRepository(models.Model):
-
     UserId = models.IntegerField(db_column='USER_ID', primary_key=True)
     CreateDoc = ArrayField(models.BigIntegerField(), db_column='CreateDoc', default=list)
     CreateNode = ArrayField(models.BigIntegerField(), db_column='CreateNode', default=list)
@@ -86,12 +80,10 @@ class UserRepository(models.Model):
     UploadFile = ArrayField(models.BigIntegerField(), db_column='UPLOAD', default=list)
 
     class Meta:
-
         db_table = 'user_collection'
 
 
 class UserConcern(models.Model):
-
     UserId = models.BigIntegerField(db_column='USER_ID', db_index=True)
     # 用户关心的Source
     SourceId = models.BigIntegerField(db_column='SOURCE_ID', db_index=True)
@@ -110,3 +102,87 @@ class UserConcern(models.Model):
         ]
         db_table = 'user_labels'
 
+
+# todo 用户进度记录 level: 2
+class UserDocProgress(models.Model):
+    UserId = models.BigIntegerField(db_column='UserId', db_index=True)
+    # 用户查看的专题
+    SourceId = models.BigIntegerField(db_column='SourceId', db_index=True)
+    SourceType = models.TextField(db_column='SourceType', db_index=True)
+    SpendTime = models.IntegerField(db_column='SpendTime')
+    LastPart = models.BigIntegerField(db_column='LastPart')  # 上次最后停在哪个位置
+
+    class Meta:
+        db_table = 'user_progress'
+
+
+# ----------------用户权限----------------
+
+# 原则:
+# 1 Common=False的Source 不暴露id和内容
+# 2 Used=False的Source 拦截所有API
+# 3 只有Owner才可以delete
+# 4 ChangeState 是指可以改变状态的用户，拥有除了Delete外的全部权限
+# 5 Collaborator 是指可以完全操作的用户
+# 5 SharedTo 是指可以进行查询级别操作的用户
+
+
+# done in 07-22
+class BaseAuthority(models.Model):
+    SourceId = models.BigIntegerField(primary_key=True, db_index=True)  # 资源id
+
+    # 状态
+    Used = models.BooleanField(db_column='used', default=True)
+    Common = models.BooleanField(db_column='common', default=True)
+    Shared = models.BooleanField(db_column='shared', default=False)
+    OpenSource = models.BooleanField(db_column='open', default=False)
+    Payment = models.BooleanField(db_column='payment', default=False)
+
+    class Meta:
+        abstract = True
+
+
+class DocAuthority(BaseAuthority):
+    class Meta:
+        db_table = 'authority_doc'
+
+
+class NodeAuthority(BaseAuthority):
+    class Meta:
+        db_table = 'authority_node'
+
+
+class MediaAuthority(BaseAuthority):
+    class Meta:
+        db_table = 'authority_media'
+
+
+# todo 支付管理 level: 3
+# class PaymentManager(models.Model):
+#
+#     OrderId = models.BigIntegerField(db_column='OrderId', primary_key=True)
+#     SourceId = models.IntegerField(db_column='SourceId')
+#     Success = models.BooleanField(db_column='Success')
+#     Time = models.DateTimeField(db_column='Time', auto_now=True)
+#     Price = models.FloatField(db_column='Price', default=0)
+#     Free = models.FloatField(db_column='Free', default=1)
+#
+#     class Meta:
+#         db_table = 'authority_payment'
+
+
+# 注意这个表单只做统计信息用 权限检测在User下实现 done
+class AuthorityCount(models.Model):
+    SourceId = models.BigIntegerField(primary_key=True)  # 资源uuid
+    Owner = models.BigIntegerField(db_column='Owner', db_index=True)  # 专题所有人的id
+    # 拥有修改状态权限的用户
+    Manager = ArrayField(models.BigIntegerField(), db_column='Manager', default=list)
+    # 拥有完整权限的用户
+    Collaborator = ArrayField(models.BigIntegerField(), db_column='Coll', default=list)
+    # 分享的用户
+    SharedTo = ArrayField(models.BigIntegerField(), db_column='ShareTo', default=list)
+    # 可以无偿使用的用户
+    FreeTo = ArrayField(models.BigIntegerField(), db_column='FreeTo', default=list)
+
+    class Meta:
+        db_table = 'authority_count_user'

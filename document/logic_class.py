@@ -1,54 +1,57 @@
-from document.models import Comment, Note
-from document.models import DocGraph, _Doc
+from document.models import DocPaper, DocGraph, _Doc, Comment, Note
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, encrypt
-from subgraph.logic_class import BaseNode
-from django.core.cache import cache
 from time import time
 import datetime
-from users.models import UserConcern
+from users.models import UserConcern, UserRepository, UserDocProgress, Privilege
+from record.logic_class import ErrorRecord, field_check_record
+from subgraph.logic_class import BaseNode
 from django.db.models import Avg
+
 types = ['StrNode', 'InfNode', 'Media', 'Document']
-NeoNodeKeys = ['Name', 'Name_zh', 'Name_en', 'PrimaryLabel', 'Area', 'Language', 'Alias', 'Description']
 
 
 # todo doc重新定义 level: 0
 
-front_end_doc = {
-    
-}
+# todo 数据结构精简化 目的: 节约内存 节约流量 level: 3
+# Field: Field -> TranslateField, LocationField, TypeField 等等 可以给每个Field注入格式检测， 翻译队列等
+# Privilege: BaseSource: self.user, self._id 可以捕获异常和错误 统一生成权限表
+# HistoryRecord: UpdateField 可以记录每个Field的变化
 
 
 class BaseDoc:
 
-    def __init__(self):
-        self.Info = _Doc()
-        self.Graph = DocGraph()
+    def __init__(self, user, collector=base_tools.NeoSet()):
+        self.Info = _Doc
+        self.Graph = None
+        self.Paper = None
+        self.user = user
+        self.collector = collector
+
         self.nodes = []
         self.links = []
         self.comments = []
-        self.already = False
-        self.origin = ''
 
-    def query(self, doc_id):
-        key = "cache_doc_" + self.origin[-17:]
-        cache_doc = cache.get(key)
-        self.origin = doc_id
-        if not cache_doc:
-            self.NeoNode = BaseNode().query(_id=doc_id)
-            self.Graph = self.query_graph(doc_id)
-            self.save_cache()
-        else:
-            self.NeoNode = cache_doc["NeoNode"]
-            self.Graph = cache_doc["Graph"]
-            timeout = cache.ttl(key) + encrypt.hour
-            cache.expire(key, timeout=timeout)
+    def query_base(self, _id):
+        self.Info = BaseNode(user=self.user, collector=self.collector).query_with_label(_id, 'Document')
+        if self.Info.Has_Paper:
+            try:
+                self.Paper = DocPaper.objects.get(pk=_id)
+            except ObjectDoesNotExist:
+                pass
 
-        self.Info = self.NeoNode.info
-        self.nodes = [node['doc_id'] for node in self.nodes]
-        self.links = [link['doc_id'] for link in self.links]
-        self.already = True
+        if self.Info.Has_Graph:
+            try:
+                self.Graph = DocGraph.objects.get(pk=_id)
+            except ObjectDoesNotExist:
+                pass
+
         return self
+
+    def query_comment(self, _id):
+        self.comments = Comment.objects.filter(BaseTarget=self.origin,
+                                               Is_Delete=False)
+        return self.comments
 
     def create(self, data):
         pass
@@ -100,11 +103,6 @@ class BaseDoc:
             }
             cache.add(key, abbr_doc, timeout=encrypt.week)
             return abbr_doc
-
-    def query_comment(self):
-        self.comments = Comment.objects.filter(BaseTarget=self.origin,
-                                               Is_Delete=False)
-        return self.comments
 
     def add_node(self, doc_id, conf):
         self.nodes.append({'doc_id': doc_id, 'conf': conf})
@@ -200,6 +198,7 @@ class BaseDoc:
         cache.expire(key, timeout=1)
 
 
+# 个人化的跟专题有关的内容
 class PersonalDoc:
 
     def __init__(self, doc_id, user):
@@ -227,66 +226,116 @@ class PersonalDoc:
 class BaseComment:
 
     def __init__(self):
-        self.comment = Comment()
+        self.comment = None
 
-    def query(self, doc_id):
-        comment = Comment.objects.filter(doc_id=doc_id)
-        if not comment.Is_Delete:
-            self.comment = comment
-        return self
+    @staticmethod
+    def query_doc(doc_id):
+        comment = Comment.objects.filter(Source=doc_id, Is_Delete=False)
+        return comment
 
-    def add(self, base, target, user, content, update_time):
+    @staticmethod
+    def query_user(user):
+        comment = Comment.objects.filter(Owner=user, Is_Delete=False)
+        return comment
+
+    @staticmethod
+    def query_reply_to_user(user):
+        comment = Comment.objects.filter(TargetUser=user, Is_Delete=False)
+        return comment
+
+    def add_single(self, _id, target_id, reply_id, reply_user, content, user):
         content = str(content)
 
-        self.comment = Comment(doc_id=doc_id,
-                               BaseTarget=base,
-                               Target=target,
-                               UserId=user,
+        self.comment = Comment(CommentId=_id,
+                               SourceId=target_id,
+                               TargetId=reply_id,
+                               TargetUser=reply_user,
                                Content=content,
-                               Time=update_time)
+                               Owner=user,
+                               Is_Delete=False)
         self.comment.save()
+        return self
 
     def delete(self):
         self.comment.Is_Delete = True
         self.comment.save()
+        return True
 
 
 class BaseNote:
 
-    tag_type = [
+    note_type = [
         "normal",
         "dark",
         "circle"
     ]
 
-    def __init__(self):
+    editable_prop = ["Content", "TagType", "Conf", "Is_Open"]
+
+    def __init__(self, user):
+        self.user = user
         self.note = Note()
 
-    def query(self, _id):
+    def query_single(self, _id):
         try:
-            self.note = Note.objects.get(NoteId=_id)
+            self.note = Note.objects.get(NoteId=_id, Is_Delete=False)
             return self
         except ObjectDoesNotExist:
             return None
 
-    def add(self, user, note_type, content, doc_doc_id):
-        content = str(content)
-        doc_id = base_tools.get_doc_id(name=content[0]+'comment',
-                                   label='Note',
-                                   device=0)
-        self.note = Note(doc_id=doc_id,
-                         CreateUser=user,
-                         TagType=note_type,
-                         Content=content,
-                         DocumentId=doc_doc_id)
-        self.note.save()
+    @staticmethod
+    def query_user_document(_id, user):
+        notes = Note.objects.filter(DocumentId=_id, CreateUser=user, Is_Delete=False)
+        return notes
+
+    def create(self, note):
+        self.note = Note(NoteId=note["NoteId"],
+                         CreateUser=self.user,
+                         DocumentId=note["DocumentId"])
+
+        self.update_content(note)
 
     def delete(self):
-        self.note.delete()
-
-    def update_content(self, new_content, new_type):
-        self.note.Content = str(new_content)
-        if new_type in self.tag_type:
-            self.note.TagType = new_type
+        self.note.Is_Delete = True
         self.note.save()
 
+    @field_check_record
+    def update_prop(self, field, new_prop, old_prop):
+        if new_prop != old_prop:
+            setattr(self.note, field, new_prop)
+
+    def update_content(self, note):
+        warn = []
+        update_prop = {}
+        if len(str(note["Content"])) <= 512:
+            update_prop.update({"Content": str(note["Content"])})
+        else:
+            warn.append({"field": "Content", "warn_type": "toolong_str"})
+
+        if note["TagType"] in self.note_type:
+            update_prop.update({"TagType": note["TagType"]})
+        else:
+            warn.append({"field": "TagType", "warn_type": "error_type"})
+
+        if note["Conf"] is not {}:
+            self.note.Conf = note["Conf"]
+        else:
+            warn.append({"field": "Conf", "warn_type": "error_type"})
+
+        update_prop.update({"Is_Open": note["Is_Open"]})
+
+        if not warn == []:
+            ErrorRecord.add_warn_record(user=self.user,
+                                        source_id=self.note.NoteId,
+                                        source_label='note',
+                                        content=warn)
+        self.note.objects.update(update_prop)
+        return self
+
+    def handle_for_frontend(self):
+        # test 测试记录一下
+        note = {field.name: field for field in self.note.objects.fields}
+        return note
+
+    def handle_for_open(self):
+        pass
