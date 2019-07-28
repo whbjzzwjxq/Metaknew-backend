@@ -4,7 +4,7 @@ from tools import base_tools, encrypt
 from time import time
 import datetime
 from users.models import UserConcern, UserRepository, UserDocProgress, Privilege
-from record.logic_class import ErrorRecord, field_check_record
+from record.logic_class import ErrorRecord, field_check
 from subgraph.logic_class import BaseNode
 from django.db.models import Avg
 

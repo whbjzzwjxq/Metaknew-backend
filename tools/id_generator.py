@@ -4,21 +4,24 @@ import datetime
 
 from django.shortcuts import HttpResponse
 from tools.models import *
-from tools.base_tools import query_word_list
+from tools.redis_process import query_word_index
 batch_size = 256
 small_integer = 65535
 device_id = 0
 base_time = datetime.date(year=2019, month=7, day=23)
 
 methods = {
+    # 按照主标签取号
     'node': {
         'manager': NodeBlockManager,
         'record': NodeBlockIdRecord
     },
+    # 按照设备取号
     'device': {
         'manager': DeviceBlockManager,
         'record': DeviceBlockIdRecord
     },
+    # 按照时间取号
     'time': {
         'manager': RecordBlockManager,
         'record': RecordBlockIdRecord
@@ -42,8 +45,8 @@ def id_generator(number, method, content, jump=3):
             record = methods[method]['record']
             if method == 'node':
                 try:
-                    content = query_word_list([content])[0]
-                except BaseException:
+                    content = query_word_index([content])[0]
+                except AttributeError:
                     content = 0
             if method == 'time':
                 try:

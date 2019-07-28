@@ -2,12 +2,11 @@ from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools
 from record.logic_class import EWRecord, field_check
-from record.models import VersionRecord
+from record.models import NodeVersionRecord, WarnRecord
 from subgraph.models import NodeCtrl, Translate, MediaNode, NodeInfo
 from es_module.logic_class import es
 from datetime import datetime
 from tools.id_generator import id_generator, device_id
-from copy import deepcopy
 from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError
 
@@ -42,7 +41,8 @@ node_format = {
         ]
     },
     "loading_history": {
-
+        "RecordId": "",
+        "Name": "",
     },
     "translate": {
         "name_auto": "Test",
@@ -70,19 +70,22 @@ class BaseNode(object):
         self.trans = Translate()
 
         # history的id和node不一致
-        self.loading_history = VersionRecord("0")
-        self.new_history = VersionRecord()
+        # 当前加载的历史文件 稳定版的历史固定为空
+        self.loading_history = NodeVersionRecord()
+
+        # 新建的历史文件
+        self.new_history = NodeVersionRecord()
 
         self.collector = collector  # neo4j连接池
         self._id = _id  # _id
         self.label = ''  # 标签
         self.user = user  # 操作用户
         self.is_draft = False  # 是否是草稿
-        self.current_trans = {}  # 目前的翻译文件内容
+        self.is_create = False  # 是否是新建
 
         self.needed_props = []  # 该种PrimaryLabel必须的标签
         self.lack = []  # element in lack : 'record' | 'trans' | 'node'
-        self.warn = []  # 警告信息
+        self.warn = WarnRecord()  # 警告信息
 
     # ----------------- query ----------------
     # 只查询基础信息: info 和 ctrl
@@ -126,7 +129,7 @@ class BaseNode(object):
 
     def __query_history(self):
         try:
-            self.history = VersionRecord.objects.filter(SourceId=self._id)
+            self.history = NodeVersionRecord.objects.filter(SourceId=self._id)
         except ObjectDoesNotExist:
             self.lack.append('record')
 
@@ -139,6 +142,10 @@ class BaseNode(object):
     # ---------------- create ----------------
     @error_check
     def create(self, node):
+        self.is_draft = False
+        self.is_create = True
+        # 最新稳定版的Base指向id=0
+        self.loading_history = NodeVersionRecord(RecordId=0)
         # 注意这里id是从生成器取的！！
         if '_id' not in node:
             raise IdGenerationError
@@ -149,12 +156,11 @@ class BaseNode(object):
             self._id = node['_id']
             self.label = node['PrimaryLabel']
             self.needed_props = base_tools.get_user_props(self.label)
-            self.loading_history = self.__history_create(node=node)
+            self.new_history = self.__history_create(name=node["Name"])
             self.__translation_create()
             self.__ctrl_create(node=node)
             self.__info_create(node=node)
             self.__neo4j_create(node=node)
-
             # es索引记录 todo 异步 level :2
             # 返回self对象
             return self
@@ -162,14 +168,15 @@ class BaseNode(object):
     @error_check
     def update_as_stable(self, node):
         self.is_draft = False
+        pass
 
     @error_check
     def update_as_draft(self, node):
         self.is_draft = True
+        pass
 
     def __info_create(self, node):
         self.info = base_tools.init(self.label)()
-        self.is_draft = False
         # 基础信息 专有修改接口
         self.info.NodeId = self._id
         self.info.PrimaryLabel = self.label
@@ -189,7 +196,7 @@ class BaseNode(object):
             contributor = [{"user_id": self.user, "level": 10}]
         self.ctrl = NodeCtrl(
             NodeId=self._id,
-            History=self.history.RecordId,
+            History=self.new_history.RecordId,
             CountCacheTime=datetime.now(),
             Is_UserMade=user,  # 注意这里后台导入时user == 0
             CreateUser=node["user"],
@@ -197,21 +204,22 @@ class BaseNode(object):
             Contributor=contributor
         )
 
-    def __history_create(self, node):
+    def __history_create(self, name):
         version_id = id_generator(1, method='device', content=device_id, jump=3)
-        new_history = VersionRecord(RecordId=version_id,
-                                    SourceId=self._id,
-                                    SourceType=self.label,
-                                    CreateUser=self.user,
-                                    Name=node["Name"],
-                                    FrontRecord=self.loading_history.RecordId,
-                                    Content={},
-                                    Is_Draft=self.is_draft
-                                    )
+        new_history = NodeVersionRecord(RecordId=version_id,
+                                        SourceId=self._id,
+                                        SourceType=self.label,
+                                        CreateUser=self.user,
+                                        Name=name,
+                                        BaseHistory=self.loading_history.RecordId,
+                                        Content={},
+                                        Is_Draft=self.is_draft
+                                        )
         return new_history
 
     def __translation_create(self):
         self.trans = Translate(FileId=self._id)
+        return self
 
     # Neo4j创建 done
     def __neo4j_create(self, node):
@@ -252,31 +260,12 @@ class BaseNode(object):
 
     def update_props(self, node):
         # todo 把 地理识别的内容 改写为LocationField level: 3
-        # todo 把 需要翻译的内容 改写为NameField level: 3
-        for key in self.needed_props:
-            if key not in node:
-                warn = {"field": key, "warn_type": "lack_prop"}
-                self.warn.append(warn)
-            else:
-                current_prop = getattr(self.info, key)
-                new_prop = node[key]
-                # test 默认值问题 level: 0
-                if not type(current_prop) == type(new_prop):
-                    warn = {"field": key, "warn_type": "error_type"}
-                    self.warn.append(warn)
-                else:
-                    if type(new_prop).__name__ == 'str' and len(new_prop) >= 512:
-                        warn = {"field": key, "warn_type": "toolong_str"}
-                        self.warn.append(warn)
-                        # 记录warn
-                    elif type(new_prop).__name__ == 'list' and len(new_prop) >= 128:
-                        warn = {"field": key, "warn_type": "toolong_list"}
-                        self.warn.append(warn)
-                        # 记录warn
-                    else:
-                        if key == 'Location':
-                            set_location_queue([node[key]])
-                        setattr(self.info, key, node[key])
+        for field in self.needed_props:
+            new_prop = getattr(node, field.name)
+            old_prop = getattr(self.info, field.name)
+            self.update_prop(field, new_prop, old_prop)
+            if field.name == 'Location':
+                set_location_queue([new_prop])
         return self
 
     # todo 媒体相关field 改为 MediaField level: 3
@@ -285,9 +274,12 @@ class BaseNode(object):
             record = MediaNode.objects.get(pk=media)
             if record.MediaType == 'picture':
                 self.info.MainPic = media
+            else:
+                warn = {'field': 'MainPic', 'warn_type': "error_type"}
+                self.warn.WarnContent.append(warn)
         except ObjectDoesNotExist:
-            warn = {'field': 'MainPic', 'warn_type': "error_type"}
-            self.warn.append(warn)
+            warn = {'field': 'MainPic', 'warn_type': "empty_prop"}
+            self.warn.WarnContent.append(warn)
         return self
 
     def delete(self):
@@ -314,6 +306,8 @@ class BaseNode(object):
         self.collector.tx.commit()
         self.info.save()
         self.ctrl.save()
+        self.new_history.save()
+        self.loading_history.save()
 
     def handle_for_frontend(self):
         pass

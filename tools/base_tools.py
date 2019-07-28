@@ -34,7 +34,7 @@ def init(label):
         return NodeInfo
 
 
-def get_user_props(p_label: str):
+def get_user_props(p_label: str) -> list:
     """
     :param p_label: PrimaryLabel
     :return: 不包含BaseNode字段信息的列表

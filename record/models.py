@@ -63,7 +63,7 @@ class LocationsRecord(models.Model):
 
 
 # todo version branch level: 2 todo 压缩记录 level: 1
-class VersionRecord(models.Model):
+class NodeVersionRecord(models.Model):
     RecordId = models.BigIntegerField(primary_key=True)
     CreateUser = models.BigIntegerField(db_column='User', editable=False)
     CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
@@ -71,8 +71,8 @@ class VersionRecord(models.Model):
     SourceType = models.TextField(db_column='Type', editable=False)
 
     Name = models.TextField(db_column='Name')
-    FrontRecord = models.IntegerField(db_column='Last')
     Is_Draft = models.BooleanField(db_column='Draft', db_index=True)
+    BaseHistory = models.BigIntegerField(db_column='BaseHis', db_index=True)
     Content = JSONField(db_column='Content')
 
     class Meta:

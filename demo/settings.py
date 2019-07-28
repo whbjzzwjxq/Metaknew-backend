@@ -68,7 +68,6 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'djcelery',
     'users',
-    'authority',
     'subgraph',
     'document',
     'search',
