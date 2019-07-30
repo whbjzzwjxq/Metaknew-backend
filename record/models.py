@@ -20,7 +20,7 @@ class SourceAddRecord(models.Model):
     SourceLabel = models.IntegerField(db_column='Label', db_index=True, default=0)
     BugType = models.SmallIntegerField(db_column='Type')
     CreateUser = models.BigIntegerField(db_column='User')
-    Time = models.DateTimeField(db_column='Time', auto_now_add=True)
+    CreateTime = models.DateTimeField(db_column='Time', auto_now_add=True)
     Is_Solved = models.BooleanField(db_column='Solved', db_index=True, default=False)
 
     class Meta:

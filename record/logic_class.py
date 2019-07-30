@@ -16,10 +16,10 @@ def error_check(_func):
         except Exception as e:
             name = type(e).__name__
             EWRecord.add_error_record(user=self.user,
-                                         source_id=self._id,
-                                         source_label=self.__name__,
-                                         data=node,
-                                         bug_type=name)
+                                      source_id=self._id,
+                                      source_label=self.__name__,
+                                      data=node,
+                                      bug_type=name)
             return False
             # todo 消息队列 level: 1
 

@@ -1,4 +1,4 @@
-from document.models import DocPaper, DocGraph, _Doc, Comment, Note
+from document.models import DocPaper, DocGraph, DocInfo, Comment, Note
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, encrypt
 from time import time
@@ -22,7 +22,7 @@ types = ['StrNode', 'InfNode', 'Media', 'Document']
 class BaseDoc:
 
     def __init__(self, user, collector=base_tools.NeoSet()):
-        self.Info = _Doc
+        self.Info = DocInfo
         self.Graph = None
         self.Paper = None
         self.user = user
@@ -59,7 +59,7 @@ class BaseDoc:
     def update_info(self, data):
         self.Info.Title = data['title']
         self.Info.MainPic = data['main_pic']
-        self.Info.Area = data['area']
+        self.Info.Topic = data['Topic']
         self.Info.Description = data['description']
 
     def update_graph(self):
@@ -95,7 +95,7 @@ class BaseDoc:
             abbr_doc = {
                 'doc_id': self.origin,
                 'title': self.Info.Title,
-                'area': self.Info.Area,
+                'Topic': self.Info.Topic,
                 'main_pic': self.Info.MainPic,
                 'imp': self.Info.Imp,
                 'hard_level': self.Info.HardLevel,
@@ -299,7 +299,7 @@ class BaseNote:
         self.note.Is_Delete = True
         self.note.save()
 
-    @field_check_record
+    @field_check
     def update_prop(self, field, new_prop, old_prop):
         if new_prop != old_prop:
             setattr(self.note, field, new_prop)

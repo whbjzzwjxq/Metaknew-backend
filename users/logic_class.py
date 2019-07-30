@@ -6,9 +6,8 @@ from users.models import User, GroupCtrl, UserConcern, UserRepository, Privilege
 from tools.encrypt import make_token
 from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
-from tools.id_generator import id_generator
+from tools.id_generator import id_generator, device_id
 
-device_id = 0
 salt = 'al76vdj895as12cq'
 
 
@@ -120,10 +119,8 @@ class BaseUser:
             UserPw=make_password(password=password, salt=salt)
         )
         if status:
-            area = concern['area']
-            groups = concern['group']
-            self.user.Area = area
-            self.user.Joint_Group = BaseGroup.apply(_id, groups)
+            self.user.Topic = concern['Topic']
+            self.user.Joint_Group = BaseGroup.apply(_id, concern['group'])
         self.privilege = Privilege.objects.create(UserId=_id)
         self.repository = UserRepository.objects.create(UserId=_id)
         self.save()

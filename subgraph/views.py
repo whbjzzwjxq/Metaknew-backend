@@ -132,7 +132,7 @@ def add_document(request):
     # 新建专题
     new_document = {'Name': info['title'],
                     'PrimaryLabel': 'Document',
-                    'Area': info['area'],
+                    'Topic': info['Topic'],
                     'type': "Document",
                     'Title': info['title'],
                     'Description': info['description'],

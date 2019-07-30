@@ -22,9 +22,9 @@ class User(models.Model):
 
     # 兴趣部分
     # key: GroupId value: 0-Owner 1-Manager 2-Member 3-Applying
-    Joint_Group = HStoreField(db_column='JOINT_GROUP')
+    Joint_Group = HStoreField(db_column='JOINT_GROUP', default=dict)
     # 用户感兴趣的领域
-    Area = ArrayField(models.TextField(), db_column='AREA', default=list)
+    Topic = ArrayField(models.TextField(), default=list)
 
     class Meta:
         db_table = 'user_info_base'
@@ -37,7 +37,7 @@ class GroupCtrl(models.Model):
     Owner = models.BigIntegerField(db_column='Owner')
     Manager = ArrayField(models.BigIntegerField(), db_column='Manager')
     Member = ArrayField(models.BigIntegerField(), db_column='Member')
-    Area = ArrayField(models.TextField(), default=list)
+    Topic = ArrayField(models.TextField(), default=list)
     Labels = ArrayField(models.TextField(), default=list)
     Is_Auto = models.BooleanField(db_column='Auto', default=False)
     Is_Open = models.BooleanField(db_column='Open', default=True)

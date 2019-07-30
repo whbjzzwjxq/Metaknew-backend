@@ -17,7 +17,7 @@ def handle_data(line, user):
         "type": "StrNode",
         "PrimaryLabel": "ArchProject",
         "Labels": ["Latin_America", "20century"],
-        "Area": "Architecture",
+        "Topic": "Architecture",
         "Leader": Leader,
         "WorkTeam": Leader,
         "Location": data["Location"],

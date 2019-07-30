@@ -1,9 +1,10 @@
 from py2neo.data import Node, Relationship, walk
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from tools import base_tools
 from record.logic_class import EWRecord, field_check
 from record.models import NodeVersionRecord, WarnRecord
-from subgraph.models import NodeCtrl, Translate, MediaNode, NodeInfo
+from subgraph.models import NodeCtrl, NodeInfo, Translate, MediaNode
+from subgraph.models import SearchTogether, AfterVisit, MentionTogether, Doc2Node, Topic2Node, Topic2Topic
 from es_module.logic_class import es
 from datetime import datetime
 from tools.id_generator import id_generator, device_id
@@ -11,19 +12,20 @@ from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
+# 前端使用的格式
 node_format = {
     "conf": {},  # 这是在专题里实现的
     "ctrl": {},  # 控制类信息 不修改
     "info": {
         "_id": "111",
-        "type": "StrNode", 
+        "type": "StrNode",
         "Name": "Test",
         "PrimaryLabel": "Person",
         "Language": "en",  # 默认auto
         "Alias": [],  # 默认[]
         "Labels": [],  # 默认[]
         "Description": "this is a test node",
-        "Area": [],
+        "Topic": [],
         "ExtraProps": {
             "Livein": "New York"
         },
@@ -38,24 +40,23 @@ node_format = {
              "end": "1915-04-06",
              "content": "Live in YangZhou"
              }
-        ]
+        ],
+        "Translate": {
+            "Name_auto": "Test",
+            "Name_zh": "测试",
+            "Name_en": "Test",
+            "Names": {},
+            "Des_auto": "this is a test node",
+            "Des_zh": "这是测试节点",
+            "Des_en": "this is a test node",
+            "Description": {}
+        },
     },
+    "lack": [],  # 缺少的属性
+    "edited_prop": [],  # 在前端编辑过的属性
     "loading_history": {
         "RecordId": "",
-        "Name": "",
-    },
-    "translate": {
-        "name_auto": "Test",
-        "name_zh": "测试",
-        "name_en": "Test",
-        "names": {},
-        "des_auto": "this is a test node",
-        "des_zh": "这是测试节点",
-        "des_en": "this is a test node",
-        "description": {}
-    },
-    "status": {
-        "lack": []
+        "Content": ""
     }
 }
 
@@ -69,21 +70,22 @@ class BaseNode(object):
         self.ctrl = NodeCtrl()
         self.trans = Translate()
 
-        # history的id和node不一致
+        # 注意history的id和node不一致
         # 当前加载的历史文件 稳定版的历史固定为空
         self.loading_history = NodeVersionRecord()
 
         # 新建的历史文件
         self.new_history = NodeVersionRecord()
+        self.needed_props = []  # 该种PrimaryLabel必须的标签
 
         self.collector = collector  # neo4j连接池
         self._id = _id  # _id
         self.label = ''  # 标签
         self.user = user  # 操作用户
         self.is_draft = False  # 是否是草稿
-        self.is_create = False  # 是否是新建
+        self.is_create = False  # 是否是创建状态
 
-        self.needed_props = []  # 该种PrimaryLabel必须的标签
+        self.edited_props = []  # 发生过编辑的属性
         self.lack = []  # element in lack : 'record' | 'trans' | 'node'
         self.warn = WarnRecord()  # 警告信息
 
@@ -93,7 +95,7 @@ class BaseNode(object):
         try:
             self.ctrl = NodeCtrl.objects.get(pk=self._id)
             self.label = self.ctrl.PrimaryLabel
-            self.info = base_tools.init(self.label).objects.get(pk=self._id)
+            self.info = base_tools.node_init(self.label).objects.get(pk=self._id)
             self.needed_props = base_tools.get_user_props(self.label)
             return self
         except ObjectDoesNotExist:
@@ -114,7 +116,7 @@ class BaseNode(object):
         try:
             self.ctrl = self.ctrl.objects.get(pk=self._id)
             self.label = self.ctrl.PrimaryLabel
-            self.info = base_tools.init(self.label).objects.get(pk=self._id)
+            self.info = base_tools.node_init(self.label).objects.get(pk=self._id)
             self.needed_props = base_tools.get_user_props(self.label)
             return self
         except ObjectDoesNotExist:
@@ -144,8 +146,6 @@ class BaseNode(object):
     def create(self, node):
         self.is_draft = False
         self.is_create = True
-        # 最新稳定版的Base指向id=0
-        self.loading_history = NodeVersionRecord(RecordId=0)
         # 注意这里id是从生成器取的！！
         if '_id' not in node:
             raise IdGenerationError
@@ -156,8 +156,9 @@ class BaseNode(object):
             self._id = node['_id']
             self.label = node['PrimaryLabel']
             self.needed_props = base_tools.get_user_props(self.label)
-            self.new_history = self.__history_create(name=node["Name"])
+            self.__history_create(name=node["Name"])
             self.__translation_create()
+
             self.__ctrl_create(node=node)
             self.__info_create(node=node)
             self.__neo4j_create(node=node)
@@ -168,20 +169,20 @@ class BaseNode(object):
     @error_check
     def update_as_stable(self, node):
         self.is_draft = False
-        pass
 
     @error_check
     def update_as_draft(self, node):
         self.is_draft = True
         pass
 
+    # ---------------- __private_create ----------------
     def __info_create(self, node):
-        self.info = base_tools.init(self.label)()
+        self.info = base_tools.node_init(self.label)()
         # 基础信息 专有修改接口
         self.info.NodeId = self._id
         self.info.PrimaryLabel = self.label
         # 初始化
-        self.update_props(node)
+        self.info_update(node)
         self.translation_setter(node)
         self.main_pic_setter(node["MainPic"])
         return self
@@ -196,8 +197,8 @@ class BaseNode(object):
             contributor = [{"user_id": self.user, "level": 10}]
         self.ctrl = NodeCtrl(
             NodeId=self._id,
-            History=self.new_history.RecordId,
             CountCacheTime=datetime.now(),
+            History=self.new_history.RecordId,
             Is_UserMade=user,  # 注意这里后台导入时user == 0
             CreateUser=node["user"],
             PrimaryLabel=self.label,
@@ -206,16 +207,33 @@ class BaseNode(object):
 
     def __history_create(self, name):
         version_id = id_generator(1, method='device', content=device_id, jump=3)
-        new_history = NodeVersionRecord(RecordId=version_id,
-                                        SourceId=self._id,
-                                        SourceType=self.label,
-                                        CreateUser=self.user,
-                                        Name=name,
-                                        BaseHistory=self.loading_history.RecordId,
-                                        Content={},
-                                        Is_Draft=self.is_draft
-                                        )
-        return new_history
+        self.new_history = NodeVersionRecord(RecordId=version_id,
+                                             SourceId=self._id,
+                                             SourceType=self.label,
+                                             CreateUser=self.user,
+                                             Name=name,
+                                             Content={},
+                                             Is_Draft=self.is_draft
+                                             )
+        if self.is_draft:
+            self.new_history.BaseHistory = self.loading_history.RecordId
+        else:
+            if self.is_create:
+                self.new_history.BaseHistory = 0
+            else:
+                self.loading_history.BaseHistory = self.new_history.RecordId
+                self.new_history.BaseHistory = 0
+
+    def __history_save(self):
+
+        if self.is_draft:
+            self.new_history.save()
+        else:
+            if self.is_create:
+                self.new_history.save()
+            else:
+                self.loading_history.save()
+                self.new_history.save()
 
     def __translation_create(self):
         self.trans = Translate(FileId=self._id)
@@ -226,17 +244,19 @@ class BaseNode(object):
         self.node = Node(node['type'])
         self.node.update({
             "_id": self._id,
-            "Name": node["Name"]["auto"]
+            "Name": node["Name"],
+            "Imp": node["BaseImp"],
+            "HardLevel": node["BaseHardLevel"],
         })
         self.node.__primarylabel__ = node['PrimaryLabel']
         self.node.__primarykey__ = "_id"
         self.node.__primaryvalue__ = self._id
         self.collector.tx.create(self.node)
-        self.__neo4j_update_label()
+        self.__neo4j_update()
 
-    def __neo4j_update_label(self):
+    def __neo4j_update(self):
         labels = [self.info.PrimaryLabel]
-        labels.extend(self.info.Area)
+        labels.extend(self.info.Topic)
         labels.extend(self.info.Labels)
         self.node.update_labels(labels)
         self.collector.tx.push(self.node)
@@ -244,13 +264,13 @@ class BaseNode(object):
     def translation_setter(self, node):
         trans_list = [field for field in self.trans._meta.get_fields()]
         for field in trans_list:
-            new_prop = getattr(node["translate"], field.name)
+            new_prop = getattr(node["Translate"], field.name)
             old_prop = getattr(self.trans, field.name)
-            self.update_prop(field, new_prop, old_prop)
+            self.__update_prop(field, new_prop, old_prop)
         return self
 
     @field_check
-    def update_prop(self, field, new_prop, old_prop):
+    def __update_prop(self, field, new_prop, old_prop):
         if new_prop != old_prop:
             if self.is_draft:
                 self.new_history.Content.update({field.model + '-' + field.name: new_prop})
@@ -258,12 +278,15 @@ class BaseNode(object):
                 self.loading_history.Content.update({field.model + '-' + field.name: old_prop})
                 setattr(field.model, field.name, new_prop)
 
-    def update_props(self, node):
+    def info_update(self, node):
         # todo 把 地理识别的内容 改写为LocationField level: 3
         for field in self.needed_props:
-            new_prop = getattr(node, field.name)
             old_prop = getattr(self.info, field.name)
-            self.update_prop(field, new_prop, old_prop)
+            if field.name in node:
+                new_prop = getattr(node, field.name)
+            else:
+                new_prop = type(old_prop)()
+            self.__update_prop(field, new_prop, old_prop)
             if field.name == 'Location':
                 set_location_queue([new_prop])
         return self
@@ -306,8 +329,6 @@ class BaseNode(object):
         self.collector.tx.commit()
         self.info.save()
         self.ctrl.save()
-        self.new_history.save()
-        self.loading_history.save()
 
     def handle_for_frontend(self):
         pass
@@ -324,45 +345,76 @@ class BaseNode(object):
 
 # todo Link 重构 level: 0
 class BaseLink(object):
-    def __init__(self, collector=base_tools.NeoSet()):
-        self.origin = ''
-        self.start = {}
-        self.end = {}
-        self.walk = {}
-        self.root = {}
-        self.collector = collector
-
-    def query(self, uuid):
-        self.root = self.collector.Rmatcher.match(uuid=uuid).first()
-        self.origin = uuid
-        if self.root:
-            self.walk = walk(self.root)
-            self.start = self.walk.start_node
-            self.end = self.walk.en_node
-            return self
+    def __init__(self, link_type, collector=base_tools.NeoSet(), user=0):
+        self._id = 0
+        self.r_type = link_type
+        if user == 0:
+            self.user = device_id
         else:
+            self.user = user
+
+        self.link_info = base_tools.link_init(link_type)
+        self.collector = collector
+        self.link = Relationship()
+        self.walk = walk()
+        self.start = Node()
+        self.end = Node()
+
+    def query_single_by_id(self, _id):
+        try:
+            self.link_info = self.link_info.objects.filter(Type=self.r_type)
+            self.link_info = self.link_info.objects.get(LinkId=_id)
+            self._id = self.link_info.LinkId
+            self.r_type = self.link_info.Type
+            self.link = self.collector.Rmatcher.match(nodes=None, r_type=self.r_type, _id=self._id).first()
+            self.do_walk()
+            return self
+        except ObjectDoesNotExist or MultipleObjectsReturned:
             return None
 
+    # 主要是系统生成的关系使用 因为是唯一的
+    def query_single_by_start_end(self, start, end):
+        try:
+            self.link_info = self.link_info.objects.get(Start=start["_id"], End=end["_id"], Type=self.r_type)
+            self._id = self.link_info.LinkId
+            self.r_type = self.link_info.Type
+            self.link = self.collector.Rmatcher.match(nodes=(start, end), r_type=self.r_type, _id=self._id).first()
+            self.do_walk()
+            return self
+        except ObjectDoesNotExist or MultipleObjectsReturned:
+            return None
+
+    def do_walk(self):
+        self.walk = walk(self.link)
+        self.start = self.walk.start_node
+        self.end = self.walk.end_node
+
+
+class SystemMade(BaseLink):
+
+    @error_check
     def create(self, link):
-        # source 和 target 是Node对象
-        self.start = link["source"]
-        self.end = link["target"]
-        link.update({'uuid': base_tools.rel_uuid()})
-        self.root = Relationship(self.start, link['type'], self.end)
-        link.pop('type')
-        link.pop('source')
-        link.pop('target')
-        self.root.update(link)
-        self.collector.tx.create(self.root)
-        self.save()
+        # 注意start end就已经是Node()而不是_id了
+        result = self.query_single_by_start_end(link["start"], link["end"])
+        if result:
+            pass
+        else:
+            assert "_id" in link
+            self.link = Relationship(link["start"], self.r_type, link["end"])
+            props = base_tools.get_system_link_props(self.r_type)
+            for prop in props:
+                value = getattr(link, prop)
+                self.link.update({prop: value})
+                self.link_info.objects.update({prop: value})
+            self.do_walk()
+            self.collector.tx.push(self.link)
         return self
 
-    def save(self):
-        self.collector.tx.push(self.root)
+    
 
 
 # todo 消息队列处理 level :3
-async def add_node_index(node: BaseNode()):
+async def add_node_index(node):
     assert node.already
     root = node.root
     info = node.info
@@ -393,7 +445,7 @@ async def add_doc_index(doc):
     target = "content.%s" % root["Language"]
     updatetime = info.UpdateTime.date()
     body = {
-        "area": info.Area,
+        "Topic": info.Topic,
         target: info.Description,
         "hard_level": info.HardLevel,
         "hot": info.Hot,
@@ -414,3 +466,5 @@ async def add_doc_index(doc):
         return True
     else:
         return False
+
+

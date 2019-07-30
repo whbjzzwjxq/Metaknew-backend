@@ -40,7 +40,7 @@ def dataframe2dict(data):
         # node["Remarks"] = data.iloc[row,Remarks]  if str(data.iloc[row,Remarks]) != 'nan' else None
         node["PrimaryLabel"] = "Project"
         node["Type"] = "StrNode"
-        node["Area"] = "Architecture"
+        node["Topic"] = "Architecture"
         node["Label"] = "Architecture"
 
         NodeList.append(node)

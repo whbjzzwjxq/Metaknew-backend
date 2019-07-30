@@ -107,17 +107,19 @@ def paper_content():
     return setting
 
 
-def paper_setting():
-    setting = {
-        "base": {
-            "theme": 0,
-            "background": '',
-            "color": '000000',
-            "opacity": 0
-            # todo 可能还有更多的设置 level : 2
+class PaperSetting:
+
+    def __call__(self):
+        setting = {
+            "base": {
+                "theme": 0,
+                "background": '',
+                "color": '000000',
+                "opacity": 0
+                # todo 可能还有更多的设置 level : 2
+            }
         }
-    }
-    return setting
+        return setting
 
 
 # def base_path():
@@ -131,7 +133,7 @@ def paper_setting():
 
 
 # done in 07-22
-class _Doc(NodeInfo):
+class DocInfo(NodeInfo):
     Has_Paper = models.BooleanField(db_column='Paper', default=True)
     Has_Graph = models.BooleanField(db_column='Graph', default=True)
     Size = models.IntegerField(db_column='SIZE', default=0)  # 计算得出
@@ -163,7 +165,7 @@ class DocPaper(models.Model):
     IncludedNodes = ArrayField(JSONField(), db_column='Nodes', default=node_setting())  # json里包含节点在该专题下的设置
     IncludedNotes = ArrayField(JSONField(), db_column='Notes', default=note_setting())  # json里包含便签在该专题下的设置
     Content = JSONField(default=paper_content())  # 专题内容
-    Conf = JSONField(default=paper_setting())  # 设置
+    Conf = JSONField(default=PaperSetting())  # 设置
 
     class Meta:
         db_table = 'document_paper'
@@ -177,7 +179,7 @@ class Comment(models.Model):
     TargetUser = models.BigIntegerField(db_column='TARGET_USER', db_index=True)  # 回复的用户的id
     Content = models.TextField(db_column='CONTENT', default='')  # 评论内容
     Owner = models.BigIntegerField(db_column='USER', default='0', db_index=True)  # 发表用户id
-    Time = models.DateTimeField(db_column='TIME', auto_now_add=True)  # 评论时间
+    CreateTime = models.DateTimeField(db_column='TIME', auto_now_add=True)  # 评论时间
     Is_Delete = models.BooleanField(db_column='DELETED', default=False)
 
     class Meta:

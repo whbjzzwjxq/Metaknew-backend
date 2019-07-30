@@ -86,7 +86,7 @@
 #         # 新建专题
 #         new_document = {'Name': info['title'],
 #                         'PrimaryLabel': 'Document',
-#                         'Area': info['area'],
+#                         'Topic': info['Topic'],
 #                         'type': "Document",
 #                         "nodes": doc_nodes,
 #                         "relationships": doc_relationships

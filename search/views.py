@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 import json
 from record.logic_class import ErrorRecord
-from tools.base_tools import class_table, NeoSet
+from tools.base_tools import node_model_dict, NeoSet
 from subgraph.logic_class import BaseNode
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 

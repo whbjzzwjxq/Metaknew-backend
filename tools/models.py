@@ -27,17 +27,17 @@ class BaseBlockManager(models.Model):
 
 class NodeBlockManager(BaseBlockManager):
     class Meta:
-        db_table = 'global_node_block'
+        db_table = 'global_node_block_manager'
 
 
 class DeviceBlockManager(BaseBlockManager):
     class Meta:
-        db_table = 'global_media_block'
+        db_table = 'global_device_block_manager'
 
 
 class RecordBlockManager(BaseBlockManager):
     class Meta:
-        db_table = 'global_private_block'
+        db_table = 'global_private_block_manager'
 
 
 # 每个Block的管理记录
@@ -52,16 +52,16 @@ class BlockIdRecord(models.Model):
 
 class NodeBlockIdRecord(BlockIdRecord):
     class Meta:
-        db_table = 'global_node_block'
+        db_table = 'device_node_block'
 
 
 class DeviceBlockIdRecord(models.Model):
 
     class Meta:
-        db_table = 'global_device_block'
+        db_table = 'device_device_block'
 
 
 class RecordBlockIdRecord(models.Model):
 
     class Meta:
-        db_table = 'global_time_block'
+        db_table = 'device_time_block'

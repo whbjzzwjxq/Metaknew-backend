@@ -27,7 +27,6 @@ urlpatterns = [
     url(r'media/(?P<path>.*)', serve, {'document_root': settings.BASE_DIR}),
     path('search/', include('search.urls')),
     path('subgraph/', include('subgraph.urls')),
-    path('authority/', include('authority.urls')),
     path('es_query/', include('es_module.urls')),
     path('tools/', include('tools.urls'))
 
