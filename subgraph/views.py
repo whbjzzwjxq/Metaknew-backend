@@ -1,7 +1,8 @@
-from document.logic_class import BaseDoc
 from django.http import HttpResponse
 from subgraph.logic_class import BaseNode, BaseLink
+from document.logic_class import BaseDoc
 from tools.base_tools import NeoSet, get_user_props
+from tools.id_generator import id_generator
 from py2neo import Relationship
 import json
 import datetime
@@ -105,12 +106,12 @@ def add_document(request):
 
         # 记录专题内节点坐标
         conf = {'uuid': new_node['uuid'], 'conf': node['conf']}
-        doc.Graph.IncludedNodes.append(conf)
+        doc.graph.IncludedNodes.append(conf)
 
         # 记录下主要节点
         if new_node['Name'] in info['Keywords']:
             main_node_links.append({'type': 'doc_main_node', 'source': new_node, 'count': 1})
-            doc.Graph.MainNodes.append(new_node['uuid'])
+            doc.graph.MainNodes.append(new_node['uuid'])
 
     for relationship in relationships:
         # 从node_index里访问提交后的Node对象
@@ -127,7 +128,7 @@ def add_document(request):
         if new_rel:
             new_rel = new_rel.root
         conf = {'uuid': new_rel['uuid'], 'conf': relationship['conf']}
-        doc.Graph.IncludedLinks.append(conf)
+        doc.graph.IncludedLinks.append(conf)
 
     # 新建专题
     new_document = {'Name': info['title'],
@@ -157,10 +158,10 @@ def add_document(request):
             collector.tx.create(result)
 
     # DocumentInformation部分
-    doc.Info.uuid = new_document.origin
-    doc.Graph.uuid = new_document.origin
-    doc.Info.CountCacheTime = datetime.datetime.now()
-    doc.Info.CreateTime = datetime.datetime.now()
+    doc.node.uuid = new_document.origin
+    doc.graph.uuid = new_document.origin
+    doc.node.CountCacheTime = datetime.datetime.now()
+    doc.node.CreateTime = datetime.datetime.now()
     doc.save()
     collector.tx.commit()
     return HttpResponse('Create Document Success')
@@ -170,3 +171,23 @@ def query_needed_prop(request):
     label = request.GET.get('Plabel')
     result = get_user_props(p_label=label)
     return HttpResponse(json.dumps(result))
+
+
+def create_document(request):
+    collector = NeoSet()
+    doc_id = id_generator(number=1,
+                          method="node",
+                          content="document",
+                          jump=3)
+    user = request.GET.get("user_id")
+    data = json.dumps(request.body)
+    doc = BaseDoc(_id=doc_id, user=user, collector=collector)
+    if not doc:
+        try:
+            doc.create(data)
+            doc.save()
+            return HttpResponse(content="Create Document Success", status=200)
+        except BaseException:
+            return HttpResponse(content="TimeoutError Please Contact the Admin", status=400)
+    else:
+        return HttpResponse(content="Document Already Exist", status=401)

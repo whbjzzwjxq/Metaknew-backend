@@ -8,6 +8,10 @@ class IdGenerationError(BaseException):
     pass
 
 
+class ObjectAlreadyExist(BaseException):
+    pass
+
+
 def error_check(_func):
     def wrapped(self, node):
         try:
@@ -20,7 +24,7 @@ def error_check(_func):
                                       source_label=self.__name__,
                                       data=node,
                                       bug_type=name)
-            return False
+            return None
             # todo 消息队列 level: 1
 
     return wrapped
@@ -81,6 +85,7 @@ class EWRecord:
             CreateUser=user,
             OriginData=data,
             BugType=bug_type)
+        record.save()
         # todo 消息队列 level: 1
         return record
 

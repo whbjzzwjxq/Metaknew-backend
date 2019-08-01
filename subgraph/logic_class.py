@@ -1,6 +1,7 @@
 from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from tools import base_tools
+from django.db.models import Max
 from record.logic_class import EWRecord, field_check
 from record.models import NodeVersionRecord, WarnRecord
 from subgraph.models import NodeCtrl, NodeInfo, Translate, MediaNode
@@ -9,7 +10,7 @@ from es_module.logic_class import es
 from datetime import datetime
 from tools.id_generator import id_generator, device_id
 from tools.redis_process import set_location_queue
-from record.logic_class import error_check, IdGenerationError
+from record.logic_class import error_check, IdGenerationError, ObjectAlreadyExist
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
 # 前端使用的格式
@@ -62,7 +63,7 @@ node_format = {
 
 
 # todo 各种权限表生成与实现 level: 0  bulk_create level: 0
-class BaseNode(object):
+class BaseNode:
 
     def __init__(self, user, _id, collector=base_tools.NeoSet()):
         self.node = Node()
@@ -130,9 +131,8 @@ class BaseNode(object):
             self.lack.append('trans')
 
     def __query_history(self):
-        try:
-            self.history = NodeVersionRecord.objects.filter(SourceId=self._id)
-        except ObjectDoesNotExist:
+        self.history = NodeVersionRecord.objects.filter(SourceId=self._id)
+        if len(self.history) == 0:
             self.lack.append('record')
 
     def __query_node(self):
@@ -197,8 +197,7 @@ class BaseNode(object):
             contributor = [{"user_id": self.user, "level": 10}]
         self.ctrl = NodeCtrl(
             NodeId=self._id,
-            CountCacheTime=datetime.now(),
-            History=self.new_history.RecordId,
+            CountCacheTime=datetime.now().replace(microsecond=0),
             Is_UserMade=user,  # 注意这里后台导入时user == 0
             CreateUser=node["user"],
             PrimaryLabel=self.label,
@@ -206,8 +205,13 @@ class BaseNode(object):
         )
 
     def __history_create(self, name):
-        version_id = id_generator(1, method='device', content=device_id, jump=3)
-        self.new_history = NodeVersionRecord(RecordId=version_id,
+        if self.is_create:
+            version_id = 1
+        else:
+            self.__query_history()
+            version_id = self.history.aggregate(Max("VersionId"))
+            version_id += 1
+        self.new_history = NodeVersionRecord(VersionId=version_id,
                                              SourceId=self._id,
                                              SourceType=self.label,
                                              CreateUser=self.user,
@@ -216,12 +220,12 @@ class BaseNode(object):
                                              Is_Draft=self.is_draft
                                              )
         if self.is_draft:
-            self.new_history.BaseHistory = self.loading_history.RecordId
+            self.new_history.BaseHistory = self.loading_history.VersionId
         else:
             if self.is_create:
                 self.new_history.BaseHistory = 0
             else:
-                self.loading_history.BaseHistory = self.new_history.RecordId
+                self.loading_history.BaseHistory = self.new_history.VersionId
                 self.new_history.BaseHistory = 0
 
     def __history_save(self):
@@ -350,9 +354,13 @@ class BaseLink(object):
         self.r_type = link_type
         if user == 0:
             self.user = device_id
+            self.is_user_made = False
         else:
             self.user = user
+            self.is_user_made = True
 
+        self.is_create = False
+        self.warn = WarnRecord()
         self.link_info = base_tools.link_init(link_type)
         self.collector = collector
         self.link = Relationship()
@@ -397,20 +405,57 @@ class SystemMade(BaseLink):
         # 注意start end就已经是Node()而不是_id了
         result = self.query_single_by_start_end(link["start"], link["end"])
         if result:
-            pass
+            raise ObjectAlreadyExist
         else:
             assert "_id" in link
             self.link = Relationship(link["start"], self.r_type, link["end"])
             props = base_tools.get_system_link_props(self.r_type)
             for prop in props:
-                value = getattr(link, prop)
-                self.link.update({prop: value})
-                self.link_info.objects.update({prop: value})
+                value = getattr(link, prop.name)
+                self.link.update({prop.name: value})
+                self.link_info.objects.update({prop.name: value})
             self.do_walk()
             self.collector.tx.push(self.link)
         return self
 
-    
+
+class KnowLedge(BaseLink):
+
+    @error_check
+    def create(self, link):
+        self.is_create = True
+        assert "_id" in link
+        result = self.query_single_by_start_end(link["start"], link["end"])
+        if result:
+            self.update_props(link)
+        else:
+            self.link = Relationship(link["start"], self.r_type, link["end"])
+            self.link_info = self.link_info()
+            self.update_props(link)
+        self.do_walk()
+        self.collector.tx.push(self.link)
+        return self
+
+    @field_check
+    def __update_prop(self, field, new_prop, old_prop):
+        self.link.update({field.name: new_prop})
+        setattr(self.link_info, field.name, new_prop)
+
+    def update_props(self, link):
+        props = base_tools.get_system_link_props(self.r_type)
+        for prop in props:
+            if prop.name in link:
+                new_prop = getattr(link, prop.name)
+                old_prop = getattr(self.link_info, prop.name)
+                self.__update_prop(prop, new_prop, old_prop)
+            else:
+                pass
+        if self.is_create:
+            confidence = 50 + int(self.is_user_made) * 50
+            # test
+            self.__update_prop(self.link_info.objects.Is_UserMade, self.is_user_made, False)
+            self.__update_prop(self.link_info.objects.CreateUser, self.user, 0)
+            self.__update_prop(self.link_info.objects.Confidence, confidence, 50)
 
 
 # todo 消息队列处理 level :3

@@ -34,7 +34,6 @@ pictures = ['jpg', 'png', 'gif']
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     # 不传回的控制性内容
-    History = models.BigIntegerField(db_column='History')  # 当前版本的history标号
     CountCacheTime = models.DateTimeField(db_column='CACHE_TIME')  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column='UserMade', db_index=True)  # 是否是用户新建的
     # 直接传回的内容
@@ -249,12 +248,11 @@ class Doc2Node(Relationship):
 class KnowLedge(Relationship):
     Is_UserMade = models.BooleanField(db_column='Is_UserMade', db_index=True)
     CreateUser = models.BigIntegerField(db_column='CreateUser', db_index=True)
+    Confidence = models.SmallIntegerField(db_column='Confidence', default=50)
     # todo LocationField level: 2
-    PrimaryLabel = models.TextField(db_column='Plabel', db_index=True)
     Props = JSONField(db_column='Props', default=dict)
-    Content = models.TextField(db_column='Content')
-    LinkedSource = models.BigIntegerField(db_column='Linked')
-    Confidence = models.SmallIntegerField(db_column='Confidence')
+    Content = models.TextField(db_column='Content', default='')
+    LinkedSource = models.BigIntegerField(db_column='Linked', default=0)
 
     class Meta:
         db_table = 'graph_link_knowledge'

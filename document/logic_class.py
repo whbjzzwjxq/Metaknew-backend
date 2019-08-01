@@ -4,12 +4,11 @@ from tools import base_tools, encrypt
 from time import time
 import datetime
 from users.models import UserConcern, UserRepository, UserDocProgress, Privilege
-from record.logic_class import ErrorRecord, field_check
+from record.logic_class import error_check, field_check
 from subgraph.logic_class import BaseNode
 from django.db.models import Avg
 
 types = ['StrNode', 'InfNode', 'Media', 'Document']
-
 
 # todo doc重新定义 level: 0
 
@@ -18,91 +17,101 @@ types = ['StrNode', 'InfNode', 'Media', 'Document']
 # Privilege: BaseSource: self.user, self._id 可以捕获异常和错误 统一生成权限表
 # HistoryRecord: UpdateField 可以记录每个Field的变化
 
+document_frontend_edit = {
+    "node": {
+        "info": {},
+        "ctrl": {},
+        "conf": {},
+    },
+    "graph": {
+        "RefNodes": [],
+        "RefLinks": [],
+        "UpdateNodes": [],
+        "UpdateLinks": [],
+        "AddNodes": [],
+        "AddLinks": [],
+        "CommonNotes": []
+    },
+    "paper": {}
+}
+
+document_frontend_normal = {
+    "node": {
+        "info": {},
+        "ctrl": {},
+        "conf": {},
+    },
+    "graph": {
+        "Nodes": [],
+        "Links": [],
+        "CommonNotes": []
+    },
+    "paper": {
+
+    }
+}
+
 
 class BaseDoc:
 
-    def __init__(self, user, collector=base_tools.NeoSet()):
-        self.Info = DocInfo
-        self.Graph = None
-        self.Paper = None
+    def __init__(self, _id, user, collector=base_tools.NeoSet()):
         self.user = user
+        self._id = _id
         self.collector = collector
 
-        self.nodes = []
-        self.links = []
+        self.node = BaseNode(_id=self._id, user=self.user, collector=self.collector).query_with_label("Document")
+        if self.node:
+            if self.node.info.Has_Paper:
+                try:
+                    self.paper = DocPaper.objects.get(pk=self._id)
+                except ObjectDoesNotExist:
+                    self.paper = DocPaper()
+
+            if self.node.info.Has_Graph:
+                try:
+                    self.graph = DocGraph.objects.get(pk=self._id)
+                except ObjectDoesNotExist:
+                    self.graph = DocGraph()
+
+        self.include_nodes = []
+        self.include_links = []
         self.comments = []
 
-    def query_base(self, _id):
-        self.Info = BaseNode(user=self.user, collector=self.collector).query_with_label(_id, 'Document')
-        if self.Info.Has_Paper:
-            try:
-                self.Paper = DocPaper.objects.get(pk=_id)
-            except ObjectDoesNotExist:
-                pass
-
-        if self.Info.Has_Graph:
-            try:
-                self.Graph = DocGraph.objects.get(pk=_id)
-            except ObjectDoesNotExist:
-                pass
-
-        return self
-
-    def query_comment(self, _id):
-        self.comments = Comment.objects.filter(BaseTarget=self.origin,
+    def query_comment(self):
+        self.comments = Comment.objects.filter(BaseTarget=self._id,
                                                Is_Delete=False)
         return self.comments
 
+    @error_check
     def create(self, data):
+        info = data["info"]
+        self.node = BaseNode(_id=self._id, user=self.user, collector=self.collector).create(info)
+        if info["Has_Graph"]:
+            graph = data["graph"]
+            self.update_graph(graph)
+        if data["Has_Paper"]:
+            paper = data["paper"]
+
+    def update_graph(self, graph):
+        ref_nodes = graph["RefNodes"]
+        ref_links = graph["RefLinks"]
+        update_nodes = graph["UpdateNodes"]
+        update_links = graph["UpdateLinks"]
+        add_nodes = graph["AddNodes"]
+        add_links = graph["AddLinks"]
+        common_notes = graph["CommonNotes"]
+
+    def update_paper(self, paper):
         pass
 
     def update_info(self, data):
-        self.Info.Title = data['title']
-        self.Info.MainPic = data['main_pic']
-        self.Info.Topic = data['Topic']
-        self.Info.Description = data['description']
-
-    def update_graph(self):
-        pass
+        self.node.Title = data['title']
+        self.node.MainPic = data['main_pic']
+        self.node.Topic = data['Topic']
+        self.node.Description = data['description']
 
     def reference(self):
         pass
-
-    def query_info(self, doc_id):
-        self.origin = doc_id
-        try:
-            self.Info = DocInfo.objects.get(doc_id=doc_id)
-            return self
-        except ObjectDoesNotExist:
-            return self
-
-    def query_graph(self, doc_id):
-        self.origin = doc_id
-        try:
-            self.Graph = DocGraph.objects.get(pk=doc_id)
-            return self
-        except ObjectDoesNotExist:
-            return self
-
-    def query_abbr_doc(self, doc_id):
-        self.query_info(doc_id)
-        key = "abbr_" + self.origin[-17:]
-        abbr_doc = cache.get(key)
-        if abbr_doc:
-            cache.expire(key, timeout=encrypt.week)
-            return abbr_doc
-        else:
-            abbr_doc = {
-                'doc_id': self.origin,
-                'title': self.Info.Title,
-                'Topic': self.Info.Topic,
-                'main_pic': self.Info.MainPic,
-                'imp': self.Info.Imp,
-                'hard_level': self.Info.HardLevel,
-                'size': self.Info.Size
-            }
-            cache.add(key, abbr_doc, timeout=encrypt.week)
-            return abbr_doc
 
     def add_node(self, doc_id, conf):
         self.nodes.append({'doc_id': doc_id, 'conf': conf})
@@ -110,7 +119,7 @@ class BaseDoc:
     def remove_node(self, doc_id):
         if doc_id in self.nodes:
             index = self.nodes.index(doc_id)
-            self.Graph.IncludedNodes.pop(index)
+            self.graph.IncludedNodes.pop(index)
 
         self.remove_main_node(doc_id=doc_id)
         self.remove_rel(node=doc_id, link_doc_id=None)
@@ -118,16 +127,16 @@ class BaseDoc:
     def update_node(self, doc_id, conf):
         if doc_id in self.nodes:
             index = self.nodes.index(doc_id)
-            self.Graph.IncludedNodes[index]['conf'] = conf
+            self.graph.IncludedNodes[index]['conf'] = conf
 
     def set_main_node(self, doc_id):
-        self.Graph.MainNodes.append(doc_id)
+        self.graph.MainNodes.append(doc_id)
 
     def remove_main_node(self, doc_id):
-        self.Graph.MainNodes.remove(doc_id)
+        self.graph.MainNodes.remove(doc_id)
 
     def add_rel(self, doc_id, source, target, conf):
-        self.Graph.IncludedLinks.append({'doc_id': doc_id,
+        self.graph.IncludedLinks.append({'doc_id': doc_id,
                                          'source': source,
                                          'target': target,
                                          'conf': conf})
@@ -136,66 +145,58 @@ class BaseDoc:
         if link_doc_id is not None:
             if link_doc_id in self.links:
                 index = self.links.index(link_doc_id)
-                self.Graph.IncludedLinks.pop(index)
+                self.graph.IncludedLinks.pop(index)
         elif node is not None:
-            source = [link['source'] for link in self.Graph.IncludedLinks]
-            target = [link['target'] for link in self.Graph.IncludedLinks]
+            source = [link['source'] for link in self.graph.IncludedLinks]
+            target = [link['target'] for link in self.graph.IncludedLinks]
             while node in source:
                 index = source.index(node)
-                self.Graph.IncludedLinks.pop(index)
+                self.graph.IncludedLinks.pop(index)
             while node in target:
                 index = target.index(node)
-                self.Graph.IncludedLinks.pop(index)
+                self.graph.IncludedLinks.pop(index)
 
     def update_rel(self, doc_id, conf):
 
         if doc_id in self.links:
             index = self.links.index(doc_id)
-            self.Graph.IncludedLinks[index]['conf'] = conf
+            self.graph.IncludedLinks[index]['conf'] = conf
 
     def save(self):
-        if time() - self.Info.CountCacheTime.timestamp() > encrypt.week:
+        if time() - self.node.CountCacheTime.timestamp() > encrypt.week:
             self.re_count()
-            self.Info.CountCacheTime = datetime.datetime.now()
-        self.Info.UpdateTime = datetime.datetime.now()
-        self.Info.save()
-        self.Graph.save()
+            self.node.CountCacheTime = datetime.datetime.now()
+        self.node.UpdateTime = datetime.datetime.now()
+        self.node.save()
+        self.graph.save()
 
     def re_count(self):
-        self.Info.Size = self.Graph.IncludedNodes.count()
-        result = UserConcern.objects.filter(SourceId=self.origin)
-        self.Info.Useful = result.filter(Useful__gte=0).aggregate(Avg('Useful'))
-        self.Info.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg('HardLevel'))
-        self.Info.Imp = result.filter(Imp__gte=0).aggregate(Avg('Imp'))
-        self.Info.CountCacheTime = time()
+        self.node.info.Size = self.graph.IncludedNodes.count()
+        result = UserConcern.objects.filter(SourceId=self._id)
+        self.node.ctrl.Useful = result.filter(Useful__gte=0).aggregate(Avg('Useful'))
+        self.node.ctrl.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg('HardLevel'))
+        self.node.ctrl.Imp = result.filter(Imp__gte=0).aggregate(Avg('Imp'))
+        self.node.CountCacheTime = time()
         # todo hot_count level : 1
 
     def get_default_image(self):
         pass
 
-    def upload_media(self, doc_id_list):
-        self.Info.IncludedMedia.extend(doc_id_list)
+    def upload_media(self, medias):
+        self.node.IncludedMedia.extend(medias)
 
     def update_media_by_doc_id(self, doc_id, include_media):
-        self.Info = DocInfo.objects.filter(doc_id=doc_id).update(IncludedMedia=include_media)
+        self.node = DocInfo.objects.filter(doc_id=doc_id).update(IncludedMedia=include_media)
         return self
 
-    def remove_media(self, doc_id_list):
-        for doc_id in doc_id_list:
-            if doc_id in self.Info.IncludedMedia:
-                self.Info.IncludedMedia.remove(doc_id)
+    def remove_media(self, medias):
+        pass
 
     def save_cache(self):
-        key = "cache_doc_" + self.origin[-17:]
-        cache_doc = {
-            "NeoNode": self.NeoNode,
-            "Graph": self.Graph
-        }
-        cache.add(key, cache_doc, timeout=encrypt.hour * 2)
+        pass
 
     def clear_cache(self):
-        key = "cache_doc_" + self.origin[-17:]
-        cache.expire(key, timeout=1)
+        pass
 
 
 # 个人化的跟专题有关的内容
@@ -263,7 +264,6 @@ class BaseComment:
 
 
 class BaseNote:
-
     note_type = [
         "normal",
         "dark",
@@ -275,6 +275,7 @@ class BaseNote:
     def __init__(self, user):
         self.user = user
         self.note = Note()
+        self.warn = []
 
     def query_single(self, _id):
         try:
@@ -301,13 +302,12 @@ class BaseNote:
 
     @field_check
     def update_prop(self, field, new_prop, old_prop):
-        if new_prop != old_prop:
-            setattr(self.note, field, new_prop)
+        setattr(self.note, field, new_prop)
 
     def update_content(self, note):
         warn = []
         update_prop = {}
-        if len(str(note["Content"])) <= 512:
+        if len(str(note["Content"])) <= 1024:
             update_prop.update({"Content": str(note["Content"])})
         else:
             warn.append({"field": "Content", "warn_type": "toolong_str"})
@@ -320,7 +320,7 @@ class BaseNote:
         if note["Conf"] is not {}:
             self.note.Conf = note["Conf"]
         else:
-            warn.append({"field": "Conf", "warn_type": "error_type"})
+            warn.append({"field": "Conf", "warn_type": "empty_prop"})
 
         update_prop.update({"Is_Open": note["Is_Open"]})
 

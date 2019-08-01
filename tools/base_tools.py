@@ -44,11 +44,11 @@ def node_init(label):
         return NodeInfo
 
 
-def link_init(label):
+def link_init(label) -> link_model_dict:
     if label in link_model_dict:
         return link_model_dict[label]
     else:
-        return NodeInfo
+        return KnowLedge
 
 
 def get_user_props(p_label: str) -> list:
@@ -70,9 +70,8 @@ def get_user_props(p_label: str) -> list:
 
 def get_system_link_props(r_type: str) -> list:
     """
-    :param r_type: Type
-    :return: 不包含BaseNode字段信息的列表
-    注意p_label = Document进行了特殊处理
+    :param r_type: Link的Type
+    :return: 该link之下需要填充的属性
     """
     try:
         target = link_model_dict[r_type]._meta.get_fields()
