@@ -21,20 +21,20 @@ def send_message(request):
     """
 
     # 模版变量对应参数值
-    phone = request.GET.get('phone')
+    phone = request.GET.get("phone")
     current = check_message(phone=phone)
     message_code = random.randint(123456, 898998)
     if current:
-        return HttpResponse(content='请隔1分钟再请求验证码')
+        return HttpResponse(content="请隔1分钟再请求验证码")
     else:
         set_message(phone, message_code)
-        params = {'code': str(message_code)}
-        client = AcsClient('LTAITKweDYoqN2cH', 'jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB', 'default')
-        ali_request = ali_dayu_api('SendSms', 'MetaKnew', 'SMS_163847373')
-        ali_request.add_query_param('TemplateParam', params)
-        ali_request.add_query_param('PhoneNumbers', phone)
+        params = {"code": str(message_code)}
+        client = AcsClient("LTAITKweDYoqN2cH", "jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB", "default")
+        ali_request = ali_dayu_api("SendSms", "MetaKnew", "SMS_163847373")
+        ali_request.add_query_param("TemplateParam", params)
+        ali_request.add_query_param("PhoneNumbers", phone)
         client.do_action_with_exception(ali_request)
-        return HttpResponse(content='发送成功', content_type="application/json")
+        return HttpResponse(content="发送成功", content_type="application/json")
 
 
 # 查询发送记录
@@ -77,15 +77,15 @@ def query_send_detail(biz_id, mobile, page_size=10, current_page=1):
     }
         """
 
-    client = AcsClient('LTAITKweDYoqN2cH', 'jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB', 'default')
-    alirequest = ali_dayu_api('QuerySendDetails', 'MetaKnew', 'SMS_163847373')
-    alirequest.add_query_param('PhoneNumbers', mobile)
-    alirequest.add_query_param('CurrentPage', current_page)
-    alirequest.add_query_param('SendDate', time.strftime("%Y%m%d", time.localtime(int(time.time()))))
-    alirequest.add_query_param('PageSize', page_size)
-    alirequest.add_query_param('BizId', biz_id)
+    client = AcsClient("LTAITKweDYoqN2cH", "jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB", "default")
+    alirequest = ali_dayu_api("QuerySendDetails", "MetaKnew", "SMS_163847373")
+    alirequest.add_query_param("PhoneNumbers", mobile)
+    alirequest.add_query_param("CurrentPage", current_page)
+    alirequest.add_query_param("SendDate", time.strftime("%Y%m%d", time.localtime(int(time.time()))))
+    alirequest.add_query_param("PageSize", page_size)
+    alirequest.add_query_param("BizId", biz_id)
     response = client.do_action_with_exception(alirequest)
-    print(str(response, encoding='utf-8'))
+    print(str(response, encoding="utf-8"))
 
     return JsonResponse(str(response))
 
@@ -93,13 +93,13 @@ def query_send_detail(biz_id, mobile, page_size=10, current_page=1):
 # 阿里大于查询公共请求信息封装接口
 def ali_dayu_api(actionName, signName, templateCode):
     alirequest = CommonRequest()
-    alirequest.set_accept_format('json')
-    alirequest.set_domain('dysmsapi.aliyuncs.com')
-    alirequest.set_method('POST')
-    alirequest.set_protocol_type('https')  # https | http
-    alirequest.set_version('2017-05-25')
+    alirequest.set_accept_format("json")
+    alirequest.set_domain("dysmsapi.aliyuncs.com")
+    alirequest.set_method("POST")
+    alirequest.set_protocol_type("https")  # https | http
+    alirequest.set_version("2017-05-25")
     alirequest.set_action_name(actionName)
-    alirequest.add_query_param('SignName', signName)
-    alirequest.add_query_param('TemplateCode', templateCode)
+    alirequest.add_query_param("SignName", signName)
+    alirequest.add_query_param("TemplateCode", templateCode)
 
     return alirequest

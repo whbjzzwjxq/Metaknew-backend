@@ -12,23 +12,23 @@ base_time = datetime.date(year=2019, month=7, day=23)
 
 methods = {
     # 按照主标签取号
-    'node': {
-        'manager': NodeBlockManager,
-        'record': NodeBlockIdRecord
+    "node": {
+        "manager": NodeBlockManager,
+        "record": NodeBlockIdRecord
     },
     # 按照设备取号
-    'device': {
-        'manager': DeviceBlockManager,
-        'record': DeviceBlockIdRecord
+    "device": {
+        "manager": DeviceBlockManager,
+        "record": DeviceBlockIdRecord
     },
     # 按照时间取号
-    'time': {
-        'manager': RecordBlockManager,
-        'record': RecordBlockIdRecord
+    "time": {
+        "manager": RecordBlockManager,
+        "record": RecordBlockIdRecord
     },
-    'word': {
-        'manager': DeviceBlockManager,
-        'record': DeviceBlockIdRecord
+    "word": {
+        "manager": DeviceBlockManager,
+        "record": DeviceBlockIdRecord
     },
 }
 
@@ -39,22 +39,22 @@ def id_generator(number, method, content, jump=3):
         return []
     else:
         if number * jump > small_integer:
-            raise IndexError('Too Large Number/Fill_Ratio For IdGenerating Once')
+            raise IndexError("Too Large Number/Fill_Ratio For IdGenerating Once")
         try:
-            manager = methods[method]['manager']
-            record = methods[method]['record']
-            if method == 'node':
+            manager = methods[method]["manager"]
+            record = methods[method]["record"]
+            if method == "node":
                 try:
                     content = query_word_index([content])[0]
                 except AttributeError:
                     content = 0
-            if method == 'time':
+            if method == "time":
                 try:
                     content -= base_time
                     content = content.days
-                except TypeError('method time need date as content'):
+                except TypeError("method time need date as content"):
                     return None
-        except AttributeError('%s must be node or device or time or word' % method):
+        except AttributeError("%s must be node or device or time or word" % method):
             return None
 
         block = record.objects.last()  # 注意这里是本机的record 也就是只有new_block依赖于主数据库
@@ -117,7 +117,7 @@ def commit(id_list, block_id, record):
 
 # 测试用 设备/节点都测试完毕
 def new_id_list(request):
-    num = request.GET.get('num')
-    jump = request.GET.get('jump')
-    result = id_generator(number=int(num), method='node', content='Person', jump=int(jump))
+    num = request.GET.get("num")
+    jump = request.GET.get("jump")
+    result = id_generator(number=int(num), method="node", content="Person", jump=int(jump))
     return HttpResponse(json.dumps(result))

@@ -12,14 +12,14 @@ from tools.id_generator import id_generator, device_id
 from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError, ObjectAlreadyExist
 
-types = ['StrNode', 'InfNode', 'Media', 'Document']
+types = ["StrNode", "InfNode", "Media", "Document"]
 # 前端使用的格式
 node_format = {
-    "conf": {},  # 这是在专题里实现的
-    "ctrl": {},  # 控制类信息 不修改
-    "info": {
+    "Conf": {},  # 这是在专题里实现的
+    "Ctrl": {},  # 控制类信息 不修改
+    "Info": {
         "_id": "111",
-        "type": "StrNode",
+        "Type": "StrNode",
         "Name": "Test",
         "PrimaryLabel": "Person",
         "Language": "en",  # 默认auto
@@ -53,9 +53,9 @@ node_format = {
             "Description": {}
         },
     },
-    "lack": [],  # 缺少的属性
-    "edited_prop": [],  # 在前端编辑过的属性
-    "loading_history": {
+    "Lack": [],  # 缺少的属性
+    "EditedProp": [],  # 在前端编辑过的属性
+    "LoadingHistory": {
         "RecordId": "",
         "Content": ""
     }
@@ -81,13 +81,13 @@ class BaseNode:
 
         self.collector = collector  # neo4j连接池
         self._id = _id  # _id
-        self.label = ''  # 标签
+        self.label = ""  # 标签
         self.user = user  # 操作用户
         self.is_draft = False  # 是否是草稿
         self.is_create = False  # 是否是创建状态
 
         self.edited_props = []  # 发生过编辑的属性
-        self.lack = []  # element in lack : 'record' | 'trans' | 'node'
+        self.lack = []  # element in lack : "record" | "trans" | "node"
         self.warn = WarnRecord()  # 警告信息
 
     # ----------------- query ----------------
@@ -128,18 +128,18 @@ class BaseNode:
         try:
             self.trans = Translate.objects.get(FileId=self._id)
         except ObjectDoesNotExist:
-            self.lack.append('trans')
+            self.lack.append("trans")
 
     def __query_history(self):
         self.history = NodeVersionRecord.objects.filter(SourceId=self._id)
         if len(self.history) == 0:
-            self.lack.append('record')
+            self.lack.append("record")
 
     def __query_node(self):
         try:
             self.node = self.collector.Nmatcher.match(_id=self._id).first()
         except ObjectDoesNotExist:
-            self.lack.append('node')
+            self.lack.append("node")
 
     # ---------------- create ----------------
     @error_check
@@ -147,14 +147,14 @@ class BaseNode:
         self.is_draft = False
         self.is_create = True
         # 注意这里id是从生成器取的！！
-        if '_id' not in node:
+        if "_id" not in node:
             raise IdGenerationError
         else:
-            assert 'type' in node
-            assert 'Name' in node
-            assert 'PrimaryLabel' in node
-            self._id = node['_id']
-            self.label = node['PrimaryLabel']
+            assert "type" in node
+            assert "Name" in node
+            assert "PrimaryLabel" in node
+            self._id = node["_id"]
+            self.label = node["PrimaryLabel"]
             self.needed_props = base_tools.get_user_props(self.label)
             self.__history_create(name=node["Name"])
             self.__translation_create()
@@ -245,14 +245,14 @@ class BaseNode:
 
     # Neo4j创建 done
     def __neo4j_create(self, node):
-        self.node = Node(node['type'])
+        self.node = Node(node["type"])
         self.node.update({
             "_id": self._id,
             "Name": node["Name"],
             "Imp": node["BaseImp"],
             "HardLevel": node["BaseHardLevel"],
         })
-        self.node.__primarylabel__ = node['PrimaryLabel']
+        self.node.__primarylabel__ = node["PrimaryLabel"]
         self.node.__primarykey__ = "_id"
         self.node.__primaryvalue__ = self._id
         self.collector.tx.create(self.node)
@@ -277,9 +277,9 @@ class BaseNode:
     def __update_prop(self, field, new_prop, old_prop):
         if new_prop != old_prop:
             if self.is_draft:
-                self.new_history.Content.update({field.model + '-' + field.name: new_prop})
+                self.new_history.Content.update({field.model + "-" + field.name: new_prop})
             else:
-                self.loading_history.Content.update({field.model + '-' + field.name: old_prop})
+                self.loading_history.Content.update({field.model + "-" + field.name: old_prop})
                 setattr(field.model, field.name, new_prop)
 
     def info_update(self, node):
@@ -291,7 +291,7 @@ class BaseNode:
             else:
                 new_prop = type(old_prop)()
             self.__update_prop(field, new_prop, old_prop)
-            if field.name == 'Location':
+            if field.name == "Location":
                 set_location_queue([new_prop])
         return self
 
@@ -299,13 +299,13 @@ class BaseNode:
     def main_pic_setter(self, media):
         try:
             record = MediaNode.objects.get(pk=media)
-            if record.MediaType == 'picture':
+            if record.MediaType == "picture":
                 self.info.MainPic = media
             else:
-                warn = {'field': 'MainPic', 'warn_type': "error_type"}
+                warn = {"field": "MainPic", "warn_type": "error_type"}
                 self.warn.WarnContent.append(warn)
         except ObjectDoesNotExist:
-            warn = {'field': 'MainPic', 'warn_type': "empty_prop"}
+            warn = {"field": "MainPic", "warn_type": "empty_prop"}
             self.warn.WarnContent.append(warn)
         return self
 
@@ -342,7 +342,7 @@ class BaseNode:
         #
         # for key in get_special(self.label):
         #     props.update({key: self.info.__getattribute__(key)})
-        # props['uuid'] = str(props['uuid'])
+        # props["uuid"] = str(props["uuid"])
         # todo 更加详细的前端数据格式 level : 0
         # return {"Labels": labels, "Props": props}
 
@@ -469,14 +469,14 @@ async def add_node_index(node):
         target: info["Description"],
         "labels": list(root.labels),
         "language": root["Language"],
-        "name": {'auto': root["name"],
-                 'zh': root["name_zh"],
-                 'en': root["name_en"]},
+        "name": {"auto": root["name"],
+                 "zh": root["name_zh"],
+                 "en": root["name_en"]},
         "p_label": root["PrimaryLabel"],
         "uuid": root["uuid"]
     }
-    result = es.index(index='nodes', body=body, doc_type='_doc')
-    if result['_shards']['successful'] == 1:
+    result = es.index(index="nodes", body=body, doc_type="_doc")
+    if result["_shards"]["successful"] == 1:
         return True
     else:
         # todo record 记录索引失败 level: 2
@@ -499,15 +499,15 @@ async def add_doc_index(doc):
         "labels": list(root.labels),
         "language": root["Language"],
         "size": info.Size,
-        "title": {'auto': root["name"],
-                  'zh': root["name_zh"],
-                  'en': root["name_en"]},
+        "title": {"auto": root["name"],
+                  "zh": root["name_zh"],
+                  "en": root["name_en"]},
         "updatetime": updatetime,
         "useful": info.Useful,
         "uuid": root["uuid"]
     }
-    result = es.index(index='documents', body=body, doc_type='_doc')
-    if result['_shards']['successful'] == 1:
+    result = es.index(index="documents", body=body, doc_type="_doc")
+    if result["_shards"]["successful"] == 1:
         return True
     else:
         return False

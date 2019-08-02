@@ -5,14 +5,14 @@ import time
 import json
 
 
-YOUDAO_URL = 'http://openapi.youdao.com/api'
-APP_KEY = '2b44d851154f90ca'
-APP_SECRET = 'lkY470moRMP7MdYFFoV5AOyMHbnb3v90'
+YOUDAO_URL = "http://openapi.youdao.com/api"
+APP_KEY = "2b44d851154f90ca"
+APP_SECRET = "lkY470moRMP7MdYFFoV5AOyMHbnb3v90"
 
 
 def encrypt(signStr):
     hash_algorithm = hashlib.sha256()
-    hash_algorithm.update(signStr.encode('utf-8'))
+    hash_algorithm.update(signStr.encode("utf-8"))
     return hash_algorithm.hexdigest()
 
 
@@ -27,7 +27,7 @@ def truncate(q):
 
 
 def do_request_youdao(data):
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
     return requests.post(YOUDAO_URL, data=data, headers=headers)
 
 
@@ -36,22 +36,22 @@ def connect(query, en2zh=True):
 
     data = {}
     if en2zh:
-        # data['from'] = 'EN'  源语言自动检测
-        data['to'] = 'zh-CHS'
+        # data["from"] = "EN"  源语言自动检测
+        data["to"] = "zh-CHS"
     else:
-        data['to'] = 'EN'
-        # data['from'] = 'zh-CHS'
+        data["to"] = "EN"
+        # data["from"] = "zh-CHS"
 
-    data['signType'] = 'v3'
+    data["signType"] = "v3"
     curtime = str(int(time.time()))
-    data['curtime'] = curtime
+    data["curtime"] = curtime
     salt = str(uuid.uuid1())
     signStr = APP_KEY + truncate(q) + salt + curtime + APP_SECRET
     sign = encrypt(signStr)
-    data['appKey'] = APP_KEY
-    data['q'] = q
-    data['salt'] = salt
-    data['sign'] = sign
+    data["appKey"] = APP_KEY
+    data["q"] = q
+    data["salt"] = salt
+    data["sign"] = sign
 
     response = do_request_youdao(data)
 

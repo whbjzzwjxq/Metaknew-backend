@@ -6,15 +6,15 @@ from tools.base_tools import merge_list
 import json
 from django.shortcuts import HttpResponse
 
-es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
+es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
 
 def es_ask_all(request):
-    if request.method == 'GET':
-        keyword = request.GET.get('keyword')
-        auto = request.GET.get('auto')
-        fuzzy = request.GET.get('fuzzy')
-        language = request.GET.get('language')
+    if request.method == "GET":
+        keyword = request.GET.get("keyword")
+        auto = request.GET.get("auto")
+        fuzzy = request.GET.get("fuzzy")
+        language = request.GET.get("language")
         es_query = EsQuery(index="nodes")
         node_results = []
         doc_results = []

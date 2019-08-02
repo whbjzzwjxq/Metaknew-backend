@@ -3,11 +3,12 @@ from subgraph.models import *
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from document.models import DocInfo
 from functools import reduce
+from django.db.models import Model
 
-re_for_uuid = re.compile(r'\w{8}(-\w{4}){3}-\w{12}')
-re_for_ptr = re.compile(r'.*_ptr')
-graph = Graph('bolt://39.96.10.154:7687', username='neo4j', password='12345678')
-types = ['StrNode', 'InfNode', 'Media', 'Document']
+re_for_uuid = re.compile(r"\w{8}(-\w{4}){3}-\w{12}")
+re_for_ptr = re.compile(r".*_ptr")
+graph = Graph("bolt://39.96.10.154:7687", username="neo4j", password="12345678")
+types = ["StrNode", "InfNode", "Media", "Document"]
 
 
 class NeoSet:
@@ -18,11 +19,11 @@ class NeoSet:
 
 
 node_model_dict = {
-    'NodeInfo': NodeInfo,
-    'Person': Person,
-    'Project': Project,
-    'ArchProject': ArchProject,
-    'Document': DocInfo,
+    "NodeInfo": NodeInfo,
+    "Person": Person,
+    "Project": Project,
+    "ArchProject": ArchProject,
+    "Document": DocInfo,
 }
 
 link_model_dict = {
@@ -56,7 +57,7 @@ def get_user_props(p_label: str) -> list:
     :param p_label: PrimaryLabel
     :return: 该主标签下需要用户/前端提交的属性
     """
-    remove_list = ['_id', 'PrimaryLabel', 'MainPic']
+    remove_list = ["_id", "PrimaryLabel", "MainPic"]
     try:
         # 目标包含的域
         target = node_model_dict[p_label]._meta.get_fields()
@@ -64,7 +65,7 @@ def get_user_props(p_label: str) -> list:
                   if not re_for_ptr.match(field.name)
                   and field.name not in remove_list]
         return result
-    except AttributeError('没有这种标签: %s' % p_label):
+    except AttributeError("没有这种标签: %s" % p_label):
         return []
 
 
@@ -79,12 +80,12 @@ def get_system_link_props(r_type: str) -> list:
                   if not re_for_ptr.match(field.name)
                   and field.model != "Relationship"]
         return result
-    except AttributeError('没有这种标签: %s' % r_type):
+    except AttributeError("没有这种标签: %s" % r_type):
         return []
 
 
 def dict_dryer(node: dict):
-    dry_prop = ['_id', 'type', 'PrimaryLabel']
+    dry_prop = ["_id", "type", "PrimaryLabel"]
     for key in dry_prop:
         if key in node:
             node.pop(key)
@@ -101,3 +102,9 @@ def merge_list(lists):
 
     return result
 
+
+def model_to_dict(model: Model):
+    fields = model._meta.get_fields()
+    # test 测试getattr
+    result = {field.name: getattr(model, field) for field in fields if not re_for_ptr.match(field.name)}
+    return result

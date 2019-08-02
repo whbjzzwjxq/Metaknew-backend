@@ -44,14 +44,14 @@ class JsonChangedCompress:
         self.json_index = {schema: i for i, schema in enumerate(json_regex)}
 
         self.def_replace = def_replace
-        self.re_end = regex.compile("\\" + self.def_replace + '\w{0,5}')
-        self.str_schema = [{"schema": regex.compile(r'(\w{8}-)(\w{4}-)(\w{4}-)(\w{4}-)(\w{12})'),
+        self.re_end = regex.compile("\\" + self.def_replace + "\w{0,5}")
+        self.str_schema = [{"schema": regex.compile(r"(\w{8}-)(\w{4}-)(\w{4}-)(\w{4}-)(\w{12})"),
                             "replace": self.def_replace,
                             "base": []},
-                           {"schema": regex.compile('(\d{4}-)(\d{2}-)(\d{2})(\s\d{2}:\d{2}:\d{2})(.\d{6})'),
+                           {"schema": regex.compile("(\d{4}-)(\d{2}-)(\d{2})(\s\d{2}:\d{2}:\d{2})(.\d{6})"),
                             "replace": self.def_replace,
                             "base": []},
-                           {"schema": regex.compile('(\d{4}-)(\d{2}-)(\d{2})'),
+                           {"schema": regex.compile("(\d{4}-)(\d{2}-)(\d{2})"),
                             "replace": self.def_replace,
                             "base": []}]
         if use_re_base:
@@ -75,7 +75,7 @@ class JsonChangedCompress:
         elif isinstance(instance, list):
             return self.__com_list(instance)
         else:
-            print('不需要压缩的类型')
+            print("不需要压缩的类型")
             return None
 
     def decompress(self):
@@ -123,24 +123,24 @@ class JsonChangedCompress:
             temp = _str.replace(self.def_replace, "(%s)" % self.def_replace)
             return temp
         else:
-            _back_str = ''
+            _back_str = ""
             temps = list(difflib.Differ().compare(_str, _str2))
-            tag = ' '
+            tag = " "
             for i, temp in enumerate(temps):
-                if temp[0] == ' ':
-                    if not tag == ' ':
-                        tag = ' '
+                if temp[0] == " ":
+                    if not tag == " ":
+                        tag = " "
                 else:
                     if tag == temp[0]:
-                        if temp[2] == '+' or temp[2] == '-':
-                            _back_str += '(%s)' % temp[2]
+                        if temp[2] == "+" or temp[2] == "-":
+                            _back_str += "(%s)" % temp[2]
                         else:
                             _back_str += temp[2]
                     else:
                         tag = temp[0]
                         _back_str += temp[0]
-                        if temp[2] == '+' or temp[2] == '-':
-                            _back_str += '(%s)' % temp[2]
+                        if temp[2] == "+" or temp[2] == "-":
+                            _back_str += "(%s)" % temp[2]
                         else:
                             _back_str += temp[2]
             if len(_back_str) <= len(_str):
@@ -154,7 +154,7 @@ class JsonChangedCompress:
 
     def pattern_match(self, _str):
         if self.short_str <= len(_str) <= self.long_str:
-            _back_str = ''
+            _back_str = ""
             for i, pattern in enumerate(self.str_schema):
                 re = pattern["schema"]
                 result = regex.match(re, _str)
@@ -185,7 +185,7 @@ class JsonChangedCompress:
                         _back_str += more
                         # method = match
                     _back_str += "%s%d" % (self.def_replace, i)
-                    if not _back_str == '':
+                    if not _back_str == "":
                         return _back_str
                     else:
                         return None

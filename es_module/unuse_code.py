@@ -7,9 +7,9 @@
 #
 #
 # def add_node_index(uuid,
-#                    name, name_zh='', name_en='', language='',
-#                    alias=None, p_label='', keywords=None, labels=None,
-#                    description='', description_zh='', description_en=''):
+#                    name, name_zh="", name_en="", language="",
+#                    alias=None, p_label="", keywords=None, labels=None,
+#                    description="", description_zh="", description_en=""):
 #     """
 #
 #     :param uuid: 节点的id
@@ -39,7 +39,7 @@
 #         "script": {
 #             "lang": "painless",
 #             "source": """
-#                     if doc['hits']['total']['value'] == 0 {
+#                     if doc["hits"]["total"]["value"] == 0 {
 #                         ctx._source.name.auto = params.name
 #                         ctx._source.name.zh = params.name_zh
 #                         ctx._source.name.en = params.name_en
@@ -81,7 +81,7 @@
 # if __name__ == "__main__":
 #     add_node_index(uuid="1111",
 #                    name="2222",
-#                    name_zh='',
-#                    name_en='',
+#                    name_zh="",
+#                    name_en="",
 #                    language="auto"
 #                    )

@@ -9,7 +9,7 @@ import os
 
 def handle_data(line, user):
     data = line
-    set_location_queue(data['location'])
+    set_location_queue(data["location"])
     Leader = data["Architect"].split(";")
     Leader = [element for element in Leader if element]
     node = data
@@ -32,8 +32,8 @@ def handle_data(line, user):
 def script_latin(request):
     user = request.GET.get("user_id")
     collector = NeoSet()
-    path = os.path.join(os.path.dirname(__file__), 'latin_json.json')
-    file = open(path, 'r', encoding='utf-8').read()
+    path = os.path.join(os.path.dirname(__file__), "latin_json.json")
+    file = open(path, "r", encoding="utf-8").read()
     lines = json.loads(file)
     nodes = [handle_data(line, user=user) for line in lines]
     results = [BaseNode(collector=collector).create(node=node) for node in nodes]

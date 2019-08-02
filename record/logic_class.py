@@ -52,13 +52,14 @@ def field_check(_func):
     return wrapped
 
 
+
 class EWRecord:
 
     def __init__(self):
         self.record = SourceAddRecord.objects.all()
 
     def query_by_criteria(self, criteria_query):
-        assert criteria_query["source_type"] == 'AddRecord'
+        assert criteria_query["source_type"] == "AddRecord"
         if criteria_query["labels"] is not []:
             for label in criteria_query["labels"]:
                 self.query_by_status(label)
@@ -98,3 +99,5 @@ class EWRecord:
             WarnContent=content
         )
         return record
+
+

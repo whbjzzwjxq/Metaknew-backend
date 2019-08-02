@@ -9,7 +9,7 @@ from celery import Celery
 
 from document import models
 
-app = Celery(__name__, broker='amqp://guest:guest@localhost:5672//')
+app = Celery(__name__, broker="amqp://guest:guest@localhost:5672//")
 
 
 @app.task

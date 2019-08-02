@@ -22,7 +22,7 @@ def query_word_list(word_list):
                 loc_word[1] = record[0].WordIndex
         # 未记录的词语
         if len(un_index_words) > 0:
-            id_list = id_generator(number=len(un_index_words), method='word', content=device_id, jump=1)
+            id_list = id_generator(number=len(un_index_words), method="word", content=device_id, jump=1)
             new_record = []
             for loc, loc_word in enumerate(un_index_words):
                 new_record.append(GlobalWordIndex(WordIndex=id_list[loc], Word=loc_word[1]))
@@ -53,12 +53,12 @@ def index_to_word(index):
                 uncached_word.append(word)
                 result.append(word)
             except ObjectDoesNotExist:
-                result.append('unknown')
+                result.append("unknown")
     set_word_index(uncached_word, uncached_index)
     return result
 
 
 def word_request(request):
-    word = request.GET.get('word')
+    word = request.GET.get("word")
     index = query_word_list(word)
     return HttpResponse(index)

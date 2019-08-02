@@ -2,7 +2,7 @@ from tools.translate import connect
 import re
 import tools.unused.baidu_map as tool
 
-zhPattern = re.compile(u'[\u4e00-\u9fa5]+')
+zhPattern = re.compile(u"[\u4e00-\u9fa5]+")
 
 
 starttime = 0
@@ -17,12 +17,12 @@ Remarks = 8
 
 
 def dataframe2dict(data):
-    '''
+    """
     Arg:
        data : (DataFrame) data read from excel
     Return:
        (list<dict>) structured data
-    '''
+    """
 
     NodeList = []
     for row in range(len(data)):
@@ -32,12 +32,12 @@ def dataframe2dict(data):
         node["Name"], node["Name_en"], node["Name_zh"] = name_translation(data.iloc[row,Name])
         node["Architect_es"], node["Architect_zh"] = architect_translation(data.iloc[row,Architect])
         node["Nation"] = data.iloc[row,Nation]
-        node["Location"] = data.iloc[row,Location] if str(data.iloc[row,Location]) != 'nan' else None
-        node['Longitude'] = tool.getLocation(node['Location'])[0]
-        node['Latitude'] = tool.getLocation(node['Location'])[1]
-        # node["Address"] = data.iloc[row,Address]  if str(data.iloc[row,Address]) != 'nan' else None
-        # node["Type"] = data.iloc[row,Type]     if str(data.iloc[row,Type]) != 'nan' else None
-        # node["Remarks"] = data.iloc[row,Remarks]  if str(data.iloc[row,Remarks]) != 'nan' else None
+        node["Location"] = data.iloc[row,Location] if str(data.iloc[row,Location]) != "nan" else None
+        node["Longitude"] = tool.getLocation(node["Location"])[0]
+        node["Latitude"] = tool.getLocation(node["Location"])[1]
+        # node["Address"] = data.iloc[row,Address]  if str(data.iloc[row,Address]) != "nan" else None
+        # node["Type"] = data.iloc[row,Type]     if str(data.iloc[row,Type]) != "nan" else None
+        # node["Remarks"] = data.iloc[row,Remarks]  if str(data.iloc[row,Remarks]) != "nan" else None
         node["PrimaryLabel"] = "Project"
         node["Type"] = "StrNode"
         node["Topic"] = "Architecture"
@@ -52,24 +52,24 @@ def dataframe2dict(data):
 
 def name_translation(name):
 
-    '''
+    """
     Arg:
        name : (String) name string
     Return:
        (String) es_name, zh_name
-    '''
+    """
     name_origin = None
     name_zh = None
     name_en = None
 
-    if '（' in name or '(' in name:
+    if "（" in name or "(" in name:
 
-        nameList = re.split('\(+|（+', name)
-        while '' in nameList:
-            nameList.remove('')
+        nameList = re.split("\(+|（+", name)
+        while "" in nameList:
+            nameList.remove("")
 
-        while ' ' in nameList:
-            nameList.remove(' ')
+        while " " in nameList:
+            nameList.remove(" ")
 
         for i in range(len(nameList)):
             if nameList[i] != "" and (nameList[i][-1] == ")" or nameList[i][-1] == "）"):
@@ -107,16 +107,16 @@ def name_translation(name):
 
 def architect_translation(architect):
 
-    '''
+    """
     Arg:
        name : (String) name string
     Return:
        (String) es_name, zh_name
-    '''
+    """
 
-    if '（' in architect or '(' in architect:
-        architect_es = re.split('\(+|（+', architect)[-1][:-1]
-        architect_zh = re.split('\(+|（+', architect)[-2]
+    if "（" in architect or "(" in architect:
+        architect_es = re.split("\(+|（+", architect)[-1][:-1]
+        architect_zh = re.split("\(+|（+", architect)[-2]
 
         if not zhPattern.search(architect_zh):
             #无中文
@@ -131,12 +131,12 @@ def architect_translation(architect):
             architect_zh = None
 
     if architect_es:
-        architect_es = re.split(' and |,|，',architect_es)
+        architect_es = re.split(" and |,|，",architect_es)
         if "" in architect_es:
             architect_es.remove("")
 
     if architect_zh:
-        architect_zh = re.split('，|,',architect_zh)
+        architect_zh = re.split("，|,",architect_zh)
 
     return architect_es, architect_zh
 

@@ -3,7 +3,7 @@ from record.logic_class import ErrorRecord
 
 import json
 
-es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
+es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
 
 #  todo 加入评分 level: 3
@@ -12,13 +12,13 @@ class EsQuery:
     def __init__(self, index):
         self.index = index
         self.result = []
-        self.es = Elasticsearch([{'host': '39.96.10.154', 'port': 7000}])
+        self.es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
     @staticmethod
     def get_uuid_from_result(es_result):
         if es_result:
-            nodes = es_result['hits']['hits']
-            result = [node['_source']['uuid'] for node in nodes if 'uuid' in node['_source']]
+            nodes = es_result["hits"]["hits"]
+            result = [node["_source"]["uuid"] for node in nodes if "uuid" in node["_source"]]
             return result
         else:
             return []
@@ -90,19 +90,19 @@ class EsQuery:
 #         target: info["Description"],
 #         "labels": list(root.labels),
 #         "language": root["Language"],
-#         "name": {'auto': root["name"],
-#                  'zh': root["name_zh"],
-#                  'en': root["name_en"]},
+#         "name": {"auto": root["name"],
+#                  "zh": root["name_zh"],
+#                  "en": root["name_en"]},
 #         "p_label": root["PrimaryLabel"],
 #         "uuid": root["uuid"]
 #     }
-#     result = es.index(index='nodes', body=body, doc_type='_doc')
-#     if result['_shards']['successful'] == 1:
+#     result = es.index(index="nodes", body=body, doc_type="_doc")
+#     if result["_shards"]["successful"] == 1:
 #         return True
 #     else:
 #         a = AddRecord()
-#         content = {'result': result,
-#                    'status': 'Failed',
-#                    'type': 'es_upload'}
+#         content = {"result": result,
+#                    "status": "Failed",
+#                    "type": "es_upload"}
 #         a.add_record(False, True, uuid, p_label, json.dumps(content))
 #         return False
