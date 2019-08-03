@@ -35,6 +35,7 @@ def set_user_login(user, token):
     cache_info = {
         "root": user.Is_Superuser,
         "dev": user.Is_Developer,
+        "publish": user.Is_Publisher,
         "vip": user.Is_Vip,
         "high_vip": user.Is_high_vip
     }

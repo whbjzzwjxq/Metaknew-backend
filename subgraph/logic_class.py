@@ -11,6 +11,7 @@ from datetime import datetime
 from tools.id_generator import id_generator, device_id
 from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError, ObjectAlreadyExist
+from users.logic_class import BaseUser
 
 types = ["StrNode", "InfNode", "Media", "Document"]
 # 前端使用的格式
@@ -83,6 +84,7 @@ class BaseNode:
         self._id = _id  # _id
         self.label = ""  # 标签
         self.user = user  # 操作用户
+        self.user_model = BaseUser()
         self.is_draft = False  # 是否是草稿
         self.is_create = False  # 是否是创建状态
 
@@ -294,6 +296,13 @@ class BaseNode:
             if field.name == "Location":
                 set_location_queue([new_prop])
         return self
+
+    def user_privilege(self):
+        self.user_model = self.user_model.query_privilege(self.user)
+        self.user_model.create_node(self._id)
+
+    def node_status(self):
+        pass
 
     # todo 媒体相关field 改为 MediaField level: 3
     def main_pic_setter(self, media):

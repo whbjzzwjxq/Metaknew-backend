@@ -4,13 +4,14 @@ from tools import base_tools, encrypt
 from time import time
 import datetime
 from users.models import UserConcern, UserRepository, UserDocProgress, Privilege
-from record.logic_class import error_check, field_check
+from record.logic_class import error_check, field_check, EWRecord
 from record.models import DocumentVersionRecord
 from subgraph.logic_class import BaseNode, SystemMade
 from django.db.models import Avg
 from tools.id_generator import id_generator, device_id
 from django.db.models import Max
 from tools.redis_process import week
+from tools.base_tools import model_to_dict
 
 types = ["StrNode", "InfNode", "Media", "Document"]
 
@@ -425,7 +426,7 @@ class BaseNote:
         notes = Note.objects.filter(DocumentId=doc_id, CreateUser=user, Is_Delete=False)
         result = []
         for note in notes:
-            result.append(BaseNote(user=note.CreateUser, _id=note.NoteId, note=note))
+            result.append(model_to_dict(note))
         return result
 
     def create(self, note):
@@ -444,30 +445,30 @@ class BaseNote:
         setattr(self.note, field, new_prop)
 
     def update_content(self, note):
-        warn = []
+
         update_prop = {}
         if len(str(note["Content"])) <= 1024:
             update_prop.update({"Content": str(note["Content"])})
         else:
-            warn.append({"field": "Content", "warn_type": "toolong_str"})
+            self.warn.append({"field": "Content", "warn_type": "toolong_str"})
 
         if note["TagType"] in self.note_type:
             update_prop.update({"TagType": note["TagType"]})
         else:
-            warn.append({"field": "TagType", "warn_type": "error_type"})
+            self.warn.append({"field": "TagType", "warn_type": "error_type"})
 
         if note["Conf"] is not {}:
             self.note.Conf = note["Conf"]
         else:
-            warn.append({"field": "Conf", "warn_type": "empty_prop"})
+            self.warn.append({"field": "Conf", "warn_type": "empty_prop"})
 
         update_prop.update({"Is_Open": note["Is_Open"]})
 
-        # if not warn == []:
-        #     ErrorRecord.add_warn_record(user=self.user,
-        #                                 source_id=self.note.NoteId,
-        #                                 source_label="note",
-        #                                 content=warn)
+        if not self.warn == []:
+            EWRecord.add_warn_record(user=self.user,
+                                     source_id=self.note.NoteId,
+                                     source_label="note",
+                                     content=self.warn)
         self.note.objects.update(update_prop)
         return self
 

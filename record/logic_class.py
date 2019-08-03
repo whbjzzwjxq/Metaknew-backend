@@ -52,7 +52,6 @@ def field_check(_func):
     return wrapped
 
 
-
 class EWRecord:
 
     def __init__(self):
@@ -98,6 +97,7 @@ class EWRecord:
             CreateUser=user,
             WarnContent=content
         )
+        record.save()
         return record
 
 

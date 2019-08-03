@@ -7,6 +7,7 @@ from tools.encrypt import make_token
 from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
 from tools.id_generator import id_generator, device_id
+from django.db.models import ObjectDoesNotExist
 
 salt = "al76vdj895as12cq"
 
@@ -124,6 +125,28 @@ class BaseUser:
         self.privilege = Privilege.objects.create(UserId=_id)
         self.repository = UserRepository.objects.create(UserId=_id)
         self.save()
+
+    def query_privilege(self, _id):
+        try:
+            self.privilege = Privilege.objects.get(UserId=_id)
+            return self
+        except ObjectDoesNotExist as e:
+            raise e
+
+    def query_repository(self, _id):
+        try:
+            self.user = UserRepository.objects.get(UserId=_id)
+            return self
+        except ObjectDoesNotExist as e:
+            raise e
+
+    def create_node(self, _id):
+        self.privilege.Is_Owner.append(_id)
+        self.repository.CreateNode.append(_id)
+
+    def create_doc(self, _id):
+        self.privilege.Is_Owner.append(_id)
+        self.repository.CreateDoc.append(_id)
 
     def save(self):
         self.user.save()

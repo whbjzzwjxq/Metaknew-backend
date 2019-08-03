@@ -5,23 +5,13 @@ from users.models import User
 
 # 将可能的模板写在前面
 def contributor():
-    return [{"user_id": 1, "level": 10}]
+    return [{"user_id": "1", "type": "create"}]
 
 
 def feature_vector():
     return {"group_vector": [],
             "word_embedding": [],
             "label_embedding": []}
-
-
-def chronology():
-    return [
-        {
-            "start": "",
-            "end": "",
-            "content": ""
-        }
-    ]
 
 
 pictures = ["jpg", "png", "gif"]
@@ -47,13 +37,13 @@ class NodeCtrl(models.Model):
     HardLevel = models.IntegerField(db_column="HARD_LEVEL", default=1)  # 难易度
     Useful = models.IntegerField(db_column="USEFUL", default=1)  # 有用的程度
     Star = models.IntegerField(db_column="STAR", default=0)  # 收藏数量
-    Contributor = ArrayField(JSONField(), db_column="CONTRIBUTOR", default=contributor())
+    Contributor = ArrayField(JSONField(), db_column="CONTRIBUTOR", default=contributor)
     UserLabels = ArrayField(models.TextField(), db_column="USER_LABELS", default=list)
 
     # 从数据分析统计的内容 更新频率 低
     Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
     Structure = models.IntegerField(db_column="STR", default=1)  # 结构化的程度
-    FeatureVec = JSONField(db_column="FEATURE_VECTOR", default=feature_vector())  # 特征值
+    FeatureVec = JSONField(db_column="FEATURE_VECTOR", default=feature_vector)  # 特征值
 
     class Meta:
         db_table = "graph_node_ctrl"
