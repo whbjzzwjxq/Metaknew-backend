@@ -22,9 +22,9 @@ def set_message(phone, message):
 def check_message(phone):
     current = redis.ttl("phone_"+phone)
     if current >= 120:
-        return False
-    else:
         return True
+    else:
+        return False
 
 
 def set_user_login(user, token):
