@@ -16,8 +16,13 @@ Including another URLconf
 from django.conf.urls import url
 
 from users import views
+from users import logic_class
 
 urlpatterns = [
-    url("send_message", views.send_message)
+    url("send_message", views.send_message),
+    url("login_normal", views.login_normal),
+    url("login_message", views.login_message),
+    url("login_cookie", views.login_cookie),
+    url("register", views.register)
     # url("send_message", views.send_message),
 ]

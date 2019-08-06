@@ -14,65 +14,12 @@ salt = "al76vdj895as12cq"
 
 class BaseUser:
 
-    def __init__(self):
+    def __init__(self, user):
 
-        self.user = User()
+        self.user = user
         self.privilege = Privilege()
         self.repository = UserRepository()
         self.concern = UserConcern()
-
-    def login_normal(self, request):
-
-        phone = request.POST.get("phone")
-        name = request.POST.get("name")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        # todo 前端密码加密 level: 3
-        # length = request.POST.get("length")
-        # password = decode(password, length)
-        if phone:
-            self.user = User.objects.get(UserPhone=phone)
-        elif name:
-            self.user = User.objects.get(UserName=name)
-        else:
-            self.user = User.objects.get(UserEmail=email)
-        if not self.user:
-            return HttpResponse(content="账户不存在", status=401)
-        else:
-            # 检查密码是否匹配
-            if check_password(password, self.user.UserPw):
-                return self.login_success()
-            else:
-                return HttpResponse(content="用户名或密码错误", status=401)
-
-    def login_cookie(self, request):
-        if "token" in request.COOKIES and "user_name" in request.COOKIES:
-            token = request.COOKIES["token"]
-            name = request.COOKIES["user_name"]
-            _id, saved_token = query_user_by_name(name)
-            if not saved_token:
-                return HttpResponse(content="登录信息过期，请重新登录", status=401)
-            elif not token == saved_token:
-                return HttpResponse(content="已经在别处登录了", status=401)
-            else:
-                return self.login_success()
-        else:
-            return HttpResponse(content="以游客身份登录", status=200)
-
-    def login_message(self, request):
-        body = json.dumps(request.body)
-        info = body["info"]
-        message_code = query_message(info["phone"])  # 用户session
-        if message_code is None:
-            return HttpResponse(content="验证码失效，请重新发送验证码", status=400)
-        elif message_code != info["code"]:
-            return HttpResponse(content="验证码有误，请重新输入", status=400)
-        else:
-            user_info = User.objects.get(UserPhone=info["phone"])
-            if not user_info:
-                return HttpResponse(content="该手机号不存在", status=400)
-            else:
-                return self.login_success()
 
     def login_success(self):
         name = self.user.UserName
@@ -84,30 +31,7 @@ class BaseUser:
         response.set_cookie(key="user_name", value=self.user.UserName, max_age=week)
         return response
 
-    def register(self, request):
-        body = json.dumps(request.body)
-        info = body["info"]
-        concern = body["concern"]
-        status = body["status"]
-        if info["name"] == "":
-            info["name"] = info["phone"]
-        # redis中读取验证码信息
-        message_code = query_message(info["phone"])  # 用户session
-        if message_code is None:
-            return HttpResponse(content="验证码失效，请重新发送验证码", status=400)
-        elif message_code != info["code"]:
-            return HttpResponse(content="验证码有误，请重新输入", status=400)
-        else:
-            user_info = User.objects.get(UserPhone=info["phone"])
-            if user_info:
-                return HttpResponse(content="该手机号已注册", status=400)
-            else:
-                self.__create(info=info, concern=concern, status=status)
-                response = self.login_success()
-                response.content = "注册成功"
-                return response
-
-    def __create(self, info, concern, status):
+    def create(self, info, concern, status):
         _id = id_generator(number=1, method="device", content=device_id, jump=3)[0]
         password = info["password"]
         # todo 前端密码加密 level: 3
@@ -125,6 +49,7 @@ class BaseUser:
         self.privilege = Privilege.objects.create(UserId=_id)
         self.repository = UserRepository.objects.create(UserId=_id)
         self.save()
+        return self
 
     def query_privilege(self, _id):
         try:
@@ -135,7 +60,7 @@ class BaseUser:
 
     def query_repository(self, _id):
         try:
-            self.user = UserRepository.objects.get(UserId=_id)
+            self.repository = UserRepository.objects.get(UserId=_id)
             return self
         except ObjectDoesNotExist as e:
             raise e
