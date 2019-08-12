@@ -4,6 +4,9 @@ from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from document.models import DocInfo
 from functools import reduce
 from django.db.models import Model
+from enum import Enum
+from django.db.models import Field
+from typing import List, Dict
 
 re_for_uuid = re.compile(r"\w{8}(-\w{4}){3}-\w{12}")
 re_for_ptr = re.compile(r".*_ptr")
@@ -18,15 +21,16 @@ class NeoSet:
         self.Rmatcher = RelationshipMatcher(graph)
 
 
-node_model_dict = {
-    "NodeInfo": NodeInfo,
+node_model_dict: Dict[str, NodeInfo] = {
+    "BaseNode": NodeInfo,
     "Person": Person,
     "Project": Project,
     "ArchProject": ArchProject,
     "Document": DocInfo,
 }
 
-link_model_dict = {
+
+link_model_dict: Dict[str, Relationship] = {
     "Topic2Topic": Topic2Topic,
     "Topic2Node": Topic2Node,
     "Doc2Node": Doc2Node,
@@ -38,7 +42,7 @@ link_model_dict = {
 }
 
 
-def node_init(label):
+def node_init(label) -> node_model_dict:
     if label in node_model_dict:
         return node_model_dict[label]
     else:
@@ -52,24 +56,24 @@ def link_init(label) -> link_model_dict:
         return KnowLedge
 
 
-def get_user_props(p_label: str) -> list:
+def get_user_props(p_label: str) -> List[Field]:
     """
     :param p_label: PrimaryLabel
     :return: 该主标签下需要用户/前端提交的属性
     """
-    remove_list = ["_id", "PrimaryLabel", "MainPic"]
+    remove_list = ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia"]
     try:
         # 目标包含的域
         target = node_model_dict[p_label]._meta.get_fields()
         result = [field for field in target
-                  if not re_for_ptr.match(field.name)
+                  if not field.auto_created
                   and field.name not in remove_list]
         return result
     except AttributeError("没有这种标签: %s" % p_label):
         return []
 
 
-def get_system_link_props(r_type: str) -> list:
+def get_system_link_props(r_type: str) -> List[Field]:
     """
     :param r_type: Link的Type
     :return: 该link之下需要填充的属性

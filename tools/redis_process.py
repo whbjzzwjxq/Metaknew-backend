@@ -1,4 +1,6 @@
 import redis
+import typing
+import json
 second = 1
 minute = 60
 hour = 3600
@@ -16,11 +18,11 @@ redis = redis.StrictRedis(connection_pool=pool)
 
 # ----------------user登录相关
 def set_message(phone, message):
-    return redis.setex(name="phone_"+phone, time=5 * minute, value=message)
+    return redis.setex(name="phone_" + phone, time=5 * minute, value=message)
 
 
 def check_message(phone):
-    current = redis.ttl("phone_"+phone)
+    current = redis.ttl("phone_" + phone)
     if current >= 120:
         return True
     else:
@@ -40,6 +42,7 @@ def set_user_login(user, token):
         "high_vip": user.Is_high_vip
     }
     cache_info.update(user.Joint_Group)
+    cache_info = {key: bytes(value) for key, value in cache_info.items()}
     redis.hmset("info_" + str(_id), cache_info)
 
 
@@ -51,7 +54,7 @@ def query_user_by_name(username):
 
 
 def query_message(phone):
-    return redis.get(phone)
+    return redis.get("phone_" + phone).decode()
 
 
 # ----------------名字翻译 地名转译相关
@@ -93,3 +96,28 @@ def set_word_index(word_list, index_list):
         return a and b
     else:
         return True
+
+
+# ----------------标签-属性
+def query_needed_prop(plabel):
+    # prop_list = redis.smembers("plabel_" + plabel)
+    # if prop_list:
+    #     prop_list: typing.Set[bytes] = [prop.decode() for prop in prop_list]
+    #     return prop_list
+    # else:
+    #     return []
+    return []
+
+
+def set_needed_prop(plabel, prop_list):
+    key = "plabel_" + plabel
+    return redis.sadd(key, *prop_list)
+
+
+def query_available_plabel():
+    plabel_list = redis.smembers("plabel_list")
+    if plabel_list:
+        plabel_list: typing.Set[bytes] = [plabel.decode() for plabel in plabel_list]
+        return plabel_list
+    else:
+        return []

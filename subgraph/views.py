@@ -6,6 +6,14 @@ from tools.id_generator import id_generator
 from py2neo import Relationship
 import json
 import datetime
+from users.logic_class import BaseUser
+from users.models import User
+from django.db.models import ObjectDoesNotExist
+from subgraph.models import NodeCtrl, NodeInfo
+from record.logic_class import EWRecord, History
+import numpy as np
+from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
+
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
@@ -167,9 +175,15 @@ import datetime
 #     return HttpResponse("Create Document Success")
 
 
-def query_needed_prop(request):
-    label = request.GET.get("plabel")
-    result = get_user_props(p_label=label)
+def query_frontend_prop(request):
+    labels = query_available_plabel()
+    result = {}
+    for label in labels:
+        props = query_needed_prop(label)
+        if not props:
+            props = [field.name for field in get_user_props(p_label=label)]
+            set_needed_prop(label, props)
+        result.update({label: props})
     return HttpResponse(json.dumps(result))
 
 
@@ -194,19 +208,34 @@ def create_document(request):
 
 
 def bulk_create_node(request):
-
+    batch_size = 256
     collector = NeoSet()
-    data = request.POST.get("data")
-    user = request.GET.get("user_id")
+    data_list = request.POST.get("data")
+    user_id = request.GET.get("user_id")
     plabel = request.POST.get("plabel")
-    id_list = id_generator(number=len(data), method='node', content=plabel, jump=3)
-    nodes = [BaseNode(user=user, _id=_id, collector=collector) for _id in id_list]
-    bulk_save_node(nodes, collector=collector)
-    return HttpResponse(content='创建成功', status=200)
+    user_model = BaseUser(_id=user_id).query_user()
+    if user_model:
+        # 请求一定数量的id
+        id_list = id_generator(number=len(data_list), method='node', content=plabel, jump=3)
+        # 创建node object
+        nodes = [BaseNode(user=user_model, _id=_id, collector=collector) for _id in id_list]
+        # 注入数据
+        nodes = [node.create(node=data) for node, data in zip(nodes, data_list)]
+        # 去除掉生成错误的节点 可以看create的装饰器
+        nodes = [node for node in nodes if node]
+        # 保存
+        output = np.array([node.output_table_create() for node in nodes])
+        ctrl = list(output[:, 0])
+        NodeCtrl.objects.bulk_create(ctrl, batch_size=batch_size)
+        info = list(output[:, 1])
+        NodeInfo.objects.bulk_create(info, batch_size=batch_size)
+        warn = list(output[:, 2])
+        EWRecord.bulk_save_warn_record(warn)
+        history = list(output[:, 3])
+        History.bulk_save_node_history(history)
 
+        return HttpResponse(content='创建成功', status=200)
+    else:
+        return HttpResponse(content='用户不存在', status=400)
 
-def bulk_save_node(nodes, collector):
-
-    ctrl = [node.ctrl for node in nodes]
-    info = [node.info for node in nodes]
 

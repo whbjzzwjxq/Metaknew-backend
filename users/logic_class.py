@@ -6,17 +6,17 @@ from users.models import User, GroupCtrl, UserConcern, UserRepository, Privilege
 from tools.encrypt import make_token
 from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
-from tools.id_generator import id_generator, device_id
-from django.db.models import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+
 
 salt = "al76vdj895as12cq"
 
 
 class BaseUser:
 
-    def __init__(self, user):
-
-        self.user = user
+    def __init__(self, _id: int):
+        self.user_id = _id
+        self.user = User()
         self.privilege = Privilege()
         self.repository = UserRepository()
         self.concern = UserConcern()
@@ -26,18 +26,20 @@ class BaseUser:
         _id = self.user.UserId
         token = make_token(name, _id)
         set_user_login(self.user, token)
-        response = HttpResponse(content="登录成功", status=200)
-        response.set_cookie(key="token", value=token, max_age=week, httponly=True)
-        response.set_cookie(key="user_name", value=self.user.UserName, max_age=week)
+        result = {
+            "content": "登录成功",
+            "token": token,
+            "userName": self.user.UserName
+        }
+        response = HttpResponse(json.dumps(result), content_type="application/json", status=200)
         return response
 
     def create(self, info, concern, status):
-        _id = id_generator(number=1, method="device", content=device_id, jump=3)[0]
         password = info["password"]
         # todo 前端密码加密 level: 3
         # password = decode(password, info["length"])
         self.user = User.objects.create(
-            UserId=_id,
+            UserId=self.user_id,
             UserName=info["name"],
             UserPhone=info["phone"],
             UserEmail=info["email"],
@@ -45,31 +47,58 @@ class BaseUser:
         )
         if status:
             self.user.Topic = concern["Topic"]
-            self.user.Joint_Group = BaseGroup.apply(_id, concern["group"])
-        self.privilege = Privilege.objects.create(UserId=_id)
-        self.repository = UserRepository.objects.create(UserId=_id)
+            self.user.Joint_Group = BaseGroup.apply(self.user_id, concern["group"])
+        self.privilege = Privilege.objects.create(UserId=self.user_id)
+        self.repository = UserRepository.objects.create(UserId=self.user_id)
         self.save()
         return self
 
-    def query_privilege(self, _id):
+    @staticmethod
+    def query_user_by_info(criteria):
         try:
-            self.privilege = Privilege.objects.get(UserId=_id)
+            user = User.objects.get(criteria)
+        except ObjectDoesNotExist or MultipleObjectsReturned:
+            return None
+        else:
+            return user
+
+    def query_user(self):
+        try:
+            self.user = User.objects.get(pk=self.user_id)
+        except ObjectDoesNotExist:
+            return None
+        else:
+            return self
+
+    def query_privilege(self):
+        try:
+            self.privilege = Privilege.objects.get(UserId=self.user.UserId)
             return self
         except ObjectDoesNotExist as e:
             raise e
 
-    def query_repository(self, _id):
+    def query_repository(self):
         try:
-            self.repository = UserRepository.objects.get(UserId=_id)
+            self.repository = UserRepository.objects.get(UserId=self.user.UserId)
             return self
         except ObjectDoesNotExist as e:
             raise e
 
     def create_node(self, _id):
+        """
+
+        :param _id: 创建的节点id
+        :return:
+        """
         self.privilege.Is_Owner.append(_id)
         self.repository.CreateNode.append(_id)
 
     def create_doc(self, _id):
+        """
+
+        :param _id: 创建的专题id
+        :return:
+        """
         self.privilege.Is_Owner.append(_id)
         self.repository.CreateDoc.append(_id)
 

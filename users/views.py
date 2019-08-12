@@ -12,6 +12,7 @@ from users.models import User
 from users.logic_class import BaseUser
 from tools.redis_process import *
 from django.db.models import ObjectDoesNotExist
+from tools.id_generator import id_generator, device_id
 
 
 # 发送验证码短信
@@ -45,35 +46,38 @@ def send_message(request):
 
 @csrf_exempt
 def register(request):
-    body = json.dumps(request.body)
+    body = json.loads(request.body)
     info = body["info"]
     concern = body["concern"]
     status = body["status"]
     if info["name"] == "":
         info["name"] = info["phone"]
     # redis中读取验证码信息
-    message_code = query_message(info["phone"])  # 用户session
+    message_code = query_message(info["phone"])
     if message_code is None:
         return HttpResponse(content="验证码失效，请重新发送验证码", status=400)
     elif message_code != info["code"]:
         return HttpResponse(content="验证码有误，请重新输入", status=400)
     else:
-        user_info = User.objects.get(UserPhone=info["phone"])
-        if user_info:
-            return HttpResponse(content="该手机号已注册", status=400)
-        else:
-            new_user = BaseUser(user=User()).create(info=info, concern=concern, status=status)
+        try:
+            User.objects.get(UserPhone=info["phone"])
+        except ObjectDoesNotExist:
+            _id = id_generator(number=1, method="device", content=device_id, jump=3)[0]
+            new_user = BaseUser(_id=_id).create(info=info, concern=concern, status=status)
             response = new_user.login_success()
             response.content = "注册成功"
             return response
+        else:
+            return HttpResponse(content="该手机号已注册", status=400)
 
 
 @csrf_exempt
 def login_normal(request):
-    phone = request.POST.get("phone")
-    name = request.POST.get("name")
-    email = request.POST.get("email")
-    password = request.POST.get("password")
+    info = json.loads(request.body)
+    phone = info["phone"]
+    name = info["name"]
+    email = info["email"]
+    password = info["password"]
     # todo 前端密码加密 level: 3
     # length = request.POST.get("length")
     # password = decode(password, length)
@@ -85,13 +89,15 @@ def login_normal(request):
         else:
             user = User.objects.get(UserEmail=email)
     except ObjectDoesNotExist:
-        return HttpResponse(content="账户不存在", status=401)
+        return HttpResponse(content="账户不存在", status=400)
     else:
         # 检查密码是否匹配
         if check_password(password, user.UserPw):
-            return BaseUser(user).login_success()
+            base_user = BaseUser(_id=user.UserId)
+            base_user.user = user
+            return base_user.login_success()
         else:
-            return HttpResponse(content="用户名或密码错误", status=401)
+            return HttpResponse(content="用户名或密码错误", status=400)
 
 
 @csrf_exempt
@@ -101,17 +107,16 @@ def login_cookie(request):
         name = request.COOKIES["user_name"]
         _id, saved_token = query_user_by_name(name)
         if not saved_token:
-            return HttpResponse(content="登录信息过期，请重新登录", status=401)
+            return HttpResponse(content="登录信息过期，请重新登录", status=400)
         elif not token == saved_token:
-            return HttpResponse(content="已经在别处登录了", status=401)
+            return HttpResponse(content="已经在别处登录了", status=400)
         else:
-            try:
-                user = User.objects.get(UserId=_id)
-            except ObjectDoesNotExist:
-                return HttpResponse(content="非法的用户名", status=401)
+            user = BaseUser(_id=_id).query_user()
+            if not user:
+                return HttpResponse(content="非法的用户名", status=400)
             else:
                 # 需不需要刷新状态 todo level: 3
-                return BaseUser(user=user).login_success()
+                return user.login_success()
     else:
         return HttpResponse(content="以游客身份登录", status=200)
 
@@ -131,7 +136,9 @@ def login_message(request):
         except ObjectDoesNotExist:
             return HttpResponse(content="该手机号不存在", status=400)
         else:
-            return BaseUser(user=user).login_success()
+            base_user = BaseUser(_id=user.UserId)
+            base_user.user = user
+            return base_user.login_success()
 
 
 # 查询发送记录

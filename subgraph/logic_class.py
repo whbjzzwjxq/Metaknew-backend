@@ -1,17 +1,18 @@
 from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from tools import base_tools
-from django.db.models import Max
+from django.db.models import Max, QuerySet
 from record.logic_class import EWRecord, field_check
 from record.models import NodeVersionRecord, WarnRecord
 from subgraph.models import NodeCtrl, NodeInfo, Translate, MediaNode
-from subgraph.models import SearchTogether, AfterVisit, MentionTogether, Doc2Node, Topic2Node, Topic2Topic
 from es_module.logic_class import es
 from datetime import datetime
 from tools.id_generator import id_generator, device_id
 from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError, ObjectAlreadyExist
 from users.logic_class import BaseUser
+from typing import TypeVar
+
 
 types = ["StrNode", "InfNode", "Media", "Document"]
 # 前端使用的格式
@@ -28,9 +29,6 @@ node_format = {
         "Labels": [],  # 默认[]
         "Description": "this is a test node",
         "Topic": [],
-        "ExtraProps": {
-            "Livein": "New York"
-        },
         "MainPic": "123456",
         "IncludedMedia": ["123456", "345678", "324561"],
         "DateOfBirth": "1900-01-01",
@@ -53,6 +51,9 @@ node_format = {
             "Des_en": "this is a test node",
             "Description": {}
         },
+        "ExtraProps": {
+            "Livein": "New York"
+        },
     },
     "Lack": [],  # 缺少的属性
     "EditedProp": [],  # 在前端编辑过的属性
@@ -66,31 +67,26 @@ node_format = {
 # todo 各种权限表生成与实现 level: 0  bulk_create level: 0
 class BaseNode:
 
-    def __init__(self, user, _id, collector=base_tools.NeoSet()):
+    def __init__(self, user: BaseUser, _id: int, collector=base_tools.NeoSet()):
+
+        # 以下是模型
         self.node = Node()
         self.info = NodeInfo()
         self.ctrl = NodeCtrl()
         self.trans = Translate()
-
-        # 注意history的id和node不一致
-        # 当前加载的历史文件 稳定版的历史固定为空
         self.loading_history = NodeVersionRecord()
+        self.history = NodeVersionRecord.objects.none()
+        self.user_model = user
+        self.warn = WarnRecord()  # 警告信息
 
-        # 新建的历史文件
-        self.new_history = NodeVersionRecord()
-        self.needed_props = []  # 该种PrimaryLabel必须的标签
-
+        # 以下是值
         self.collector = collector  # neo4j连接池
         self._id = _id  # _id
         self.label = ""  # 标签
-        self.user = user  # 操作用户
-        self.user_model = BaseUser()
+        self.user = user.user_id  # 操作用户
         self.is_draft = False  # 是否是草稿
         self.is_create = False  # 是否是创建状态
-
-        self.edited_props = []  # 发生过编辑的属性
         self.lack = []  # element in lack : "record" | "trans" | "node"
-        self.warn = WarnRecord()  # 警告信息
 
     # ----------------- query ----------------
     # 只查询基础信息: info 和 ctrl
@@ -99,7 +95,6 @@ class BaseNode:
             self.ctrl = NodeCtrl.objects.get(pk=self._id)
             self.label = self.ctrl.PrimaryLabel
             self.info = base_tools.node_init(self.label).objects.get(pk=self._id)
-            self.needed_props = base_tools.get_user_props(self.label)
             return self
         except ObjectDoesNotExist:
             return None
@@ -120,7 +115,6 @@ class BaseNode:
             self.ctrl = self.ctrl.objects.get(pk=self._id)
             self.label = self.ctrl.PrimaryLabel
             self.info = base_tools.node_init(self.label).objects.get(pk=self._id)
-            self.needed_props = base_tools.get_user_props(self.label)
             return self
         except ObjectDoesNotExist:
             return None
@@ -155,10 +149,8 @@ class BaseNode:
             assert "type" in node
             assert "Name" in node
             assert "PrimaryLabel" in node
-            self._id = node["_id"]
             self.label = node["PrimaryLabel"]
-            self.needed_props = base_tools.get_user_props(self.label)
-            self.__history_create(name=node["Name"])
+            self.__history_create(node=node)
             self.__translation_create()
 
             self.__ctrl_create(node=node)
@@ -180,7 +172,6 @@ class BaseNode:
     # ---------------- __private_create ----------------
     def __info_create(self, node):
         self.info = base_tools.node_init(self.label)()
-        # 基础信息 专有修改接口
         self.info.NodeId = self._id
         self.info.PrimaryLabel = self.label
         # 初始化
@@ -199,47 +190,29 @@ class BaseNode:
             contributor = [{"user_id": self.user, "level": 10}]
         self.ctrl = NodeCtrl(
             NodeId=self._id,
+            Type=node["type"],
             CountCacheTime=datetime.now().replace(microsecond=0),
             Is_UserMade=user,  # 注意这里后台导入时user == 0
-            CreateUser=node["user"],
+            CreateUser=self.user,
             PrimaryLabel=self.label,
             Contributor=contributor
         )
 
-    def __history_create(self, name):
+    def __history_create(self, node):
         if self.is_create:
             version_id = 1
         else:
             self.__query_history()
             version_id = self.history.aggregate(Max("VersionId"))
             version_id += 1
-        self.new_history = NodeVersionRecord(VersionId=version_id,
-                                             SourceId=self._id,
-                                             SourceType=self.label,
-                                             CreateUser=self.user,
-                                             Name=name,
-                                             Content={},
-                                             Is_Draft=self.is_draft
-                                             )
-        if self.is_draft:
-            self.new_history.BaseHistory = self.loading_history.VersionId
-        else:
-            if self.is_create:
-                self.new_history.BaseHistory = 0
-            else:
-                self.loading_history.BaseHistory = self.new_history.VersionId
-                self.new_history.BaseHistory = 0
-
-    def __history_save(self):
-
-        if self.is_draft:
-            self.new_history.save()
-        else:
-            if self.is_create:
-                self.new_history.save()
-            else:
-                self.loading_history.save()
-                self.new_history.save()
+        self.loading_history = NodeVersionRecord(VersionId=version_id,
+                                                 SourceId=self._id,
+                                                 SourceType=self.label,
+                                                 CreateUser=self.user,
+                                                 Name=node["Name"],
+                                                 Content=node,
+                                                 Is_Draft=self.is_draft
+                                                 )
 
     def __translation_create(self):
         self.trans = Translate(FileId=self._id)
@@ -278,15 +251,13 @@ class BaseNode:
     @field_check
     def __update_prop(self, field, new_prop, old_prop):
         if new_prop != old_prop:
-            if self.is_draft:
-                self.new_history.Content.update({field.model + "-" + field.name: new_prop})
-            else:
-                self.loading_history.Content.update({field.model + "-" + field.name: old_prop})
+            if not self.is_draft:
                 setattr(field.model, field.name, new_prop)
 
     def info_update(self, node):
         # todo 把 地理识别的内容 改写为LocationField level: 3
-        for field in self.needed_props:
+        needed_props = base_tools.get_user_props(self.label)
+        for field in needed_props:
             old_prop = getattr(self.info, field.name)
             if field.name in node:
                 new_prop = getattr(node, field.name)
@@ -298,8 +269,12 @@ class BaseNode:
         return self
 
     def user_privilege(self):
-        self.user_model = self.user_model.query_privilege(self.user)
-        self.user_model.create_node(self._id)
+        self.user_model.query_privilege()
+        self.user_model.query_repository()
+        if self.label == 'Document':
+            self.user_model.create_doc(self._id)
+        else:
+            self.user_model.create_node(self._id)
 
     def node_status(self):
         pass
@@ -354,6 +329,9 @@ class BaseNode:
         # props["uuid"] = str(props["uuid"])
         # todo 更加详细的前端数据格式 level : 0
         # return {"Labels": labels, "Props": props}
+
+    def output_table_create(self):
+        return self.ctrl, self.info, self.warn, self.loading_history
 
 
 # todo Link 重构 level: 0
@@ -520,5 +498,3 @@ async def add_doc_index(doc):
         return True
     else:
         return False
-
-

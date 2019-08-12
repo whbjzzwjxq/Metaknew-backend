@@ -55,13 +55,13 @@ class NodeBlockIdRecord(BlockIdRecord):
         db_table = "device_node_block"
 
 
-class DeviceBlockIdRecord(models.Model):
+class DeviceBlockIdRecord(BlockIdRecord):
 
     class Meta:
         db_table = "device_device_block"
 
 
-class RecordBlockIdRecord(models.Model):
+class RecordBlockIdRecord(BlockIdRecord):
 
     class Meta:
         db_table = "device_time_block"

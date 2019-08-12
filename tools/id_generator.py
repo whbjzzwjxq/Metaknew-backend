@@ -57,9 +57,9 @@ def id_generator(number, method, content, jump=3):
         except AttributeError("%s must be node or device or time or word" % method):
             return None
 
-        block = record.objects.last()  # 注意这里是本机的record 也就是只有new_block依赖于主数据库
+        block = record.objects.last()
         # 如果该content还从来没有注册
-        if len(block) == 0 or not block:
+        if not block:
             # 新建一个block
             block_id = new_block(manager=manager, content=content)
             # base_number是block的基准值 block_id 是从1开始的
@@ -72,7 +72,7 @@ def id_generator(number, method, content, jump=3):
             last_id = record.objects.filter(BlockId=block_id).last().OutId
             head = last_id - base_number
 
-        needed_space = number * (jump + 1) / 2
+        needed_space = int(number * (jump + 1) / 2)
         if head + needed_space <= small_integer:
             id_list = ordered_sample(_num=number, jump=jump, base=base_number, _min=head)
             commit(id_list, block_id=block_id, record=record)

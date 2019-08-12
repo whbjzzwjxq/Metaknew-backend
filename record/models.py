@@ -5,10 +5,9 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 # done in 07-25
 class SourceAddRecord(models.Model):
 
-    RecordId = models.BigIntegerField(primary_key=True)
-    SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
+    SourceId = models.BigIntegerField(db_column="SourceId", primary_key=True)
     SourceLabel = models.IntegerField(db_column="Label", db_index=True, default=0)
-    BugType = models.SmallIntegerField(db_column="Type")
+    BugType = models.TextField(db_column="Type")
     CreateUser = models.BigIntegerField(db_column="User")
     CreateTime = models.DateTimeField(db_column="Time", auto_now_add=True)
     Is_Solved = models.BooleanField(db_column="Solved", db_index=True, default=False)
@@ -69,6 +68,9 @@ class NodeVersionRecord(models.Model):
         indexes = [
             models.Index(fields=["SourceId", "Is_Draft"])
         ]
+        constraints = [
+            models.UniqueConstraint(fields=["SourceId", "VersionId"], name="NodeVersionControl")
+        ]
         db_table = "history_version_record"
 
 
@@ -76,6 +78,7 @@ class DocumentVersionRecord(models.Model):
     CreateUser = models.BigIntegerField(db_column="User", editable=False)
     CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
     SourceId = models.BigIntegerField(db_column="SourceId", editable=False, db_index=True)
+    SourceType = models.TextField(db_column="Type", editable=False, default="Document")
 
     Name = models.TextField(db_column="Name")
     VersionId = models.SmallIntegerField(db_column="VersionId")
@@ -88,3 +91,7 @@ class DocumentVersionRecord(models.Model):
         indexes = [
             models.Index(fields=["SourceId", "Is_Draft"])
         ]
+        constraints = [
+            models.UniqueConstraint(fields=["SourceId", "VersionId"], name="DocVersionControl")
+        ]
+        db_table = "history_doc_version_record"

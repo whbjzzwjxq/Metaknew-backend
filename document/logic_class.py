@@ -67,7 +67,7 @@ document_frontend_editable = {
 
 class BaseDoc:
 
-    def __init__(self, _id, user, collector=base_tools.NeoSet()):
+    def __init__(self, _id: str, user: str, collector=base_tools.NeoSet()):
         self.user = user
         self._id = _id
         self.collector = collector

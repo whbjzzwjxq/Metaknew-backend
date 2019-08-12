@@ -26,6 +26,8 @@ class NodeCtrl(models.Model):
     # 不传回的控制性内容
     CountCacheTime = models.DateTimeField(db_column="CACHE_TIME")  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
+    Type = models.TextField(db_column="Type", db_index=True, default="StrNode")
+    ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")
     # 直接传回的内容
     CreateTime = models.DateField(db_column="TIME", auto_now_add=True, editable=False)
     CreateUser = models.BigIntegerField(db_column="USER", default="0", editable=False)  # 创建用户
@@ -52,16 +54,15 @@ class NodeCtrl(models.Model):
 # Node直接允许简单写入/传回的属性 done
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
-    Name = models.TextField(db_column="Name")
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签 注意干燥
     MainPic = models.BigIntegerField(db_column="Main")  # 缩略图/主要图片
-    Description = models.TextField(db_column="Description")
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
+    Name = models.TextField(db_column="Name")
+    Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
     BaseImp = models.IntegerField(db_column="BaseImp", default=1)  # 基础重要度
     BaseHardLevel = models.IntegerField(db_column="BaseHardLevel", default=1)  # 基础难易度
-
-    Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
+    Description = models.TextField(db_column="Description")
     Language = models.TextField(db_column="Language")
     Topic = ArrayField(models.TextField(), db_column="Topic")
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
@@ -95,8 +96,6 @@ class Project(NodeInfo):
 class ArchProject(Project):
     Location = models.TextField(db_column="Location", default="Beijing")
     WorkTeam = ArrayField(models.TextField(), db_column="WorkTeam", default=list)
-    Longitude = models.TextField(default="")
-    Latitude = models.TextField(default="")
 
     class Meta:
         db_table = "graph_node_arch_project"
@@ -151,7 +150,7 @@ class Chronology(models.Model):
     PeriodStart = models.DateField(db_column="Start", null=True)
     PeriodEnd = models.DateField(db_column="End", null=True)
     Content = models.TextField(db_column="Content")
-    
+
     class Meta:
         db_table = "source_chronology"
 
@@ -210,7 +209,7 @@ class Topic2Topic(Relationship):
     Is_Parent = models.BooleanField(db_column="Parent", default=False)
     Correlation = models.IntegerField(db_column="Correlation", default=1)
     CommonSource = models.IntegerField(db_column="CommonSource", default=0)
-    
+
     class Meta:
         db_table = "graph_link_topic2topic"
 
