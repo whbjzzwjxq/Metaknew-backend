@@ -14,12 +14,12 @@ def node_setting():
             "y": 0.5,  # 纵向坐标
             "type": 0,  # 样式
             "radius": 1.0,  # 大小设置
-            "bright": 1.0,  # 亮度设置
+            "color": "#FFFFFF",  # 颜色设置
             "opacity": 1.0,  # 透明度设置
         },
         "Border": {
             "width": 0,  # 额外的边框宽度
-            "color": "000000",  # 边框颜色
+            "color": "#000000",  # 边框颜色
             "type": 0  # 样式
         },
         "Show": {
@@ -34,8 +34,7 @@ def node_setting():
         },
         "Group": 0,  # 组别
         "Explode": False,  # 是否炸开(仅限专题)
-        "Is_Main": False,
-        "Is_Update": True
+        "Is_Main": False
         # todo 可能还有更多的设置 level : 2
     }
     return [setting]

@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from subgraph.logic_class import BaseNode, BaseLink
 from document.logic_class import BaseDoc
-from tools.base_tools import NeoSet, get_user_props
+from tools.base_tools import NeoSet, get_user_props, get_special_props
 from tools.id_generator import id_generator
 from py2neo import Relationship
 import json
@@ -177,13 +177,20 @@ from tools.redis_process import query_needed_prop, set_needed_prop, query_availa
 
 def query_frontend_prop(request):
     labels = query_available_plabel()
-    result = {}
+    label_prop_dict = {}
+    base_prop = [field.name for field in get_user_props(p_label="BaseNode")]
     for label in labels:
         props = query_needed_prop(label)
         if not props:
-            props = [field.name for field in get_user_props(p_label=label)]
-            set_needed_prop(label, props)
-        result.update({label: props})
+            props = [field.name for field in get_special_props(p_label=label)]
+            if props:
+                set_needed_prop(label, props)
+        label_prop_dict.update({label: props})
+    label_prop_dict.update({"BaseNode": []})
+    result = {
+        "baseProp": base_prop,
+        "specialProp": label_prop_dict
+    }
     return HttpResponse(json.dumps(result))
 
 

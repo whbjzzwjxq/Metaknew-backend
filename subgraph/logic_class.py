@@ -36,9 +36,9 @@ node_format = {
         "BirthPlace": "Beijing, China",
         "Nation": "China",
         "Chronology": [
-            {"start": "1901-02-09",
-             "end": "1915-04-06",
-             "content": "Live in YangZhou"
+            {"Start": "1901-02-09",
+             "End": "1915-04-06",
+             "Content": "Live in YangZhou"
              }
         ],
         "Translate": {
@@ -56,9 +56,8 @@ node_format = {
         },
     },
     "Lack": [],  # 缺少的属性
-    "EditedProp": [],  # 在前端编辑过的属性
     "LoadingHistory": {
-        "RecordId": "",
+        "VersionId": "",
         "Content": ""
     }
 }

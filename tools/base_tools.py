@@ -73,6 +73,19 @@ def get_user_props(p_label: str) -> List[Field]:
         return []
 
 
+def get_special_props(p_label: str) -> List[Field]:
+    """
+    :param p_label: PrimaryLabel
+    :return: 该标签的特殊属性 不包含NodeInfo
+    """
+    if p_label in node_model_dict:
+        result = get_user_props(p_label)
+        result = [field for field in result if field.model.__name__ != 'NodeInfo']
+        return result
+    else:
+        return []
+
+
 def get_system_link_props(r_type: str) -> List[Field]:
     """
     :param r_type: Link的Type
