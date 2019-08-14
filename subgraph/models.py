@@ -1,6 +1,7 @@
 from django.contrib.postgres.fields import *
 from django.db import models
 from users.models import User
+from datetime import datetime
 
 
 # 将可能的模板写在前面
@@ -64,7 +65,7 @@ class NodeInfo(models.Model):
     BaseHardLevel = models.IntegerField(db_column="BaseHardLevel", default=1)  # 基础难易度
     Description = models.TextField(db_column="Description")
     Language = models.TextField(db_column="Language")
-    Topic = ArrayField(models.TextField(), db_column="Topic")
+    Topic = ArrayField(models.TextField(), db_column="Topic", db_index=True)
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     ExtraProps = JSONField(db_column="ExtraProps", default=dict)
 
@@ -78,6 +79,8 @@ class Person(NodeInfo):
     DateOfDeath = models.TextField(db_column="DateOfDeath")
     BirthPlace = models.TextField(db_column="BirthPlace", max_length=30)
     Nation = models.TextField(db_column="Nation", max_length=30)
+    Job = models.TextField(db_column='Job', default='')
+    Gender = models.TextField(db_column='Gender', default='Man')
 
     class Meta:
         db_table = "graph_node_person"
@@ -107,9 +110,17 @@ class MediaNode(models.Model):
     FileName = models.TextField(db_column="Name")
     Format = models.TextField(db_column="Format")
     MediaType = models.TextField(db_column="Type")
-    Url = models.URLField(db_column="URL", default="")
+
+    # 控制属性
     UploadUser = models.BigIntegerField(db_column="UploadUser")
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
+    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=datetime.now())
+
+    # 用户相关
+    Useful = models.SmallIntegerField(db_column='Useful', default=0)
+    Star = models.BigIntegerField(db_column='Star', default=0)
+    Topic = ArrayField(models.TextField(), db_column="Topic", default=list, db_index=True)
+    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     Description = models.TextField(db_column="Description", default="None")
 
     class Meta:
