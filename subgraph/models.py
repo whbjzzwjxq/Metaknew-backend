@@ -1,7 +1,8 @@
 from django.contrib.postgres.fields import *
 from django.db import models
 from users.models import User
-from datetime import datetime
+from django.utils.timezone import now
+from tools.models import LevelField
 
 
 # 将可能的模板写在前面
@@ -25,27 +26,28 @@ pictures = ["jpg", "png", "gif"]
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     # 不传回的控制性内容
-    CountCacheTime = models.DateTimeField(db_column="CACHE_TIME")  # 最后统计的时间
+    CountCacheTime = models.DateTimeField(db_column="CacheTime")  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
-    Type = models.TextField(db_column="Type", db_index=True, default="StrNode")
-    ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")
+    Type = models.TextField(db_column="Type", db_index=True, default="StrNode")  # 节点种类
+    ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")  # 导入方式
+    CreateTime = models.DateField(db_column="CreateTime", auto_now_add=True, editable=False)  # 创建时间
     # 直接传回的内容
-    CreateTime = models.DateField(db_column="TIME", auto_now_add=True, editable=False)
-    CreateUser = models.BigIntegerField(db_column="USER", default="0", editable=False)  # 创建用户
-    UpdateTime = models.DateTimeField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
-    PrimaryLabel = models.TextField(db_column="P_LABEL", db_index=True)  # 主标签 注意干燥
+    CreateUser = models.BigIntegerField(db_column="CreateUser", default="0", editable=False)  # 创建用户
+    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
+    PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签 注意干燥
 
     # 从用户(UserConcern)那里统计的内容 更新频率 高
-    Imp = models.IntegerField(db_column="IMP", default=1)
-    HardLevel = models.IntegerField(db_column="HARD_LEVEL", default=1)  # 难易度
-    Useful = models.IntegerField(db_column="USEFUL", default=1)  # 有用的程度
-    Star = models.IntegerField(db_column="STAR", default=0)  # 收藏数量
-    Contributor = ArrayField(JSONField(), db_column="CONTRIBUTOR", default=contributor)
-    UserLabels = ArrayField(models.TextField(), db_column="USER_LABELS", default=list)
+    Imp = LevelField()  # 重要度
+    HardLevel = LevelField()  # 难易度
+
+    Useful = models.IntegerField(db_column="Useful", default=0)  # 有用的程度
+    Star = models.IntegerField(db_column="Star", default=0)  # 收藏数量
+    Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
+    Contributor = ArrayField(JSONField(), db_column="Contributor", default=contributor)  # 贡献者
+    UserLabels = ArrayField(models.TextField(), db_column="UserLabels", default=list)  # 用户打的标签
 
     # 从数据分析统计的内容 更新频率 低
-    Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
-    Structure = models.IntegerField(db_column="STR", default=1)  # 结构化的程度
+    Structure = LevelField()  # 结构化的程度
     FeatureVec = JSONField(db_column="FEATURE_VECTOR", default=feature_vector)  # 特征值
 
     class Meta:
@@ -55,17 +57,17 @@ class NodeCtrl(models.Model):
 # Node直接允许简单写入/传回的属性 done
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
-    PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签 注意干燥
-    MainPic = models.BigIntegerField(db_column="Main")  # 缩略图/主要图片
+    PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
+    MainPic = models.BigIntegerField(db_column="Main")  # 缩略图/主要图片, 注意储存的是id
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
     Name = models.TextField(db_column="Name")
     Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
-    BaseImp = models.IntegerField(db_column="BaseImp", default=1)  # 基础重要度
-    BaseHardLevel = models.IntegerField(db_column="BaseHardLevel", default=1)  # 基础难易度
+    BaseImp = LevelField()  # 基础重要度
+    BaseHardLevel = LevelField()  # 基础难易度
     Description = models.TextField(db_column="Description")
     Language = models.TextField(db_column="Language")
-    Topic = ArrayField(models.TextField(), db_column="Topic", db_index=True)
+    Topic = HStoreField(db_column="Topic", db_index=True)
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     ExtraProps = JSONField(db_column="ExtraProps", default=dict)
 
@@ -114,17 +116,28 @@ class MediaNode(models.Model):
     # 控制属性
     UploadUser = models.BigIntegerField(db_column="UploadUser")
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
-    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=datetime.now())
+    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
 
     # 用户相关
     Useful = models.SmallIntegerField(db_column='Useful', default=0)
     Star = models.BigIntegerField(db_column='Star', default=0)
-    Topic = ArrayField(models.TextField(), db_column="Topic", default=list, db_index=True)
+    Topic = HStoreField(db_column="Topic", db_index=True)
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    Description = models.TextField(db_column="Description", default="None")
+    Description = models.TextField(db_column="Description", default="")
 
     class Meta:
         db_table = "graph_media_base"
+
+
+# done 08-16
+class BaseDoc(NodeInfo):
+    Keywords = ArrayField(models.TextField(), db_column="Keywords", default=list)  # 关键词
+    TotalTime = models.IntegerField(db_column="TotalTime", default=1000)  # 需要的时间
+    MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
+    Complete = LevelField()  # 计算得出
+
+    class Meta:
+        db_table = "graph_doc_base"
 
 
 # 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录
@@ -188,7 +201,6 @@ class Relationship(models.Model):
 
 # todo 日志聚合 level: 2
 class FrequencyCount(Relationship):
-
     Count = models.IntegerField(db_column="Count", default=1)
     Frequency = models.FloatField(db_column="Frequency", default=0)
 
@@ -200,7 +212,6 @@ class FrequencyCount(Relationship):
 
 
 class SearchTogether(FrequencyCount):
-
     class Meta:
         db_table = "graph_link_search_tog"
 
@@ -259,10 +270,8 @@ class KnowLedge(Relationship):
 
 
 class Event(KnowLedge):
-
     Time = models.TextField(db_column="Time", db_index=True)
     Location = models.TextField(db_column="Location", db_index=True)
 
     class Meta:
         db_table = "graph_link_event"
-

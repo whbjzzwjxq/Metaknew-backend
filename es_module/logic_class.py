@@ -79,6 +79,12 @@ class EsQuery:
         return self.get_uuid_from_result(self.auto_complete(target=target, index="documents"))
 
 
+class EsIndex:
+
+    def __init__(self, index):
+        self.index = index
+        self.es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
+
 # # todo 消息队列处理 level :1
 # async def add_node_index(node: BaseNode):
 #     assert node.already

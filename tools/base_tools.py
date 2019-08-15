@@ -1,7 +1,7 @@
 import re
 from subgraph.models import *
 from py2neo import Graph, NodeMatcher, RelationshipMatcher
-from document.models import DocInfo
+from subgraph.models import BaseDoc
 from functools import reduce
 from django.db.models import Model
 from enum import Enum
@@ -26,7 +26,7 @@ node_model_dict: Dict[str, NodeInfo] = {
     "Person": Person,
     "Project": Project,
     "ArchProject": ArchProject,
-    "Document": DocInfo,
+    "Document": BaseDoc,
 }
 
 

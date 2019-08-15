@@ -1,4 +1,4 @@
-from document.models import DocPaper, DocGraph, DocInfo, Comment, Note
+from document.models import DocPaper, DocGraph, Comment, Note
 from django.core.exceptions import ObjectDoesNotExist
 from tools import base_tools, encrypt
 from time import time

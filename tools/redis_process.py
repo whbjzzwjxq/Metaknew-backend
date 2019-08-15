@@ -110,7 +110,10 @@ def query_needed_prop(plabel):
 
 def set_needed_prop(plabel, prop_list):
     key = "plabel_" + plabel
-    return redis.sadd(key, *prop_list)
+    current = redis.smembers(key)
+    redis.srem(key, *current)
+    redis.sadd(key, *prop_list)
+    return True
 
 
 def query_available_plabel():
