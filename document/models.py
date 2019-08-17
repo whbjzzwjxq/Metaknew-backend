@@ -4,6 +4,7 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from tools.models import LevelField
 from subgraph.models import NodeInfo
 
+
 # done 08-16
 def node_setting():
     setting = {

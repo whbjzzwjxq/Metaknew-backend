@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, HStoreField
+from tools.models import TopicField
 
 # Create your models here.
 
@@ -24,7 +25,7 @@ class User(models.Model):
     # key: GroupId value: 0-Owner 1-Manager 2-Member 3-Applying
     Joint_Group = HStoreField(db_column="JOINT_GROUP", default=dict)
     # 用户感兴趣的领域
-    Topic = ArrayField(models.TextField(), default=list)
+    Topic = TopicField()
 
     class Meta:
         db_table = "user_info_base"
@@ -37,7 +38,7 @@ class GroupCtrl(models.Model):
     Owner = models.BigIntegerField(db_column="Owner")
     Manager = ArrayField(models.BigIntegerField(), db_column="Manager")
     Member = ArrayField(models.BigIntegerField(), db_column="Member")
-    Topic = ArrayField(models.TextField(), default=list)
+    Topic = TopicField()
     Labels = ArrayField(models.TextField(), default=list)
     Is_Auto = models.BooleanField(db_column="Auto", default=False)
     Is_Open = models.BooleanField(db_column="Open", default=True)

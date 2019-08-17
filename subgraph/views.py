@@ -175,10 +175,14 @@ from tools.redis_process import query_needed_prop, set_needed_prop, query_availa
 #     return HttpResponse("Create Document Success")
 
 
+# todo js缓存 level: 3
 def query_frontend_prop(request):
     labels = query_available_plabel()
     label_prop_dict = {}
-    base_prop = [field.name for field in get_user_props(p_label="BaseNode")]
+    base_prop = ["Name", "Alias", "BaseImp",
+                 "BaseHardLevel", "Language", "Topic",
+                 "Labels", "ExtraProps", "MainPic",
+                 "Description", "IncludedMedia"]
     for label in labels:
         props = query_needed_prop(label)
         if not props:

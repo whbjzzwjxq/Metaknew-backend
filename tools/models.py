@@ -25,6 +25,8 @@ class TopicField(HStoreField):
 
     def __init__(self, *args, **kwargs):
         kwargs["validators"] = [validate_topic]
+        kwargs["default"] = dict
+        kwargs["db_index"] = True
         super().__init__(*args, **kwargs)
 
 

@@ -1,8 +1,8 @@
-from django.contrib.postgres.fields import *
+from django.contrib.postgres.fields import ArrayField, JSONField, HStoreField
 from django.db import models
 from users.models import User
 from django.utils.timezone import now
-from tools.models import LevelField
+from tools.models import LevelField, TopicField
 
 
 # 将可能的模板写在前面
@@ -49,6 +49,7 @@ class NodeCtrl(models.Model):
     # 从数据分析统计的内容 更新频率 低
     Structure = LevelField()  # 结构化的程度
     FeatureVec = JSONField(db_column="FEATURE_VECTOR", default=feature_vector)  # 特征值
+    TotalTime = models.IntegerField(db_column="TotalTime", default=50)  # 需要的时间
 
     class Meta:
         db_table = "graph_node_ctrl"
@@ -67,7 +68,7 @@ class NodeInfo(models.Model):
     BaseHardLevel = LevelField()  # 基础难易度
     Description = models.TextField(db_column="Description")
     Language = models.TextField(db_column="Language")
-    Topic = HStoreField(db_column="Topic", db_index=True)
+    Topic = TopicField()
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     ExtraProps = JSONField(db_column="ExtraProps", default=dict)
 
@@ -117,11 +118,12 @@ class MediaNode(models.Model):
     UploadUser = models.BigIntegerField(db_column="UploadUser")
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
+    TotalTime = models.IntegerField(db_column="TotalTime", default=50)  # 需要的时间
 
     # 用户相关
     Useful = models.SmallIntegerField(db_column='Useful', default=0)
     Star = models.BigIntegerField(db_column='Star', default=0)
-    Topic = HStoreField(db_column="Topic", db_index=True)
+    Topic = TopicField()
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     Description = models.TextField(db_column="Description", default="")
 
@@ -131,9 +133,9 @@ class MediaNode(models.Model):
 
 # done 08-16
 class BaseDoc(NodeInfo):
-    Keywords = ArrayField(models.TextField(), db_column="Keywords", default=list)  # 关键词
-    TotalTime = models.IntegerField(db_column="TotalTime", default=1000)  # 需要的时间
+
     MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
+    Size = models.IntegerField(db_column="Size", default=1)  # 专题的规模
     Complete = LevelField()  # 计算得出
 
     class Meta:
