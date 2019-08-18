@@ -13,7 +13,7 @@ from subgraph.models import NodeCtrl, NodeInfo
 from record.logic_class import EWRecord, History
 import numpy as np
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
-
+from django.db.models import Field
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
@@ -179,23 +179,20 @@ from tools.redis_process import query_needed_prop, set_needed_prop, query_availa
 def query_frontend_prop(request):
     labels = query_available_plabel()
     label_prop_dict = {}
-    base_prop = ["Name", "Alias", "BaseImp",
-                 "BaseHardLevel", "Language", "Topic",
-                 "Labels", "ExtraProps", "MainPic",
-                 "Description", "IncludedMedia"]
     for label in labels:
         props = query_needed_prop(label)
         if not props:
-            props = [field.name for field in get_special_props(p_label=label)]
+            props = {field.name: query_field_type(field) for field in get_special_props(p_label=label)}
             if props:
                 set_needed_prop(label, props)
         label_prop_dict.update({label: props})
-    label_prop_dict.update({"BaseNode": []})
-    result = {
-        "baseProp": base_prop,
-        "specialProp": label_prop_dict
-    }
-    return HttpResponse(json.dumps(result))
+    return HttpResponse(json.dumps(label_prop_dict))
+
+
+def query_field_type(field: Field) -> str:
+
+    field_type = type(field).__name__
+    return field_type
 
 
 def create_document(request):

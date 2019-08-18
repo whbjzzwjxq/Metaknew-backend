@@ -100,19 +100,20 @@ def set_word_index(word_list, index_list):
 
 # ----------------标签-属性
 def query_needed_prop(plabel):
-    prop_list = redis.smembers("plabel_" + plabel)
-    if prop_list:
-        prop_list: typing.Set[bytes] = [prop.decode() for prop in prop_list]
-        return prop_list
+    prop_dict = redis.hgetall("plabel_" + plabel)
+    if prop_dict:
+        prop_dict: typing.Dict[bytes: bytes] = {key.decode(): value for key, value in prop_dict.items()}
+        return prop_dict
     else:
-        return []
+        return {}
 
 
-def set_needed_prop(plabel, prop_list):
+def set_needed_prop(plabel, prop_dict):
     key = "plabel_" + plabel
-    current = redis.smembers(key)
-    redis.srem(key, *current)
-    redis.sadd(key, *prop_list)
+    current = redis.hkeys(key)
+    if len(current) > 0:
+        redis.hdel(key, *current)
+    redis.hmset(key, prop_dict)
     return True
 
 
