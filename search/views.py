@@ -42,12 +42,6 @@ def criteria_query(request):
             return HttpResponse(json.dumps(result, ensure_ascii="utf-8"))
 
 
-def query_label_dict(request):
-    p_label = request.GET.get("PrimaryLabel")
-    nodes = NeoSet().Nmatcher.match()
-    return HttpResponse()
-
-
 def get_single_node(request):
 
     uuid = request.GET.get("uuid")
