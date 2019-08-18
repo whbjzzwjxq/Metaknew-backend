@@ -102,7 +102,7 @@ def set_word_index(word_list, index_list):
 def query_needed_prop(plabel):
     prop_dict = redis.hgetall("plabel_" + plabel)
     if prop_dict:
-        prop_dict: typing.Dict[bytes: bytes] = {key.decode(): value for key, value in prop_dict.items()}
+        prop_dict: typing.Dict[bytes: bytes] = {key.decode(): value.decode() for key, value in prop_dict.items()}
         return prop_dict
     else:
         return {}
