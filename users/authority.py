@@ -1,158 +1,88 @@
 from django.http import HttpResponse, HttpRequest
 from tools.redis_process import *
 from users.models import DocAuthority, NodeAuthority, MediaAuthority
+import regex
 
+default_request_info = {
+    "status": True,
+    "content": "",
+    "user_id": 0
+}
 
-# method = ["delete", "change_state", "copy", "query_total", "query_abbr", "write", "export", "reference", "download"]
 
 # todo 各功能权限表工作 正则匹配实现 level: 2
 class AuthMiddleware:
+    accurate_match_url = {
+        "/subgraph/media_node_create": {"user_type": "user"}
+    }
+    regex_match_url = {}
+    default_checker = {
+        "user_type": "guest",  # guest || user || vip || high_vip || publisher || developer || superuser
+        "method_type": "query",  # query || write || download ||
+        "need_source_id": False,  # True || False
+        "source_type": "node"  # node || media || document || course
+    }
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self.url_auth_list = {
-            "/search/single": [],
-            "/document/add_comment": [],
-            "/subgraph/add/node": [],
-            "/subgraph/add/document": [],
-            "/subgraph/run/script_latin": [],
-            "/subgraph/run/script_add_loc": [],
-            "/user/login": [],
-            "/user/register": [],
-            "/user/send_message": [],
-            "/es_query/index": [],
-            "/search/criteria_query": [],
-            "/search/get_single_node": [],
-            "/tools/generate": [],
-            "/search/es_ask/": [],
-            "/document/getPersonalByDoc": [],
-            "/document/addComment": [],
-            "/mediaNode/upload": [],
-        }
 
     def __call__(self, request: HttpRequest()):
-        path = request.path
-        if str(path) in self.url_auth_list:
-            _checkers = self.url_auth_list[path]
+        request_info = self.confirm_login_status(request)
+        _checker = self.match_url(request)
 
-            if _checkers is not []:
-                result = True
-
-                # 注意这里的参数要求
-                uuid = request.GET.get("uuid")
-                if not uuid:
-                    uuid = request.POST.get("uuid")
-                if not uuid:
-                    uuid = ""
-                request_info = self.get_user_auth(request)
-                for _check in _checkers:
-                    result = result and _check(user_id=request_info.user_id,
-                                               uuid=uuid).check()
-                if result:
-                    return self.get_response(request)
-                else:
-                    return HttpResponse(status=400, content="操作失败， 原因可能是: %s" % request_info.content)
-            else:
-                return self.get_response(request)
+        if _checker == {}:
+            return self.get_response(request)
         else:
-            print("未注册的API")
-            return HttpResponse(status=400)
+            user_info = user_query_info_by_id(request_info["user_id"])
+            return self.get_response(request)
+
+    def match_url(self, request: HttpRequest()):
+        path = request.path
+        for url in self.accurate_match_url:
+            if path == url:
+                _checker = self.accurate_match_url[url]
+                for key in self.default_checker:
+                    if key not in _checker:
+                        _checker.update({key: self.default_checker[key]})
+                return _checker
+
+        for regex_instance in self.regex_match_url:
+            if regex_instance.match(path):
+                _checker = self.regex_match_url[regex_instance]
+                for key in self.default_checker:
+                    if key not in _checker:
+                        _checker.update({key: self.default_checker[key]})
+                return _checker
+
+        return {}
 
     @staticmethod
-    def get_user_auth(request: HttpRequest()):
+    def confirm_login_status(request: HttpRequest()) -> default_request_info:
         # 默认情况下视为游客
-        request_info = RequestInfo()
-
-        if "token" in request.COOKIES and "user_name" in request.COOKIES:
-            token = request.COOKIES["token"]
-            user_name = request.COOKIES["user_name"]
-            user_id, saved_token = query_user_by_name(user_name)
+        request_info = default_request_info
+        token = request.headers["Token"]
+        user_name = request.headers["User-Name"]
+        if token != "null" and user_name != "null":
+            user_id, saved_token = user_query_by_name(user_name)
             if not saved_token:
-                request_info.content = "登录信息过期，请重新登录"
+                request_info["content"] = "登录信息过期，请重新登录"
             elif not token == saved_token:
-                request_info.content = "已经在别处登录了"
+                request_info["content"] = "已经在别处登录了"
             else:
-                request_info.content = "您没有这个操作的权限"
-                request_info.status = True
-                request_info.user_id = user_id
+                request_info["content"] = "您没有这个操作的权限"
+                request_info["status"] = True
+                request_info["user_id"] = user_id
+
                 request.GET._mutable = True
                 request.GET.update({"user_id": user_id})
                 request.GET._mutable = False
         else:
-            request_info.content = "以游客身份登录"
+            request_info["content"] = "以游客身份登录"
         return request_info
 
+    def user_type_check(self):
+        pass
 
-class RequestInfo:
-
-    def __init__(self):
-        self.status = False
-        self.content = "以游客身份登录"
-        self.user_id = 1
-
-
-# class AuthChecker:
-#     auth_sheet = BaseAuthority
-#
-#     def __init__(self, user_id, uuid):
-#         self.user_id = user_id
-#         self.uuid = uuid
-#         self.status = False
-#
-#     def check(self):
-#         self.status = True
-#         self.user_status()
-#         return self.status
-#
-#     def user_status(self):
-#         record = User.objects.get(pk=self.user_id)
-#         if record.Is_Superusero or record.Is_Developer:
-#             self.status = True
-#         elif record.Is_Banned:
-#             self.status = False
-#         elif not record.Is_Active:
-#             self.status = False
-#
-#
-# class DocQueryChecker(AuthChecker):
-#
-#     auth_sheet = BaseAuthority
-#
-#     def __init__(self, user_id, uuid):
-#         super().__init__(user_id, uuid)
-#         self.user_id = user_id
-#         self.uuid = uuid
-#         self.status = False
-#         self.record = self.auth_sheet.objects.get(uuid=self.uuid)
-#
-#     def common_checker(self):
-#         record = self.record
-#         if record.Common:
-#             self.status = True
-#         elif record.Shared and self.user_id in record.SharedTo:
-#             self.status = True
-#         elif record.Paid and self.user_id in record.payment:
-#             self.status = True
-#         elif self.user_id in record.ChangeState:
-#             self.status = True
-#         elif self.user_id == record.Owner:
-#             self.status = True
-#
-#     def check(self):
-#         record = self.record
-#         if self.user_id in record.query:
-#             self.status = True
-#         self.common_checker()
-#         self.user_status()
-#         return self.status
-#
-#
-# class QueryRecord(AuthChecker):
-#
-#     def check(self):
-#         self.status = False
-#         self.user_status()
-#         return self.status
 
 class AuthChecker:
     # 这里没有对个人化的内容做验证，这里验证的是全局内容
@@ -191,7 +121,7 @@ class AuthChecker:
             self.__anti_spider()
             return HttpResponse(status=404)
         else:
-              pass
+            pass
 
     def __anti_spider(self):
         pass

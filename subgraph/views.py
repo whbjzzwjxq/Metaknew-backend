@@ -14,6 +14,8 @@ from record.logic_class import EWRecord, History
 import numpy as np
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from django.db.models import Field
+from django.views.decorators.csrf import csrf_exempt
+
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
@@ -190,7 +192,6 @@ def query_frontend_prop(request):
 
 
 def query_field_type(field: Field) -> str:
-
     field_type = type(field).__name__
     return field_type
 
@@ -229,16 +230,20 @@ def bulk_create_node(request):
         nodes = [BaseNode(user=user_model, _id=_id, collector=collector) for _id in id_list]
         # 注入数据
         nodes = [node.create(node=data) for node, data in zip(nodes, data_list)]
-        # 去除掉生成错误的节点 可以看create的装饰器
+        # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None
         nodes = [node for node in nodes if node]
         # 保存
         output = np.array([node.output_table_create() for node in nodes])
+        # 保存ctrl
         ctrl = list(output[:, 0])
         NodeCtrl.objects.bulk_create(ctrl, batch_size=batch_size)
+        # 保存info
         info = list(output[:, 1])
         NodeInfo.objects.bulk_create(info, batch_size=batch_size)
+        # 保存warn
         warn = list(output[:, 2])
         EWRecord.bulk_save_warn_record(warn)
+        # 保存history
         history = list(output[:, 3])
         History.bulk_save_node_history(history)
 
@@ -247,3 +252,11 @@ def bulk_create_node(request):
         return HttpResponse(content='用户不存在', status=400)
 
 
+@csrf_exempt
+def single_create_media_node(request):
+    collector = NeoSet()
+    user_id = request.GET.get("user_id")
+    user_model = BaseUser(_id=user_id).query_user()
+    if user_model:
+        _id = id_generator(number=1, method='node', content='Media', jump=2)
+    return HttpResponse(content='创建成功', status=200)

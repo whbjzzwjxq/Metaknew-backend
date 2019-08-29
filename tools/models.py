@@ -21,7 +21,7 @@ class LevelField(models.SmallIntegerField):
 
 class TopicField(HStoreField):
 
-    description = "资源等使用的Topic"
+    description = "资源等使用的Topic, key是Topic value是用户对Topic感兴趣的程度/资源跟Topic的相关度"
 
     def __init__(self, *args, **kwargs):
         kwargs["validators"] = [validate_topic]

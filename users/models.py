@@ -20,6 +20,10 @@ class User(models.Model):
     Is_Publisher = models.BooleanField(db_column="PUBLISH", default=False)  # 是否是发布者
     Is_Vip = models.BooleanField(db_column="VIP", default=False)
     Is_high_vip = models.BooleanField(db_column="HighVIP", default=False)
+    # 用户控制
+    Is_Active = models.BooleanField(db_column="Active", default=True)
+    # 系统控制
+    Is_Banned = models.BooleanField(db_column="Banned", default=False)
 
     # 兴趣部分
     # key: GroupId value: 0-Owner 1-Manager 2-Member 3-Applying
@@ -31,6 +35,7 @@ class User(models.Model):
         db_table = "user_info_base"
 
 
+# GroupId 与 UserId 使用同一个id_generator
 class GroupCtrl(models.Model):
     GroupId = models.BigIntegerField(db_column="Group_Id", primary_key=True)
     GroupName = models.TextField(db_column="Group_Name", unique=True)
@@ -47,13 +52,10 @@ class GroupCtrl(models.Model):
         db_table = "user_group_info_base"
 
 
+# 用户/组 权限
 class Privilege(models.Model):
     # 注意GroupId和UserId不能重复 因此生成的时候使用同一个IdBlock
     UserId = models.BigIntegerField(primary_key=True, db_index=True)
-    # 用户控制
-    Is_Active = models.BooleanField(db_column="ACTIVE", default=True)
-    # 系统控制
-    Is_Banned = models.BooleanField(db_column="BANNED", default=False)
     # 是拥有者的资源
     Is_Owner = ArrayField(models.BigIntegerField(), db_column="Owner", default=list)
     # 拥有修改状态权限的资源
@@ -84,6 +86,7 @@ class UserRepository(models.Model):
         db_table = "user_collection"
 
 
+# 用户关注的内容
 class UserConcern(models.Model):
     UserId = models.BigIntegerField(db_column="USER_ID", db_index=True)
     # 用户关心的Source
@@ -129,6 +132,7 @@ class UserDocProgress(models.Model):
 
 
 # done in 07-22
+# 控制主题
 class BaseAuthority(models.Model):
     SourceId = models.BigIntegerField(primary_key=True, db_index=True)  # 资源id
 
@@ -170,20 +174,3 @@ class MediaAuthority(BaseAuthority):
 #
 #     class Meta:
 #         db_table = "authority_payment"
-
-
-# 注意这个表单只做统计信息用 权限检测在User下实现 done
-class AuthorityCount(models.Model):
-    SourceId = models.BigIntegerField(primary_key=True)  # 资源uuid
-    Owner = models.BigIntegerField(db_column="Owner", db_index=True)  # 专题所有人的id
-    # 拥有修改状态权限的用户
-    Manager = ArrayField(models.BigIntegerField(), db_column="Manager", default=list)
-    # 拥有完整权限的用户
-    Collaborator = ArrayField(models.BigIntegerField(), db_column="Coll", default=list)
-    # 分享的用户
-    SharedTo = ArrayField(models.BigIntegerField(), db_column="ShareTo", default=list)
-    # 可以无偿使用的用户
-    FreeTo = ArrayField(models.BigIntegerField(), db_column="FreeTo", default=list)
-
-    class Meta:
-        db_table = "authority_count_user"

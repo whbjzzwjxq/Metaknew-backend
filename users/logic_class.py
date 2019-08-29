@@ -21,11 +21,13 @@ class BaseUser:
         self.repository = UserRepository()
         self.concern = UserConcern()
 
+    # 登录成功之后的设置
     def login_success(self):
         name = self.user.UserName
         _id = self.user.UserId
         token = make_token(name, _id)
-        set_user_login(self.user, token)
+        self.query_privilege()
+        user_login_set(self.user, self.privilege, token)
         result = {
             "content": "登录成功",
             "token": token,

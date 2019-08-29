@@ -17,6 +17,8 @@ def feature_vector():
 
 
 pictures = ["jpg", "png", "gif"]
+
+
 # todo 媒体文件格式 level: 1
 
 # global_word 储存不使用 可以使用在前后端交互节约流量 level: 1
@@ -131,9 +133,20 @@ class MediaNode(models.Model):
         db_table = "graph_media_base"
 
 
+class Fragment(models.Model):
+    NodeId = models.BigIntegerField(primary_key=True)
+    Keywords = ArrayField(models.TextField(), db_column='Keyword', default=list)
+    Content = models.TextField(db_column='Content', default="")
+    Labels = ArrayField(models.TextField(), db_column='Labels', default=list)
+    CreateTime = models.DateField(db_column='CreateTime', default=now)
+    CreateUser = models.BigIntegerField(db_column='User')
+
+    class Meta:
+        db_table = "graph_normal_node"
+
+
 # done 08-16
 class BaseDoc(NodeInfo):
-
     MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
     Size = models.IntegerField(db_column="Size", default=1)  # 专题的规模
     Complete = LevelField()  # 计算得出
@@ -181,8 +194,7 @@ class Chronology(models.Model):
         db_table = "source_chronology"
 
 
-# 基准类 done
-# 系统生成的控制性关系
+# 系统生成的控制性关系 done
 SystemMade = ["Topic2Topic", "Topic2Node", "Doc2Node",
               "SearchTogether", "AfterVisit", "MentionTogether"]
 
@@ -228,7 +240,7 @@ class MentionTogether(FrequencyCount):
         db_table = "graph_link_mention_tog"
 
 
-# start是father end是 child
+# start是father end是child
 class Topic2Topic(Relationship):
     Is_Parent = models.BooleanField(db_column="Parent", default=False)
     Correlation = models.IntegerField(db_column="Correlation", default=1)
@@ -262,7 +274,6 @@ class KnowLedge(Relationship):
     Is_UserMade = models.BooleanField(db_column="Is_UserMade", db_index=True)
     CreateUser = models.BigIntegerField(db_column="CreateUser", db_index=True)
     Confidence = models.SmallIntegerField(db_column="Confidence", default=50)
-    # todo LocationField level: 2
     Props = JSONField(db_column="Props", default=dict)
     Content = models.TextField(db_column="Content", default="")
     LinkedSource = models.BigIntegerField(db_column="Linked", default=0)
@@ -271,6 +282,7 @@ class KnowLedge(Relationship):
         db_table = "graph_link_knowledge"
 
 
+# 事件
 class Event(KnowLedge):
     Time = models.TextField(db_column="Time", db_index=True)
     Location = models.TextField(db_column="Location", db_index=True)

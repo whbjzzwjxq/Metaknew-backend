@@ -1,6 +1,7 @@
 import redis
 import typing
-import json
+from users.models import User, Privilege
+
 second = 1
 minute = 60
 hour = 3600
@@ -17,11 +18,11 @@ redis = redis.StrictRedis(connection_pool=pool)
 
 
 # ----------------user登录相关
-def set_message(phone, message):
+def user_set_message(phone, message):
     return redis.setex(name="phone_" + phone, time=5 * minute, value=message)
 
 
-def check_message(phone):
+def user_check_message(phone):
     current = redis.ttl("phone_" + phone)
     if current >= 120:
         return True
@@ -29,32 +30,49 @@ def check_message(phone):
         return False
 
 
-def set_user_login(user, token):
+def user_query_message(phone):
+    return redis.get("phone_" + phone).decode()
+
+
+def user_login_set(user: User, privilege: Privilege, token):
     name = user.UserName
     _id = user.UserId
-    redis.set(_id, token, ex=week)
-    redis.set("user_" + name, _id, ex=week)
-    cache_info = {
-        "root": user.Is_Superuser,
-        "dev": user.Is_Developer,
-        "publish": user.Is_Publisher,
-        "vip": user.Is_Vip,
-        "high_vip": user.Is_high_vip
-    }
-    cache_info.update(user.Joint_Group)
-    cache_info = {key: bytes(value) for key, value in cache_info.items()}
-    redis.hmset("info_" + str(_id), cache_info)
+    with redis.pipeline(transaction=True) as pipe:
+        pipe.multi()
+        pipe.set(_id, token, ex=week)
+        pipe.set("user_" + name, _id, ex=week)
+        cache_info = {
+            "Is_Superuser": user.Is_Superuser,
+            "Is_Developer": user.Is_Developer,
+            "Is_Publisher": user.Is_Publisher,
+            "Is_Vip": user.Is_Vip,
+            "Is_high_vip": user.Is_high_vip,
+            "Is_Active": user.Is_Active,
+            "Is_Banned": user.Is_Banned
+        }
+        cache_info.update(user.Joint_Group)
+        cache_info = {key: bytes(value) for key, value in cache_info.items()}
+        pipe.hmset("info_" + str(_id), cache_info)
+        for field in privilege._meta.get_fields():
+            if field.name != "UserId":
+                name = field.name + "_" + str(_id)
+                value = getattr(privilege, field.name)
+                if value:
+                    pipe.sadd(name, *value)
+        pipe.execute()
 
 
-def query_user_by_name(username):
+def user_query_by_name(username):
     # todo 事务操作 level: 2
     _id = redis.get("user_" + username)
     token = redis.get(_id)
     return _id, token
 
 
-def query_message(phone):
-    return redis.get("phone_" + phone).decode()
+def user_query_info_by_id(_id):
+    info = redis.hgetall("info_" + str(_id))
+    info = {key.decode(): value.decode() for key, value in info.items()}
+    return info
 
 
 # ----------------名字翻译 地名转译相关

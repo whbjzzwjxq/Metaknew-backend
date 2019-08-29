@@ -29,12 +29,12 @@ def send_message(request):
 
     # 模版变量对应参数值
     phone = request.GET.get("phone")
-    current = check_message(phone=phone)
+    current = user_check_message(phone=phone)
     message_code = random.randint(123456, 898998)
     if current:
         return HttpResponse(content="请隔3分钟再请求验证码")
     else:
-        set_message(phone, message_code)
+        user_set_message(phone, message_code)
         params = {"code": str(message_code)}
         client = AcsClient("LTAITKweDYoqN2cH", "jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB", "default")
         ali_request = ali_dayu_api("SendSms", "MetaKnew", "SMS_163847373")
@@ -53,7 +53,7 @@ def register(request):
     if info["name"] == "":
         info["name"] = info["phone"]
     # redis中读取验证码信息
-    message_code = query_message(info["phone"])
+    message_code = user_query_message(info["phone"])
     if message_code is None:
         return HttpResponse(content="验证码失效，请重新发送验证码", status=400)
     elif message_code != info["code"]:
@@ -102,10 +102,10 @@ def login_normal(request):
 
 @csrf_exempt
 def login_cookie(request):
-    if "token" in request.COOKIES and "user_name" in request.COOKIES:
-        token = request.COOKIES["token"]
-        name = request.COOKIES["user_name"]
-        _id, saved_token = query_user_by_name(name)
+    token = request.headers["Token"]
+    user_name = request.headers["User-Name"]
+    if token != "null" and user_name != "null":
+        _id, saved_token = user_query_by_name(user_name)
         if not saved_token:
             return HttpResponse(content="登录信息过期，请重新登录", status=400)
         elif not token == saved_token:
@@ -125,7 +125,7 @@ def login_cookie(request):
 def login_message(request):
     body = json.dumps(request.body)
     info = body["info"]
-    message_code = query_message(info["phone"])  # 用户session
+    message_code = user_query_message(info["phone"])  # 用户session
     if message_code is None:
         return HttpResponse(content="验证码失效，请重新发送验证码", status=400)
     elif message_code != info["code"]:
