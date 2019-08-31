@@ -1,5 +1,4 @@
 import redis
-import typing
 from users.models import User, Privilege
 
 second = 1
@@ -9,7 +8,7 @@ day = 24 * 3600
 week = 7 * 24 * 3600
 month = 30 * 24 * 3600
 
-pool = redis.ConnectionPool(host="39.96.10.154", port=6379, db=1)
+pool = redis.ConnectionPool(host="39.96.10.154", port=6379, db=1, decode_responses=True)
 redis = redis.StrictRedis(connection_pool=pool)
 
 
@@ -31,7 +30,7 @@ def user_check_message(phone):
 
 
 def user_query_message(phone):
-    return redis.get("phone_" + phone).decode()
+    return redis.get("phone_" + phone)
 
 
 def user_login_set(user: User, privilege: Privilege, token):
@@ -41,6 +40,8 @@ def user_login_set(user: User, privilege: Privilege, token):
         pipe.multi()
         pipe.set(_id, token, ex=week)
         pipe.set("user_" + name, _id, ex=week)
+
+        # 基础信息 都是boolean
         cache_info = {
             "Is_Superuser": user.Is_Superuser,
             "Is_Developer": user.Is_Developer,
@@ -50,9 +51,14 @@ def user_login_set(user: User, privilege: Privilege, token):
             "Is_Active": user.Is_Active,
             "Is_Banned": user.Is_Banned
         }
-        cache_info.update(user.Joint_Group)
         cache_info = {key: bytes(value) for key, value in cache_info.items()}
         pipe.hmset("info_" + str(_id), cache_info)
+
+        # 加入的组
+        if user.Joint_Group:
+            pipe.hmset("join_group_" + str(_id), user.Joint_Group)
+
+        # 该用户拥有的各种权限
         for field in privilege._meta.get_fields():
             if field.name != "UserId":
                 name = field.name + "_" + str(_id)
@@ -60,6 +66,25 @@ def user_login_set(user: User, privilege: Privilege, token):
                 if value:
                     pipe.sadd(name, *value)
         pipe.execute()
+
+
+def user_group_privilege_info_set(_id):
+    user = Privilege.objects.get(UserId=_id)
+    cache_info = {
+        "Is_Superuser": user.Is_Superuser,
+        "Is_Developer": user.Is_Developer,
+        "Is_Publisher": user.Is_Publisher,
+        "Is_Vip": user.Is_Vip,
+        "Is_high_vip": user.Is_high_vip,
+        "Is_Active": user.Is_Active,
+        "Is_Banned": user.Is_Banned
+    }
+    cache_info = {key: bytes(value) for key, value in cache_info.items()}
+    redis.hmset("info_group_" + str(_id), cache_info)
+
+
+def user_group_privilege_info_query(_id):
+    return redis.hgetall("info_group_" + str(_id))
 
 
 def user_query_by_name(username):
@@ -70,14 +95,28 @@ def user_query_by_name(username):
 
 
 def user_query_info_by_id(_id):
-    info = redis.hgetall("info_" + str(_id))
-    info = {key.decode(): value.decode() for key, value in info.items()}
-    return info
+    # 是游客就返回None
+    if str(_id) == "0":
+        return None
+    else:
+        # info 定义 上方cache_info
+        info = redis.hgetall("info_" + str(_id))
+        info = {key: bool(value) for key, value in info.items()}
+
+        # join_group定义 上方
+        join_group = redis.hgetall("join_group_" + str(_id))
+        privilege = {}
+        for field in Privilege._meta.get_fields():
+            if field.name != "UserId":
+                name = field.name + "_" + str(_id)
+                value = redis.smembers(name)
+                privilege.update({field.name: value})
+        return {"bool_info": info, "joint_group": join_group, "privilege": privilege}
 
 
 # ----------------名字翻译 地名转译相关
 def query_location_queue():
-    return redis.smembers("location_queue").decode()
+    return redis.smembers("location_queue")
 
 
 def remove_location_queue(locations):
@@ -95,12 +134,12 @@ def query_untranslated_name():
 # ----------------word_index相关
 def query_word_index(word_list):
     index = redis.hmget("word_index", word_list)
-    return index.decode()
+    return index
 
 
 def query_index_word(indexes):
     word_list = redis.hmget("index_word", indexes)
-    return word_list.decode()
+    return word_list
 
 
 def set_word_index(word_list, index_list):
@@ -120,7 +159,6 @@ def set_word_index(word_list, index_list):
 def query_needed_prop(plabel):
     prop_dict = redis.hgetall("plabel_" + plabel)
     if prop_dict:
-        prop_dict: typing.Dict[bytes: bytes] = {key.decode(): value.decode() for key, value in prop_dict.items()}
         return prop_dict
     else:
         return {}
@@ -138,7 +176,6 @@ def set_needed_prop(plabel, prop_dict):
 def query_available_plabel():
     plabel_list = redis.smembers("plabel_list")
     if plabel_list:
-        plabel_list: typing.Set[bytes] = [plabel.decode() for plabel in plabel_list]
         return plabel_list
     else:
         return []

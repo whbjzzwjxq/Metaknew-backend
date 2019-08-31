@@ -64,5 +64,4 @@ def connect(query, en2zh=True):
             result = json.loads(bytes.decode(response.content))
             return result["l"], result["translation"][0]
         except:
-            print(bytes.decode(response.content))
             return None, None

@@ -162,6 +162,11 @@ class MediaAuthority(BaseAuthority):
         db_table = "authority_media"
 
 
+class CourseAuthority(BaseAuthority):
+    class Meta:
+        db_table = "authority_course"
+
+
 # todo 支付管理 level: 3
 # class PaymentManager(models.Model):
 #
