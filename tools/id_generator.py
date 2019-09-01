@@ -60,17 +60,16 @@ def id_generator(number, method, content, jump=3):
         block = record.objects.last()
         # 如果该content还从来没有注册
         if not block:
-            # 新建一个block
-            block_id = new_block(manager=manager, content=content)
-            # base_number是block的基准值 block_id 是从1开始的
+            # 新建一个block 获得block的id
+            block_id = new_block(manager=manager, content=content).BlockId
+            # base_number是该block下id的基准值 例如block2的基准值是1 * 65536
             base_number = (block_id - 1) * (small_integer + 1)
+            # 取号范围的第一个值
             head = 0
         else:
-            block = block.BlockId
-            block_id = block.OutId
+            block_id = block.BlockId
             base_number = (block_id - 1) * (small_integer + 1)
-            last_id = record.objects.filter(BlockId=block_id).last().OutId
-            head = last_id - base_number
+            head = block.OutId - base_number
 
         needed_space = int(number * (jump + 1) / 2)
         if head + needed_space <= small_integer:
@@ -93,7 +92,7 @@ def id_generator(number, method, content, jump=3):
 def new_block(manager, content):
     block = manager.objects.create(Classifier=content)
     block.save()
-    return block.BlockId
+    return block
 
 
 def ordered_sample(_num, jump, base, _min):

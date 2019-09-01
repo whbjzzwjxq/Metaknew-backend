@@ -14,7 +14,7 @@ from users.logic_class import BaseUser
 from typing import TypeVar
 import mimetypes
 
-types = ["StrNode", "InfNode", "Media", "Document"]
+types = ["StrNode", "InfNode", "Media", "Document", "Fragment"]
 # 前端使用的格式
 node_format = {
     "Conf": {},  # 这是在专题里实现的
@@ -448,14 +448,25 @@ class BaseMediaNode:
 
     def __init__(self, user: BaseUser, _id: int, collector=base_tools.NeoSet()):
         self._id = _id
-        self.user = user
+        self.user_model = user
         self.collector = collector
-        self.node = MediaNode()
+        self.media = MediaNode()
+        self.node = Node()
 
     def create(self, data):
-        self.node = MediaNode(MediaId=self._id,
-                              MediaType=self.get_media_type(),
-                              )
+        self.media = MediaNode(MediaId=self._id,
+                               MediaType=data["MediaType"],
+                               FileName=data["FileName"],
+                               Format=data["Format"],
+                               UploadUser=self.user_model.user_id,
+                               Description=data["Description"]
+                               )
+        self.node = Node("Media", data["MediaType"])
+        self.node.update({
+            "_id": self._id,
+            "Name": data["FileName"]
+        })
 
-    def get_media_type(self):
+    @staticmethod
+    def get_media_type():
         pass

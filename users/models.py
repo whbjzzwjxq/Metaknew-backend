@@ -26,7 +26,7 @@ class User(models.Model):
     Is_Banned = models.BooleanField(db_column="Banned", default=False)
 
     # 兴趣部分
-    # key: GroupId value: 0-Owner 1-Manager 2-Member 3-Applying
+    # key: GroupId value: Owner Manager Member Applying
     Joint_Group = HStoreField(db_column="JOINT_GROUP", default=dict)
     # 用户感兴趣的领域
     Topic = TopicField()

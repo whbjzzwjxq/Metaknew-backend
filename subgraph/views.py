@@ -1,5 +1,5 @@
 from django.http import HttpResponse
-from subgraph.logic_class import BaseNode, BaseLink
+from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
 from tools.base_tools import NeoSet, get_user_props, get_special_props
 from tools.id_generator import id_generator
@@ -15,6 +15,7 @@ import numpy as np
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from django.db.models import Field
 from django.views.decorators.csrf import csrf_exempt
+import mimetypes
 
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
@@ -257,6 +258,11 @@ def single_create_media_node(request):
     collector = NeoSet()
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id).query_user()
+    data = {"file": request.FILES["file"],
+            "name": request.POST.get("name"),
+            "description": request.POST.get("description")
+            }
     if user_model:
         _id = id_generator(number=1, method='node', content='Media', jump=2)
+        media = BaseMediaNode(_id=_id, user=user_model, collector=collector).create(data)
     return HttpResponse(content='创建成功', status=200)

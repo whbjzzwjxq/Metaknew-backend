@@ -1,7 +1,8 @@
 from django.http import HttpResponse, HttpRequest
 from tools.redis_process import *
 from users.models import BaseAuthority, DocAuthority, NodeAuthority, MediaAuthority, CourseAuthority
-import regex
+from users.logic_class import BaseGroup
+from functools import reduce
 import typing
 
 default_request_info = {
@@ -19,13 +20,12 @@ class AuthMiddleware:
     regex_match_url = {}
     default_checker = {
         "user_type": "guest",  # guest || User || Vip || HighVip || Publisher || Developer || Superuser
-        "method": "query",  # query || update || download || create ||
+        "method": "query",  # query || update || delete || query_sample || recycle || create
         "common_source": False,  # True || False
-        "personal_source": False,  # True || False
         "source_type": "node",  # node || media || document || course  公有资源
-                                # link || comment || note || fragment  私有资源
+        # link || comment || note || fragment  私有资源
     }
-    auth_sheet :typing.Dict[str: BaseAuthority]= {
+    auth_sheet = {
         "document": DocAuthority,
         "node": NodeAuthority,
         "media": MediaAuthority,
@@ -61,13 +61,6 @@ class AuthMiddleware:
                 if _checker["common_source"]:
                     _id = request.GET.get("_id")
                     status, content = self.check_common_source(_checker, user_info, _id)
-                    request_info["content"] = content
-                    request_info["status"] &= status
-
-                # 针对私有资源的权限检查
-                if _checker["personal_source"]:
-                    _id = request.GET.get("_id")
-                    status, content = self.check_personal_source(_checker, user_info, _id)
                     request_info["content"] = content
                     request_info["status"] &= status
 
@@ -199,93 +192,81 @@ class AuthMiddleware:
             if not record.Used and not method == 'recycle':
                 return False, "资源已经失效"
             else:
-                # root和dev可以完全操作
+                # 用户是root和dev可以完全操作
                 bool_info = user_info["bool_info"]
-                user_privilege = user_info["privilege"]
+                privileges = [user_info["privilege"]]
                 join_group = user_info["join_group"]
                 if bool_info["Is_Superuser"]:
                     return True, ""
                 elif bool_info["Is_Developer"] and not method == "delete":
                     return True, ""
 
-                # 业务性验证
-                if not record.Common:
-                   pass
+                # 查看从组继承的权限
+                for group, value in join_group.items():
+                    group_privilege = BaseGroup(_id=group).query_privilege()
+                    # 是组创建者继承权限
+                    if value == "Owner":
+                        pass
+                    # 是组管理者继承权限
+                    elif value == "Manager":
+                        group_privilege["Is_Owner"] = []
+                    # 是组成员继承权限
+                    elif value == "Member":
+                        group_privilege["Is_Owner"] = []
+                        group_privilege["Is_Manager"] = []
+                        group_privilege["Is_Collaborator"] = []
+                    else:
+                        group_privilege = {}
+                    if group_privilege:
+                        privileges.append(group_privilege)
 
-
-        return True, ""
+                result = [self.__privilege_source_check(privilege, _id, record, _checker["method"]) for privilege in privileges]
+                result = reduce(lambda a, b: a or b, result)
+                if result:
+                    return True, ""
+                else:
+                    return False, "您没有权限操作/访问该资源"
 
     @staticmethod
-    def check_personal_source(_checker, user_info, _id) -> (bool, str):
-        return True, ""
-
-
-class AuthChecker:
-    # 这里没有对个人化的内容做验证，这里验证的是全局内容
-    auth_sheet = {"document": DocAuthority,
-                  "node": NodeAuthority,
-                  "media": MediaAuthority,
-                  "course": CourseAuthority
-                  }
-
-    def __init__(self, source_type, source_id, user_id, request_type, request_ip):
-
-        self._type = source_type
-        self._id = source_id
-        self._user = user_id
-        self.request_type = request_type
-        self._ip = request_ip
-        try:
-            self.sheet = self.auth_sheet[request_type]
-        except AttributeError("从url解析的类型有误"):
-            pass
-
-        self.name_func = {
-            "delete": self.delete,
-            "change_state": self.change_state,
-            "copy": self.copy,
-            "query_total": self.query_total,
-            "query_abbr": self.query_abbr,
-            "write": self.write,
-            "export": self.export,
-            "reference": self.reference,
-            "download": self.download
-        }
-
-    def check(self):
-        record = self.sheet.objects.filter(RecordId=self._id)
-        if len(record) == 0:
-            self.__anti_spider()
-            return HttpResponse(status=404)
-        else:
-            pass
-
-    def __anti_spider(self):
-        pass
-
-    def delete(self):
-        pass
-
-    def change_state(self):
-        pass
-
-    def copy(self):
-        pass
-
-    def query_total(self):
-        pass
-
-    def query_abbr(self):
-        pass
-
-    def write(self):
-        pass
-
-    def export(self):
-        pass
-
-    def reference(self):
-        pass
-
-    def download(self):
-        pass
+    def __privilege_source_check(privilege_info, _id, record, method):
+        if method == "recycle":
+            if _id in privilege_info["Is_Owner"] or _id in privilege_info["Is_Manager"]:
+                return True
+            else:
+                return False
+        elif method == "delete":
+            if _id in privilege_info["Is_Owner"]:
+                return True
+            else:
+                return False
+        elif method == "update":
+            if record.OpenSource:
+                return True
+            else:
+                if _id in privilege_info["Is_Owner"] or _id in privilege_info["Is_Manager"] or _id in privilege_info["Is_Collaborator"]:
+                    return True
+                else:
+                    return False
+        elif method == "query":
+            if record.Common:
+                return True
+            else:
+                if record.Payment:
+                    if _id in privilege_info["Is_Paid"] or _id in privilege_info["Is_FreeTo"]:
+                        return True
+                    else:
+                        return False
+                elif record.Shared:
+                    if _id in privilege_info["Is_SharedTo"]:
+                        return True
+                    else:
+                        return False
+        elif method == "query_sample":
+            if record.Common:
+                return True
+            else:
+                if record.Shared:
+                    if _id in privilege_info["Is_SharedTo"]:
+                        return True
+                    else:
+                        return False

@@ -137,6 +137,7 @@ class Fragment(models.Model):
     NodeId = models.BigIntegerField(primary_key=True)
     Keywords = ArrayField(models.TextField(), db_column='Keyword', default=list)
     Content = models.TextField(db_column='Content', default="")
+    Props = JSONField(db_column="Props", default=dict)
     Labels = ArrayField(models.TextField(), db_column='Labels', default=list)
     CreateTime = models.DateField(db_column='CreateTime', default=now)
     CreateUser = models.BigIntegerField(db_column='User')
@@ -280,12 +281,3 @@ class KnowLedge(Relationship):
 
     class Meta:
         db_table = "graph_link_knowledge"
-
-
-# 事件
-class Event(KnowLedge):
-    Time = models.TextField(db_column="Time", db_index=True)
-    Location = models.TextField(db_column="Location", db_index=True)
-
-    class Meta:
-        db_table = "graph_link_event"

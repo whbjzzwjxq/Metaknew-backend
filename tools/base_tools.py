@@ -4,7 +4,6 @@ from py2neo import Graph, NodeMatcher, RelationshipMatcher
 from subgraph.models import BaseDoc
 from functools import reduce
 from django.db.models import Model
-from enum import Enum
 from django.db.models import Field
 from typing import List, Dict
 
@@ -38,7 +37,6 @@ link_model_dict: Dict[str, Relationship] = {
     "AfterVisit": AfterVisit,
     "MentionTogether": MentionTogether,
     "KnowLedge": KnowLedge,
-    "Event": Event
 }
 
 
@@ -122,6 +120,5 @@ def merge_list(lists):
 
 def model_to_dict(model: Model):
     fields = model._meta.get_fields()
-    # test 测试getattr
-    result = {field.name: getattr(model, field) for field in fields if not re_for_ptr.match(field.name)}
+    result = {field.name: getattr(model, field) for field in fields if not field.auto_created}
     return result

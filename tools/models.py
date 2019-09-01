@@ -82,7 +82,7 @@ class RecordBlockManager(BaseBlockManager):
         db_table = "global_private_block_manager"
 
 
-# 每个Block的管理记录
+# 每个Block的管理记录 例如Block5 OutId 20 就是第五个Block的id=20位置已经使用
 class BlockIdRecord(models.Model):
 
     BlockId = models.IntegerField(db_column="BLOCK_ID", db_index=True)

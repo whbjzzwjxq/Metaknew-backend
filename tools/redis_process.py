@@ -68,23 +68,29 @@ def user_login_set(user: User, privilege: Privilege, token):
         pipe.execute()
 
 
-def user_group_privilege_info_set(_id):
-    user = Privilege.objects.get(UserId=_id)
-    cache_info = {
-        "Is_Superuser": user.Is_Superuser,
-        "Is_Developer": user.Is_Developer,
-        "Is_Publisher": user.Is_Publisher,
-        "Is_Vip": user.Is_Vip,
-        "Is_high_vip": user.Is_high_vip,
-        "Is_Active": user.Is_Active,
-        "Is_Banned": user.Is_Banned
-    }
-    cache_info = {key: bytes(value) for key, value in cache_info.items()}
-    redis.hmset("info_group_" + str(_id), cache_info)
+def group_privilege_set(_id, privilege):
+    with redis.pipeline(transaction=True) as pipe:
+        pipe.multi()
+        for field in Privilege._meta.get_fields():
+            if field.name != "UserId":
+                name = field.name + "_group_" + str(_id)
+                value = getattr(privilege, field.name)
+                if value:
+                    pipe.sadd(name, *value)
+        pipe.execute()
 
 
 def user_group_privilege_info_query(_id):
-    return redis.hgetall("info_group_" + str(_id))
+    result = {}
+    with redis.pipeline() as pipe:
+        pipe.multi()
+        for field in Privilege._meta.get_fields():
+            if field.name != "UserId":
+                name = field.name + "_group_" + str(_id)
+                value = pipe.smembers(name)
+                if value:
+                    result.update({field.name: value})
+    return result
 
 
 def user_query_by_name(username):

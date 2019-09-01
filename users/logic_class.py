@@ -1,14 +1,13 @@
 # -*-coding=utf-8 -*-
 from django.http import HttpResponse
 import json
-from django.contrib.auth.hashers import check_password
 from users.models import User, GroupCtrl, UserConcern, UserRepository, Privilege
 from tools.encrypt import make_token
 from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
-
-
+from django.db.models import Model
+from tools.base_tools import model_to_dict
 salt = "al76vdj895as12cq"
 
 
@@ -73,6 +72,7 @@ class BaseUser:
             return self
 
     def query_privilege(self):
+
         try:
             self.privilege = Privilege.objects.get(UserId=self.user.UserId)
             return self
@@ -113,17 +113,30 @@ class BaseUser:
 
 class BaseGroup:
 
-    def __init__(self):
+    def __init__(self, _id: int):
 
         self.group = GroupCtrl()
-        self.already = False
+        self.privilege = Privilege()
+        self._id = _id
 
-    def query_id(self, _id):
+    def query_group(self):
+        try:
+            self.group = GroupCtrl.objects.get(GroupId=self._id)
+            return self
+        except ObjectDoesNotExist as e:
+            raise e
 
-        self.group = GroupCtrl.objects.filter(GroupId=_id)
-        if not len(self.group) == 0:
-            self.already = True
-        return self
+    def query_privilege(self) -> dict:
+        result = user_group_privilege_info_query(self._id)
+        if result:
+            return result
+        else:
+            try:
+                self.privilege = Privilege.objects.get(GroupId=self._id)
+                group_privilege_set(_id=self._id, privilege=self.privilege)
+                return model_to_dict(self.privilege)
+            except ObjectDoesNotExist as e:
+                raise e
 
     @staticmethod
     def apply(user_id, group_ids):
