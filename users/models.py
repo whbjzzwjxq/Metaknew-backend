@@ -80,7 +80,7 @@ class UserRepository(models.Model):
     CreateNode = ArrayField(models.BigIntegerField(), db_column="CreateNode", default=list)
     UpdateDoc = ArrayField(models.BigIntegerField(), default=list)
     UpdateNode = ArrayField(models.BigIntegerField(), default=list)
-    UploadFile = ArrayField(models.BigIntegerField(), db_column="UPLOAD", default=list)
+    UploadFile = ArrayField(models.BigIntegerField(), default=list)
 
     class Meta:
         db_table = "user_collection"
