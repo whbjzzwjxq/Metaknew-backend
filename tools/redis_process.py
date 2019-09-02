@@ -185,3 +185,11 @@ def query_available_plabel():
         return plabel_list
     else:
         return []
+
+
+def mime_type_query():
+    return redis.hgetall("mime_type")
+
+
+def mime_type_set(mime_type_dict):
+    redis.hmset("mime_type", mime_type_dict)

@@ -6,11 +6,14 @@ from functools import reduce
 from django.db.models import Model
 from django.db.models import Field
 from typing import List, Dict
+import os
 
 re_for_uuid = re.compile(r"\w{8}(-\w{4}){3}-\w{12}")
 re_for_ptr = re.compile(r".*_ptr")
 graph = Graph("bolt://39.96.10.154:7687", username="neo4j", password="12345678")
 types = ["StrNode", "InfNode", "Media", "Document"]
+
+basePath = os.path.dirname(os.path.dirname(__file__))
 
 
 class NeoSet:

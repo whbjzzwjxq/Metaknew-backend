@@ -126,7 +126,15 @@ class BaseGroup:
         except ObjectDoesNotExist as e:
             raise e
 
-    def query_privilege(self) -> dict:
+    def query_privilege(self):
+        try:
+            self.privilege = Privilege.objects.get(GroupId=self._id)
+            group_privilege_set(_id=self._id, privilege=self.privilege)
+            return self
+        except ObjectDoesNotExist as e:
+            raise e
+
+    def query_privilege_cache(self) -> dict:
         result = user_group_privilege_info_query(self._id)
         if result:
             return result

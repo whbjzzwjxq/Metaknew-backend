@@ -50,7 +50,7 @@ class AuthMiddleware:
                 if _checker["user_type"] != "guest":
 
                     # 如果是游客 就拒绝
-                    if user_info == {}:
+                    if not user_info:
                         return HttpResponse(status=400, content='当前操作不支持游客访问')
                     else:
                         status, content = self.check_user_type(_checker, user_info)
@@ -203,7 +203,7 @@ class AuthMiddleware:
 
                 # 查看从组继承的权限
                 for group, value in join_group.items():
-                    group_privilege = BaseGroup(_id=group).query_privilege()
+                    group_privilege = BaseGroup(_id=group).query_privilege_cache()
                     # 是组创建者继承权限
                     if value == "Owner":
                         pass

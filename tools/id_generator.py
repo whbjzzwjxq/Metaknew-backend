@@ -1,7 +1,7 @@
 import json
 import random
 import datetime
-
+import typing
 from django.shortcuts import HttpResponse
 from tools.models import *
 from tools.redis_process import query_word_index
@@ -34,7 +34,7 @@ methods = {
 
 
 # todo 把这个服务配置成主-从模式 level: 2
-def id_generator(number, method, content, jump=3):
+def id_generator(number, method, content, jump=3) -> typing.List[int]:
     if number <= 0:
         return []
     else:
@@ -53,9 +53,9 @@ def id_generator(number, method, content, jump=3):
                     content -= base_time
                     content = content.days
                 except TypeError("method time need date as content"):
-                    return None
+                    return []
         except AttributeError("%s must be node or device or time or word" % method):
-            return None
+            return []
 
         block = record.objects.last()
         # 如果该content还从来没有注册

@@ -3,20 +3,15 @@ from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
 from tools.base_tools import NeoSet, get_user_props, get_special_props
 from tools.id_generator import id_generator
-from py2neo import Relationship
+from tools.base_tools import basePath
 import json
-import datetime
 from users.logic_class import BaseUser
-from users.models import User
-from django.db.models import ObjectDoesNotExist
 from subgraph.models import NodeCtrl, NodeInfo
 from record.logic_class import EWRecord, History
 import numpy as np
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from django.db.models import Field
 from django.views.decorators.csrf import csrf_exempt
-import mimetypes
-
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
@@ -257,12 +252,20 @@ def bulk_create_node(request):
 def single_create_media_node(request):
     collector = NeoSet()
     user_id = request.GET.get("user_id")
+    file = request.FILES["file"]
+    file_format = str(file.name).split(".")[-1]
     user_model = BaseUser(_id=user_id).query_user()
-    data = {"file": request.FILES["file"],
+    _id = id_generator(number=1, method='node', content='Media', jump=2)[0]
+    data = {"format": file_format,
             "name": request.POST.get("name"),
-            "description": request.POST.get("description")
+            "description": request.POST.get("description"),
+            "Common": True,
+            "Shared": True,
+            "Payment": False
             }
-    if user_model:
-        _id = id_generator(number=1, method='node', content='Media', jump=2)
-        media = BaseMediaNode(_id=_id, user=user_model, collector=collector).create(data)
-    return HttpResponse(content='创建成功', status=200)
+    # 写入文件
+    with open(basePath + "/fileUploadCache/"+str(_id)+"."+file_format, "wb+") as target:
+            target.write(file.read())
+
+    media = BaseMediaNode(_id=_id, user=user_model, collector=collector).create(data)
+    return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)

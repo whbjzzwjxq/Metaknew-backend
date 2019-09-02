@@ -11,8 +11,12 @@ from tools.id_generator import id_generator, device_id
 from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError, ObjectAlreadyExist
 from users.logic_class import BaseUser
+from users.models import MediaAuthority
 from typing import TypeVar
+import os
 import mimetypes
+from tools.base_tools import basePath
+from tools.redis_process import mime_type_query, mime_type_set
 
 types = ["StrNode", "InfNode", "Media", "Document", "Fragment"]
 # 前端使用的格式
@@ -282,7 +286,7 @@ class BaseNode:
     def main_pic_setter(self, media):
         try:
             record = MediaNode.objects.get(pk=media)
-            if record.MediaType == "picture":
+            if record.MediaType == "image":
                 self.info.MainPic = media
             else:
                 warn = {"field": "MainPic", "warn_type": "error_type"}
@@ -452,21 +456,54 @@ class BaseMediaNode:
         self.collector = collector
         self.media = MediaNode()
         self.node = Node()
+        self.authority = MediaAuthority()
+        self.media_type = "unknown"
 
     def create(self, data):
+        self.media_type = self.get_media_type(data["format"])
         self.media = MediaNode(MediaId=self._id,
-                               MediaType=data["MediaType"],
-                               FileName=data["FileName"],
-                               Format=data["Format"],
+                               MediaType=self.media_type,
+                               FileName=data["name"],
+                               Format=data["format"],
                                UploadUser=self.user_model.user_id,
-                               Description=data["Description"]
+                               Description=data["description"]
                                )
-        self.node = Node("Media", data["MediaType"])
+        self.node = Node("Media", self.media_type)
         self.node.update({
             "_id": self._id,
-            "Name": data["FileName"]
+            "Name": data["name"]
         })
+        self.user_model.query_privilege()
+        self.user_model.query_repository()
+        self.user_model.privilege.Is_Owner.append(self._id)
+        self.user_model.repository.UploadFile.append(self._id)
+        self.authority = MediaAuthority(
+            SourceId=self._id,
+            Used=True,
+            Common=data["Common"],
+            OpenSource=False,
+            Shared=data["Shared"],
+            Payment=data["Payment"]
+        )
+        self.save()
+        return self
+
+    def save(self):
+        self.media.save()
+        self.user_model.save()
+        self.authority.save()
+        self.collector.tx.create(self.node)
+        self.collector.tx.commit()
 
     @staticmethod
-    def get_media_type():
-        pass
+    def get_media_type(file_format) -> str:
+        mime_type_dict = mime_type_query()
+        if mime_type_dict == {}:
+            mime_type_dict = mimetypes.read_mime_types(basePath + "/tools/mime.types")
+            mime_type_set(mime_type_dict)
+
+        if "." + file_format in mime_type_dict:
+            media_type = str(mime_type_dict["." + file_format]).split("/")[0]
+            return media_type
+        else:
+            return "unknown"
