@@ -62,7 +62,7 @@ def query_name_similarity(request):
             return None
 
     if request.method == "POST":
-        name_lang_list = json.loads(request.body)["data"]
+        name_lang_list = json.loads(request.body)
         query_str = [make_pattern(name_lang) for name_lang in name_lang_list]
         query_str = "".join(query_str)
 
