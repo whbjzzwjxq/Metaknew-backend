@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from subgraph.logic_class import CommonNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
-from tools.base_tools import NeoSet, get_user_props, get_special_props
+from tools.base_tools import NeoSet, get_update_props, get_special_props
 from tools.id_generator import id_generator
 from tools.base_tools import basePath
 import json
