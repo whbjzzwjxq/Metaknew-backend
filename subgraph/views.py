@@ -1,7 +1,7 @@
 from django.http import HttpResponse
-from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
+from subgraph.logic_class import CommonNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
-from tools.base_tools import NeoSet, get_user_props, get_special_props
+from tools.base_tools import NeoSet, get_update_props, get_special_props
 from tools.id_generator import id_generator
 from tools.base_tools import basePath
 import json
@@ -223,7 +223,7 @@ def bulk_create_node(request):
         # 请求一定数量的id
         id_list = id_generator(number=len(data_list), method='node', content=plabel, jump=3)
         # 创建node object
-        nodes = [BaseNode(user=user_model, _id=_id, collector=collector) for _id in id_list]
+        nodes = [CommonNode(user=user_model, _id=_id, collector=collector) for _id in id_list]
         # 注入数据
         nodes = [node.create(node=data) for node, data in zip(nodes, data_list)]
         # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None

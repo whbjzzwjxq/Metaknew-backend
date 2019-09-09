@@ -57,7 +57,7 @@ def link_init(label) -> link_model_dict:
         return KnowLedge
 
 
-def get_user_props(p_label: str) -> List[Field]:
+def get_update_props(p_label: str) -> List[Field]:
     """
     :param p_label: PrimaryLabel
     :return: 该主标签下需要用户/前端提交的属性
@@ -80,7 +80,7 @@ def get_special_props(p_label: str) -> List[Field]:
     :return: 该标签的特殊属性 不包含NodeInfo
     """
     if p_label in node_model_dict:
-        result = get_user_props(p_label)
+        result = get_update_props(p_label)
         result = [field for field in result if field.model.__name__ != 'NodeInfo']
         return result
     else:

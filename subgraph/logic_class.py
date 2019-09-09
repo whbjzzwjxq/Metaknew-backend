@@ -4,7 +4,7 @@ from tools import base_tools
 from django.db.models import Max, QuerySet
 from record.logic_class import EWRecord, field_check
 from record.models import NodeVersionRecord, WarnRecord
-from subgraph.models import NodeCtrl, NodeInfo, Translate, MediaNode
+from subgraph.models import NodeCtrl, NodeInfo, Translate, MediaNode, Fragment
 from es_module.logic_class import es
 from datetime import datetime
 from tools.id_generator import id_generator, device_id
@@ -67,8 +67,52 @@ node_format = {
 }
 
 
+class BaseFragment:
+
+    label = "Fragment"
+
+    def __init__(self, _id: int, user: int, collector=base_tools.NeoSet()):
+        self._id = _id
+        self.collector = collector
+        self.node = Node()
+        self.info = Fragment()
+        self.user = user
+        self.labels = []
+
+    def create(self, data):
+        self.info = Fragment(NodeId=self._id,
+                             CreateUser=self.user)
+
+    def info_update(self, node):
+        needed_props = base_tools.get_update_props(self.label)
+        for field in needed_props:
+            old_prop = getattr(self.info, field.name)
+            if field.name in node:
+                new_prop = getattr(node, field.name)
+            else:
+                new_prop = type(old_prop)()
+            self.__update_prop(field, new_prop, old_prop)
+            if field.name == "Location":
+                set_location_queue([new_prop])
+        return self
+
+
+    # Neo4j创建 done
+    def __neo4j_create(self):
+        self.node = Node("InfNode", "UserMade", "Fragment")
+        self.node.update({
+            "_id": self._id,
+            "CreateUser": self.user
+        })
+        self.node.__primarylabel__ = "Fragment"
+        self.node.__primarykey__ = "_id"
+        self.node.__primaryvalue__ = self._id
+        self.node.update_labels(self.labels)
+        self.collector.tx.create(self.node)
+
+
 # todo 各种权限表生成与实现 level: 0  bulk_create level: 0
-class BaseNode:
+class CommonNode:
 
     def __init__(self, user: BaseUser, _id: int, collector=base_tools.NeoSet()):
 
@@ -259,7 +303,8 @@ class BaseNode:
 
     def info_update(self, node):
         # todo 把 地理识别的内容 改写为LocationField level: 3
-        needed_props = base_tools.get_user_props(self.label)
+        # todo 尝试重构一下info_update
+        needed_props = base_tools.get_update_props(self.label)
         for field in needed_props:
             old_prop = getattr(self.info, field.name)
             if field.name in node:
