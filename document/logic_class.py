@@ -6,7 +6,7 @@ import datetime
 from users.models import UserConcern, UserRepository, UserDocProgress, Privilege
 from record.logic_class import error_check, field_check, EWRecord
 from record.models import DocumentVersionRecord
-from subgraph.logic_class import BaseNode, SystemMade
+from subgraph.logic_class import CommonNode, SystemMade
 from django.db.models import Avg
 from tools.id_generator import id_generator, device_id
 from django.db.models import Max
@@ -76,7 +76,7 @@ class BaseDoc:
         self.is_creator = True
         self.personal_notes = []
         # todo 权限验证 level: 0
-        self.node = BaseNode(_id=self._id, user=self.user, collector=self.collector).query_with_label("Document")
+        self.node = CommonNode(_id=self._id, user=self.user, collector=self.collector).query_with_label("Document")
         if self.node:
             if self.node.info.Has_Paper:
                 try:
@@ -107,7 +107,7 @@ class BaseDoc:
         self.is_draft = True
         self.is_creator = True
         info = data["info"]
-        self.node = BaseNode(_id=self._id, user=self.user, collector=self.collector).create(info)
+        self.node = CommonNode(_id=self._id, user=self.user, collector=self.collector).create(info)
         if info["Has_Graph"]:
             graph = data["graph"]
             self.graph = DocGraph()

@@ -119,8 +119,8 @@ class MediaNode(models.Model):
     # 控制属性
     UploadUser = models.BigIntegerField(db_column="UploadUser")
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
-    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
-    TotalTime = models.IntegerField(db_column="TotalTime", default=50)  # 需要的时间
+    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)   
+    TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间
 
     # 用户相关
     Useful = models.SmallIntegerField(db_column='Useful', default=0)

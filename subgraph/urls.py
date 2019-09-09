@@ -7,5 +7,7 @@ urlpatterns = [
     url("run/script_latin", latin.script_latin),
     url("run/script_add_loc", add_location_info.run_script),
     url("query/query_needed_props", views.query_frontend_prop),
-    url("media_node_create", views.single_create_media_node),
+    url("media_node_create", views.upload_main_pic),
+    url("bulk_node_create", views.bulk_create_node),
+    url("query/query_main_pic", views.query_main_pic)
 ]

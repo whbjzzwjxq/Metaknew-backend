@@ -2,7 +2,7 @@ from django.http import HttpResponse
 import json
 from record.logic_class import ErrorRecord
 from tools.base_tools import node_model_dict, NeoSet
-from subgraph.logic_class import BaseNode
+from subgraph.logic_class import CommonNode
 types = ["StrNode", "InfNode", "Media", "Document"]
 
 
@@ -45,6 +45,6 @@ def criteria_query(request):
 def get_single_node(request):
 
     uuid = request.GET.get("uuid")
-    node = BaseNode().query(uuid=uuid).handle_for_frontend()
+    node = CommonNode().query(uuid=uuid).handle_for_frontend()
 
     return HttpResponse(json.dumps(node))

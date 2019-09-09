@@ -5,7 +5,7 @@ from subgraph.models import BaseDoc
 from functools import reduce
 from django.db.models import Model
 from django.db.models import Field
-from typing import List, Dict
+from typing import List, Dict, Type
 import os
 
 re_for_uuid = re.compile(r"\w{8}(-\w{4}){3}-\w{12}")
@@ -23,7 +23,7 @@ class NeoSet:
         self.Rmatcher = RelationshipMatcher(graph)
 
 
-node_model_dict: Dict[str, NodeInfo] = {
+node_model_dict: Dict[str, Type[NodeInfo]] = {
     "BaseNode": NodeInfo,
     "Person": Person,
     "Project": Project,
@@ -31,8 +31,7 @@ node_model_dict: Dict[str, NodeInfo] = {
     "Document": BaseDoc,
 }
 
-
-link_model_dict: Dict[str, Relationship] = {
+link_model_dict: Dict[str, Type[Relationship]] = {
     "Topic2Topic": Topic2Topic,
     "Topic2Node": Topic2Node,
     "Doc2Node": Doc2Node,
@@ -43,14 +42,19 @@ link_model_dict: Dict[str, Relationship] = {
 }
 
 
-def node_init(label) -> node_model_dict:
+def node_init(label) -> Type[NodeInfo]:
+    """
+    从主标签返回模型信息
+    :param label: PrimaryLabel
+    :return: NodeInfo
+    """
     if label in node_model_dict:
         return node_model_dict[label]
     else:
         return NodeInfo
 
 
-def link_init(label) -> link_model_dict:
+def link_init(label) -> Type[Relationship]:
     if label in link_model_dict:
         return link_model_dict[label]
     else:

@@ -12,7 +12,7 @@ from tools.redis_process import set_location_queue
 from record.logic_class import error_check, IdGenerationError, ObjectAlreadyExist
 from users.logic_class import BaseUser
 from users.models import MediaAuthority
-from typing import TypeVar
+from typing import List
 import os
 import mimetypes
 from tools.base_tools import basePath
@@ -68,7 +68,7 @@ node_format = {
 
 
 # todo 各种权限表生成与实现 level: 0  bulk_create level: 0
-class BaseNode:
+class CommonNode:
 
     def __init__(self, user: BaseUser, _id: int, collector=base_tools.NeoSet()):
 
@@ -86,14 +86,18 @@ class BaseNode:
         self.collector = collector  # neo4j连接池
         self._id = _id  # _id
         self.label = ""  # 标签
-        self.user = user.user_id  # 操作用户
+        self.user_id = user.user_id  # 操作用户
         self.is_draft = False  # 是否是草稿
         self.is_create = False  # 是否是创建状态
         self.lack = []  # element in lack : "record" | "trans" | "node"
 
     # ----------------- query ----------------
-    # 只查询基础信息: info 和 ctrl
+
     def query_base(self):
+        """
+        查询info和ctrl的内容
+        :return:
+        """
         try:
             self.ctrl = NodeCtrl.objects.get(pk=self._id)
             self.label = self.ctrl.PrimaryLabel
@@ -102,8 +106,11 @@ class BaseNode:
         except ObjectDoesNotExist:
             return None
 
-    # 查询完整信息
     def query_all(self):
+        """
+        查询所有内容 包括Neo4j节点 翻译 历史文件
+        :return:
+        """
         success = self.query_base()
         if success:
             self.__query_node()
@@ -111,8 +118,12 @@ class BaseNode:
             self.__query_history()
         return self
 
-    # 通过标签查询
     def query_with_label(self, label):
+        """
+        带有主标签的查询
+        :param label:
+        :return:
+        """
         self.ctrl = NodeCtrl.objects.filter(PrimaryLabel=label)
         try:
             self.ctrl = self.ctrl.objects.get(pk=self._id)
@@ -145,23 +156,19 @@ class BaseNode:
     def create(self, node):
         self.is_draft = False
         self.is_create = True
-        # 注意这里id是从生成器取的！！
-        if "_id" not in node:
-            raise IdGenerationError
-        else:
-            assert "type" in node
-            assert "Name" in node
-            assert "PrimaryLabel" in node
-            self.label = node["PrimaryLabel"]
-            self.__history_create(node=node)
-            self.__translation_create()
+        assert "type" in node
+        assert "Name" in node
+        assert "PrimaryLabel" in node
+        self.label = node["PrimaryLabel"]
+        self.__history_create(node=node)  # done 09-05
+        self.__translation_create()  # done 09-05
 
-            self.__ctrl_create(node=node)
-            self.__info_create(node=node)
-            self.__neo4j_create(node=node)
-            # es索引记录 todo 异步 level :2
-            # 返回self对象
-            return self
+        self.__ctrl_create(node=node)  # done 09-05
+        self.__info_create(node=node)
+        self.__neo4j_create(node=node)
+        # es索引记录 todo 异步 level :2
+        # 返回self对象
+        return self
 
     @error_check
     def update_as_stable(self, node):
@@ -185,18 +192,18 @@ class BaseNode:
 
     # 设置控制信息 done
     def __ctrl_create(self, node):
-        if self.user == 0:
-            user = False,
+        if self.user_id == 0:
+            is_user_made = False,
             contributor = []
         else:
-            user = True
-            contributor = [{"user_id": self.user, "level": 10}]
+            is_user_made = True
+            contributor = [{"user_id": self.user_id, "level": 10}]
         self.ctrl = NodeCtrl(
             NodeId=self._id,
             Type=node["type"],
             CountCacheTime=datetime.now().replace(microsecond=0),
-            Is_UserMade=user,  # 注意这里后台导入时user == 0
-            CreateUser=self.user,
+            Is_UserMade=is_user_made,
+            CreateUser=self.user_id,
             PrimaryLabel=self.label,
             Contributor=contributor
         )
@@ -211,7 +218,7 @@ class BaseNode:
         self.loading_history = NodeVersionRecord(VersionId=version_id,
                                                  SourceId=self._id,
                                                  SourceType=self.label,
-                                                 CreateUser=self.user,
+                                                 CreateUser=self.user_id,
                                                  Name=node["Name"],
                                                  Content=node,
                                                  Is_Draft=self.is_draft
@@ -277,7 +284,7 @@ class BaseNode:
         if self.label == 'Document':
             self.user_model.create_doc(self._id)
         else:
-            self.user_model.create_node(self._id)
+            self.user_model.create_source(self._id)
 
     def node_status(self):
         pass
@@ -312,7 +319,7 @@ class BaseNode:
     # 注意尽量不要使用单个Node保存
     def save(self):
         if not self.warn == []:
-            EWRecord.add_warn_record(user=self.user,
+            EWRecord.add_warn_record(user=self.user_id,
                                      source_id=self._id,
                                      source_label=self.label,
                                      content=self.warn)
@@ -343,10 +350,10 @@ class BaseLink(object):
         self._id = 0
         self.r_type = link_type
         if user == 0:
-            self.user = device_id
+            self.user_id = device_id
             self.is_user_made = False
         else:
-            self.user = user
+            self.user_id = user
             self.is_user_made = True
 
         self.is_create = False
@@ -444,15 +451,16 @@ class KnowLedge(BaseLink):
             confidence = 50 + int(self.is_user_made) * 50
             # test
             self.__update_prop(self.link_info.objects.Is_UserMade, self.is_user_made, False)
-            self.__update_prop(self.link_info.objects.CreateUser, self.user, 0)
+            self.__update_prop(self.link_info.objects.CreateUser, self.user_id, 0)
             self.__update_prop(self.link_info.objects.Confidence, confidence, 50)
 
 
 class BaseMediaNode:
 
-    def __init__(self, user: BaseUser, _id: int, collector=base_tools.NeoSet()):
+    def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
         self._id = _id
-        self.user_model = user
+        self.user_id = user_id
+        self.user_model: [BaseUser, None] = None
         self.collector = collector
         self.media = MediaNode()
         self.node = Node()
@@ -465,28 +473,29 @@ class BaseMediaNode:
                                MediaType=self.media_type,
                                FileName=data["name"],
                                Format=data["format"],
-                               UploadUser=self.user_model.user_id,
+                               UploadUser=self.user_id,
                                Description=data["description"]
                                )
         self.node = Node("Media", self.media_type)
-        self.node.update({
-            "_id": self._id,
-            "Name": data["name"]
-        })
-        self.user_model.query_privilege()
-        self.user_model.query_repository()
-        self.user_model.privilege.Is_Owner.append(self._id)
-        self.user_model.repository.UploadFile.append(self._id)
-        self.authority = MediaAuthority(
-            SourceId=self._id,
-            Used=True,
-            Common=data["Common"],
-            OpenSource=False,
-            Shared=data["Shared"],
-            Payment=data["Payment"]
-        )
-        self.save()
-        return self
+        self.node.update({"_id": self._id, "Name": data["name"]})
+        self.user_model = BaseUser(_id=self.user_id).query_user()
+        if self.user_model:
+            self.user_model.query_privilege()
+            self.user_model.query_repository()
+            self.user_model.privilege.Is_Owner.append(self._id)
+            self.user_model.repository.UploadFile.append(self._id)
+            self.authority = MediaAuthority(
+                SourceId=self._id,
+                Used=True,
+                Common=data["Common"],
+                OpenSource=False,
+                Shared=data["Shared"],
+                Payment=data["Payment"]
+            )
+            self.save()
+            return self
+        else:
+            return None
 
     def save(self):
         self.media.save()
@@ -503,7 +512,15 @@ class BaseMediaNode:
             mime_type_set(mime_type_dict)
 
         if "." + file_format in mime_type_dict:
-            media_type = str(mime_type_dict["." + file_format]).split("/")[0]
+            media_type = str(mime_type_dict["." + file_format])
             return media_type
         else:
             return "unknown"
+
+    def query(self):
+        try:
+            self.media = MediaNode.objects.get(pk=self._id)
+            self.media_type = self.media.MediaType
+            return self
+        except ObjectDoesNotExist:
+            return None

@@ -47,7 +47,6 @@ class BaseUser:
             UserPw=make_password(password=password, salt=salt)
         )
         if status:
-            self.user.Topic = concern["Topic"]
             self.user.Joint_Group = BaseGroup.apply(self.user_id, concern["group"])
         self.privilege = Privilege.objects.create(UserId=self.user_id)
         self.repository = UserRepository.objects.create(UserId=self.user_id)
@@ -86,10 +85,10 @@ class BaseUser:
         except ObjectDoesNotExist as e:
             raise e
 
-    def create_node(self, _id):
+    def create_source(self, _id):
         """
-
-        :param _id: 创建的节点id
+        source的定义:Node Media Document
+        :param _id: 创建的内容的id
         :return:
         """
         self.privilege.Is_Owner.append(_id)

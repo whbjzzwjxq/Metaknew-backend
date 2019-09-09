@@ -1,5 +1,5 @@
 from django.http import HttpResponse
-from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
+from subgraph.logic_class import CommonNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
 from tools.base_tools import NeoSet, get_user_props, get_special_props
 from tools.id_generator import id_generator
@@ -12,6 +12,8 @@ import numpy as np
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from django.db.models import Field
 from django.views.decorators.csrf import csrf_exempt
+import base64
+
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
@@ -215,15 +217,15 @@ def create_document(request):
 def bulk_create_node(request):
     batch_size = 256
     collector = NeoSet()
-    data_list = request.POST.get("data")
+    data_list = json.loads(request.body)["data"]
+    plabel = json.loads(request.body)["pLabel"]
     user_id = request.GET.get("user_id")
-    plabel = request.POST.get("plabel")
     user_model = BaseUser(_id=user_id).query_user()
     if user_model:
         # 请求一定数量的id
         id_list = id_generator(number=len(data_list), method='node', content=plabel, jump=3)
         # 创建node object
-        nodes = [BaseNode(user=user_model, _id=_id, collector=collector) for _id in id_list]
+        nodes = [CommonNode(user=user_model, _id=_id, collector=collector) for _id in id_list]
         # 注入数据
         nodes = [node.create(node=data) for node, data in zip(nodes, data_list)]
         # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None
@@ -249,12 +251,11 @@ def bulk_create_node(request):
 
 
 @csrf_exempt
-def single_create_media_node(request):
+def upload_main_pic(request):
     collector = NeoSet()
     user_id = request.GET.get("user_id")
     file = request.FILES["file"]
-    file_format = str(file.name).split(".")[-1]
-    user_model = BaseUser(_id=user_id).query_user()
+    file_format = str(file.name).split(".")[-1].lower()
     _id = id_generator(number=1, method='node', content='Media', jump=2)[0]
     data = {"format": file_format,
             "name": request.POST.get("name"),
@@ -264,8 +265,26 @@ def single_create_media_node(request):
             "Payment": False
             }
     # 写入文件
-    with open(basePath + "/fileUploadCache/"+str(_id)+"."+file_format, "wb+") as target:
-            target.write(file.read())
+    with open(basePath + "/fileUploadCache/" + str(_id) + "." + file_format, "wb+") as target:
+        target.write(file.read())
 
-    media = BaseMediaNode(_id=_id, user=user_model, collector=collector).create(data)
+    media = BaseMediaNode(_id=_id, user_id=user_id, collector=collector).create(data)
     return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)
+
+
+def query_main_pic(request):
+    user_id = request.GET.get("user_id")
+    media_id = request.GET.get("media_id")
+    media = BaseMediaNode(_id=media_id, user_id=user_id).query()
+    if media:
+        with open(basePath + "/fileUploadCache/" + str(media_id) + "." + media.media.Format, "rb") as target:
+            image = target.read()
+        image = base64.b64encode(image).decode()
+        result = {
+            "name": media.media.FileName,
+            "description": media.media.Description,
+            "image": "data:%s;base64," % media.media.MediaType + image
+        }
+        return HttpResponse(json.dumps(result), status=200)
+    else:
+        return HttpResponse(status=404)

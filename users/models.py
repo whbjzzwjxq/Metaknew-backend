@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField, HStoreField
 from tools.models import TopicField
 
+
 # Create your models here.
 
 
@@ -24,12 +25,8 @@ class User(models.Model):
     Is_Active = models.BooleanField(db_column="Active", default=True)
     # 系统控制
     Is_Banned = models.BooleanField(db_column="Banned", default=False)
-
-    # 兴趣部分
-    # key: GroupId value: Owner Manager Member Applying
+    # 参与的组别
     Joint_Group = HStoreField(db_column="JOINT_GROUP", default=dict)
-    # 用户感兴趣的领域
-    Topic = TopicField()
 
     class Meta:
         db_table = "user_info_base"
@@ -75,30 +72,28 @@ class Privilege(models.Model):
 
 # 用户私有仓库
 class UserRepository(models.Model):
-    UserId = models.IntegerField(db_column="USER_ID", primary_key=True)
-    CreateDoc = ArrayField(models.BigIntegerField(), db_column="CreateDoc", default=list)
-    CreateNode = ArrayField(models.BigIntegerField(), db_column="CreateNode", default=list)
-    UpdateDoc = ArrayField(models.BigIntegerField(), default=list)
-    UpdateNode = ArrayField(models.BigIntegerField(), default=list)
+    UserId = models.IntegerField(primary_key=True)
+    # 以下是CommonSource
+    CreateDoc = ArrayField(models.BigIntegerField(), default=list)
+    CreateNode = ArrayField(models.BigIntegerField(), default=list)
     UploadFile = ArrayField(models.BigIntegerField(), default=list)
 
     class Meta:
         db_table = "user_collection"
 
 
-# 用户关注的内容
+# 用户关注的内容 更加宽泛一些
 class UserConcern(models.Model):
-    UserId = models.BigIntegerField(db_column="USER_ID", db_index=True)
+    UserId = models.BigIntegerField(db_index=True)
     # 用户关心的Source
-    SourceId = models.BigIntegerField(db_column="SOURCE_ID", db_index=True)
-    SourceType = models.TextField(db_column="SOURCE_TYPE", db_index=True)
-    # 用户打的标签
-    Labels = ArrayField(models.TextField(), db_column="LABELS", default=list)
-    Imp = models.SmallIntegerField(db_column="IMP", default=-1)
-    HardLevel = models.SmallIntegerField(db_column="HARD_LEVEL", default=-1)
-    Useful = models.SmallIntegerField(db_column="USEFUL", default=-1)
-    Is_Star = models.BooleanField(db_column="STAR", default=False)
-    Is_Edit = models.BooleanField(db_column="EDIT", default=False)
+    SourceId = models.BigIntegerField(db_index=True)
+    SourceType = models.TextField(db_index=True)
+
+    Imp = models.SmallIntegerField(default=-1)
+    HardLevel = models.SmallIntegerField(default=-1)
+    Useful = models.SmallIntegerField(default=-1)
+    Is_Star = models.BooleanField(default=False)
+    Is_Edit = models.BooleanField(default=False)
 
     class Meta:
         indexes = [
@@ -165,7 +160,6 @@ class MediaAuthority(BaseAuthority):
 class CourseAuthority(BaseAuthority):
     class Meta:
         db_table = "authority_course"
-
 
 # todo 支付管理 level: 3
 # class PaymentManager(models.Model):
