@@ -6,7 +6,7 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 class SourceAddRecord(models.Model):
 
     SourceId = models.BigIntegerField(db_column="SourceId", primary_key=True)
-    SourceLabel = models.IntegerField(db_column="Label", db_index=True, default=0)
+    SourceLabel = models.TextField(db_column="Label", db_index=True, default=0)
     BugType = models.TextField(db_column="Type")
     CreateUser = models.BigIntegerField(db_column="User")
     CreateTime = models.DateTimeField(db_column="Time", auto_now_add=True)
@@ -61,7 +61,6 @@ class NodeVersionRecord(models.Model):
     Name = models.TextField(db_column="Name")
     VersionId = models.SmallIntegerField(db_column="VersionId")
     Is_Draft = models.BooleanField(db_column="Draft", db_index=True)
-    BaseHistory = models.BigIntegerField(db_column="BaseHis", db_index=True)
     Content = JSONField(db_column="Content")
 
     class Meta:

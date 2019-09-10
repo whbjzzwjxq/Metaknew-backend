@@ -1,12 +1,12 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.contrib.postgres.fields import HStoreField
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 
 # 预定义的Field和Checker
 
 max_value = MaxValueValidator(limit_value=100)
-min_value = MinValueValidator(limit_value=0)
+min_value = MinValueValidator(limit_value=-1)
 
 
 class LevelField(models.SmallIntegerField):
@@ -15,32 +15,24 @@ class LevelField(models.SmallIntegerField):
 
     def __init__(self, *args, **kwargs):
         kwargs["validators"] = [min_value, max_value]
-        kwargs["default"] = 1
+        kwargs["default"] = -1
         super().__init__(*args, **kwargs)
 
 
-class TopicField(HStoreField):
+class TopicField(ArrayField):
 
     description = "资源等使用的Topic, key是Topic value是用户对Topic感兴趣的程度/资源跟Topic的相关度"
 
     def __init__(self, *args, **kwargs):
-        kwargs["validators"] = [validate_topic]
-        kwargs["default"] = dict
+        kwargs["default"] = list
         kwargs["db_index"] = True
+        kwargs["base_field"] = models.TextField()
         super().__init__(*args, **kwargs)
 
 
 class MediaIdField(models.BigIntegerField):
 
     description = "储存媒体文件使用的_id"
-
-
-def validate_topic(value):
-    for key in value:
-        if not isinstance(key, str):
-            raise ValidationError(_("%(value)s is not an string"), params={"value": key})
-        elif not isinstance(value[key], int) or not isinstance(value[key], float):
-            raise ValidationError(_("%(value)s is not an int/float"), params={"value": value[key]})
 
 
 class GlobalWordIndex(models.Model):

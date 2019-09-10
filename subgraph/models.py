@@ -7,13 +7,22 @@ from tools.models import LevelField, TopicField
 
 # 将可能的模板写在前面
 def contributor():
-    return [{"user_id": "1", "type": "create"}]
+    return {"create": "system", "update": []}
 
 
 def feature_vector():
     return {"group_vector": [],
             "word_embedding": [],
             "label_embedding": []}
+
+
+def text():
+    return {
+        "auto": "",
+        "zh": "",
+        "en": "",
+        "text": {}
+    }
 
 
 pictures = ["jpg", "png", "gif"]
@@ -30,7 +39,6 @@ class NodeCtrl(models.Model):
     # 不传回的控制性内容
     CountCacheTime = models.DateTimeField(db_column="CacheTime")  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
-    Type = models.TextField(db_column="Type", db_index=True, default="StrNode")  # 节点种类
     ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")  # 导入方式
     CreateTime = models.DateField(db_column="CreateTime", auto_now_add=True, editable=False)  # 创建时间
     # 直接传回的内容
@@ -41,16 +49,15 @@ class NodeCtrl(models.Model):
     # 从用户(UserConcern)那里统计的内容 更新频率 高
     Imp = LevelField()  # 重要度
     HardLevel = LevelField()  # 难易度
-
-    Useful = models.IntegerField(db_column="Useful", default=0)  # 有用的程度
+    Useful = models.IntegerField(db_column="Useful", default=-1)  # 有用的程度
     Star = models.IntegerField(db_column="Star", default=0)  # 收藏数量
     Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
-    Contributor = ArrayField(JSONField(), db_column="Contributor", default=contributor)  # 贡献者
+    Contributor = JSONField(default=contributor)  # 贡献者
     UserLabels = ArrayField(models.TextField(), db_column="UserLabels", default=list)  # 用户打的标签
 
     # 从数据分析统计的内容 更新频率 低
     Structure = LevelField()  # 结构化的程度
-    FeatureVec = JSONField(db_column="FEATURE_VECTOR", default=feature_vector)  # 特征值
+    FeatureVec = JSONField(default=feature_vector)  # 特征值
     TotalTime = models.IntegerField(db_column="TotalTime", default=50)  # 需要的时间
 
     class Meta:
@@ -119,7 +126,7 @@ class MediaNode(models.Model):
     # 控制属性
     UploadUser = models.BigIntegerField(db_column="UploadUser")
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
-    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)   
+    CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
     TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间
 
     # 用户相关
@@ -135,15 +142,29 @@ class MediaNode(models.Model):
 
 class Fragment(models.Model):
     NodeId = models.BigIntegerField(primary_key=True)
-    Keywords = ArrayField(models.TextField(), db_column='Keyword', default=list)
-    Content = models.TextField(db_column='Content', default="")
-    Props = JSONField(db_column="Props", default=dict)
-    Labels = ArrayField(models.TextField(), db_column='Labels', default=list)
-    CreateTime = models.DateField(db_column='CreateTime', default=now)
-    CreateUser = models.BigIntegerField(db_column='User')
+    Keywords = ArrayField(models.TextField(), default=list)
+    Content = models.TextField(default="")
+    Props = JSONField(default=dict)
+    Labels = ArrayField(models.TextField(), default=list)
+
+    OriginSource = models.BigIntegerField(default=0)
+    CreateTime = models.DateField(default=now)
+    CreateUser = models.BigIntegerField()
 
     class Meta:
-        db_table = "graph_normal_node"
+        db_table = "graph_node_fragment"
+
+
+class Text(models.Model):
+    NodeId = models.BigIntegerField(primary_key=True)
+    Language = models.TextField(default="auto")
+    Keywords = ArrayField(models.TextField(), default=list)
+    Text = JSONField(default=text())
+    Star = models.IntegerField(db_column="Star", default=0)  # 收藏数量
+    Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
+
+    class Meta:
+        db_table = "graph_node_text"
 
 
 # done 08-16
@@ -166,7 +187,7 @@ class LocationDoc(models.Model):
     Doc = JSONField(db_column="Content", default=dict)
 
     class Meta:
-        db_table = "source_location_doc"
+        db_table = "graph_source_location_doc"
 
 
 # done
@@ -182,7 +203,7 @@ class Translate(models.Model):
     Descriptions = HStoreField(db_column="Description_more", default=dict)
 
     class Meta:
-        db_table = "source_translate"
+        db_table = "graph_source_translate"
 
 
 class Chronology(models.Model):
@@ -192,7 +213,7 @@ class Chronology(models.Model):
     Content = models.TextField(db_column="Content")
 
     class Meta:
-        db_table = "source_chronology"
+        db_table = "graph_source_chronology"
 
 
 # 系统生成的控制性关系 done

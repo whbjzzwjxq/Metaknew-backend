@@ -130,14 +130,15 @@ def remove_location_queue(locations):
 
 
 def set_location_queue(locations):
-    return redis.sadd("location_queue", locations)
+    return redis.sadd("location_queue", *locations)
 
 
-def query_untranslated_name():
-    pass
+def set_translate_queue(name, _id):
+    return redis.set("translation_" + _id, name)
 
 
 # ----------------word_index相关
+
 def query_word_index(word_list):
     index = redis.hmget("word_index", word_list)
     return index

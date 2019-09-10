@@ -1,5 +1,5 @@
 from elasticsearch import Elasticsearch
-from subgraph.logic_class import CommonNode
+from subgraph.logic_class import BaseNode
 from document.logic_class import BaseDoc
 from es_module.logic_class import EsQuery
 from tools.base_tools import merge_list
@@ -35,7 +35,7 @@ def es_ask_all(request):
                 doc_results.append(es_query.fuzzy_keyword_documents(keywords=keyword))
             node_list = merge_list(node_results)
             doc_list = merge_list(doc_results)
-            node_results = [CommonNode().query(uuid).handle_for_frontend() for uuid in node_list]
+            node_results = [BaseNode().query(uuid).handle_for_frontend() for uuid in node_list]
             doc_results = [BaseDoc().query(uuid).handle_for_frontend() for uuid in doc_list]
             result = {"nodes": node_results, "docs": doc_results}
             return HttpResponse(json.dumps(result, ensure_ascii=False))

@@ -4,7 +4,7 @@ import datetime
 import typing
 from django.shortcuts import HttpResponse
 from tools.models import *
-from tools.redis_process import query_word_index
+from tools.word_index import query_word_list
 batch_size = 256
 small_integer = 65535
 device_id = 0
@@ -45,7 +45,7 @@ def id_generator(number, method, content, jump=3) -> typing.List[int]:
             record = methods[method]["record"]
             if method == "node":
                 try:
-                    content = query_word_index([content])[0]
+                    content = query_word_list([content])[0]
                 except AttributeError:
                     content = 0
             if method == "time":

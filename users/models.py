@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, HStoreField
 from tools.models import TopicField
-
+from tools.models import LevelField
 
 # Create your models here.
 
@@ -46,7 +46,7 @@ class GroupCtrl(models.Model):
     Is_Open = models.BooleanField(db_column="Open", default=True)
 
     class Meta:
-        db_table = "user_group_info_base"
+        db_table = "user_info_base_group"
 
 
 # 用户/组 权限
@@ -76,10 +76,12 @@ class UserRepository(models.Model):
     # 以下是CommonSource
     CreateDoc = ArrayField(models.BigIntegerField(), default=list)
     CreateNode = ArrayField(models.BigIntegerField(), default=list)
+    CreateCourse = ArrayField(models.BigIntegerField(), default=list)
     UploadFile = ArrayField(models.BigIntegerField(), default=list)
+    Fragment = ArrayField(models.BigIntegerField(), default=list)
 
     class Meta:
-        db_table = "user_collection"
+        db_table = "user_info_collection"
 
 
 # 用户关注的内容 更加宽泛一些
@@ -89,17 +91,18 @@ class UserConcern(models.Model):
     SourceId = models.BigIntegerField(db_index=True)
     SourceType = models.TextField(db_index=True)
 
-    Imp = models.SmallIntegerField(default=-1)
-    HardLevel = models.SmallIntegerField(default=-1)
-    Useful = models.SmallIntegerField(default=-1)
+    Labels = ArrayField(models.TextField(), default=list)
+    Imp = LevelField()
+    HardLevel = LevelField()
+    Useful = LevelField()
     Is_Star = models.BooleanField(default=False)
-    Is_Edit = models.BooleanField(default=False)
+    Is_Tag = models.BooleanField(default=False)
 
     class Meta:
         indexes = [
             models.Index(fields=["SourceId", "SourceType"])
         ]
-        db_table = "user_labels"
+        db_table = "user_info_concern"
 
 
 # todo 用户进度记录 level: 2
@@ -112,7 +115,7 @@ class UserDocProgress(models.Model):
     LastPart = models.BigIntegerField(db_column="LastPart")  # 上次最后停在哪个位置
 
     class Meta:
-        db_table = "user_progress"
+        db_table = "user_info_progress"
 
 
 # ----------------用户权限----------------
@@ -137,6 +140,8 @@ class BaseAuthority(models.Model):
     Shared = models.BooleanField(db_column="shared", default=False)
     OpenSource = models.BooleanField(db_column="open", default=False)
     Payment = models.BooleanField(db_column="payment", default=False)
+    Vip = models.BooleanField(db_column="vip", default=False)
+    HighVip = models.BooleanField(db_column="high_vip", default=False)
 
     class Meta:
         abstract = True
@@ -144,22 +149,22 @@ class BaseAuthority(models.Model):
 
 class DocAuthority(BaseAuthority):
     class Meta:
-        db_table = "authority_doc"
+        db_table = "graph_authority_doc"
 
 
 class NodeAuthority(BaseAuthority):
     class Meta:
-        db_table = "authority_node"
+        db_table = "graph_authority_node"
 
 
 class MediaAuthority(BaseAuthority):
     class Meta:
-        db_table = "authority_media"
+        db_table = "graph_authority_media"
 
 
 class CourseAuthority(BaseAuthority):
     class Meta:
-        db_table = "authority_course"
+        db_table = "graph_authority_course"
 
 # todo 支付管理 level: 3
 # class PaymentManager(models.Model):

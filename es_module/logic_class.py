@@ -115,9 +115,7 @@ class EsIndex:
 #         return False
 
 
-# todo 消息队列处理 level :3
-async def add_node_index(node):
-    assert node.already
+def add_node_index(node):
     root = node.root
     info = node.info
     target = "content.%s" % root["Language"]
@@ -137,34 +135,4 @@ async def add_node_index(node):
         return True
     else:
         # todo record 记录索引失败 level: 2
-        return False
-
-
-async def add_doc_index(doc):
-    assert doc.already
-    root = doc.NeoNode
-    info = doc.Info
-    target = "content.%s" % root["Language"]
-    updatetime = info.UpdateTime.date()
-    body = {
-        "Topic": info.Topic,
-        target: info.Description,
-        "hard_level": info.HardLevel,
-        "hot": info.Hot,
-        "imp": info.Imp,
-        "keyword": info.Keywords,
-        "labels": list(root.labels),
-        "language": root["Language"],
-        "size": info.Size,
-        "title": {"auto": root["name"],
-                  "zh": root["name_zh"],
-                  "en": root["name_en"]},
-        "updatetime": updatetime,
-        "useful": info.Useful,
-        "uuid": root["uuid"]
-    }
-    result = es.index(index="documents", body=body, doc_type="_doc")
-    if result["_shards"]["successful"] == 1:
-        return True
-    else:
         return False

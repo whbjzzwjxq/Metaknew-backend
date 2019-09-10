@@ -7,7 +7,9 @@ from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models import Model
+import typing
 from tools.base_tools import model_to_dict
+
 salt = "al76vdj895as12cq"
 
 
@@ -15,10 +17,10 @@ class BaseUser:
 
     def __init__(self, _id: int):
         self.user_id = _id
-        self.user = User()
-        self.privilege = Privilege()
-        self.repository = UserRepository()
-        self.concern = UserConcern()
+        self.user: typing.Optional[User] = None
+        self.privilege: typing.Optional[Privilege] = None
+        self.repository: typing.Optional[UserRepository] = None
+        self.concern: typing.Optional[UserConcern] = None
 
     # 登录成功之后的设置
     def login_success(self):
@@ -63,45 +65,58 @@ class BaseUser:
             return user
 
     def query_user(self):
-        try:
-            self.user = User.objects.get(pk=self.user_id)
-        except ObjectDoesNotExist:
-            return None
+        if not self.user:
+            try:
+                self.user = User.objects.get(pk=self.user_id)
+            except ObjectDoesNotExist:
+                return None
+            else:
+                return self
         else:
             return self
 
     def query_privilege(self):
-
-        try:
-            self.privilege = Privilege.objects.get(UserId=self.user.UserId)
+        if not self.privilege:
+            try:
+                self.privilege = Privilege.objects.get(UserId=self.user_id)
+                return self
+            except ObjectDoesNotExist as e:
+                return None
+        else:
             return self
-        except ObjectDoesNotExist as e:
-            raise e
 
     def query_repository(self):
-        try:
-            self.repository = UserRepository.objects.get(UserId=self.user.UserId)
+        if not self.repository:
+            try:
+                self.repository = UserRepository.objects.get(UserId=self.user_id)
+                return self
+            except ObjectDoesNotExist as e:
+                return None
+        else:
             return self
-        except ObjectDoesNotExist as e:
-            raise e
 
-    def create_source(self, _id):
+    def bulk_create_source(self, id_type_dict: typing.Dict[int, str]):
         """
         source的定义:Node Media Document
-        :param _id: 创建的内容的id
+        :param id_type_dict: 创建的内容的id-source dict
         :return:
         """
-        self.privilege.Is_Owner.append(_id)
-        self.repository.CreateNode.append(_id)
-
-    def create_doc(self, _id):
-        """
-
-        :param _id: 创建的专题id
-        :return:
-        """
-        self.privilege.Is_Owner.append(_id)
-        self.repository.CreateDoc.append(_id)
+        self.query_repository()
+        self.query_privilege()
+        if id_type_dict:
+            for _id, source_type in id_type_dict.items():
+                self.privilege.Is_Owner.append(_id)
+                if source_type == "Node":
+                    self.repository.CreateNode.append(_id)
+                elif source_type == "Media":
+                    self.repository.UploadFile.append(_id)
+                elif source_type == "Document":
+                    self.repository.CreateDoc.append(_id)
+                elif source_type == "Fragment":
+                    self.repository.Fragment.append(_id)
+                else:
+                    raise AttributeError("Unknown Source Type")
+            self.repository.save()
 
     def save(self):
         self.user.save()

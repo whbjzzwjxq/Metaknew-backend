@@ -29,6 +29,7 @@ node_model_dict: Dict[str, Type[NodeInfo]] = {
     "Project": Project,
     "ArchProject": ArchProject,
     "Document": BaseDoc,
+    "Fragment": Fragment
 }
 
 link_model_dict: Dict[str, Type[Relationship]] = {

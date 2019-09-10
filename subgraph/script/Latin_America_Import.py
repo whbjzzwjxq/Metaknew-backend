@@ -1,7 +1,7 @@
 import json
 from tools.google_map import get_locations
 from tools.base_tools import NeoSet
-from subgraph.logic_class import CommonNode
+from subgraph.logic_class import BaseNode
 from django.shortcuts import HttpResponse
 from tools.redis_process import *
 import os
@@ -36,7 +36,7 @@ def script_latin(request):
     file = open(path, "r", encoding="utf-8").read()
     lines = json.loads(file)
     nodes = [handle_data(line, user=user) for line in lines]
-    results = [CommonNode(collector=collector).create(node=node) for node in nodes]
+    results = [BaseNode(collector=collector).create(node=node) for node in nodes]
     collector.tx.commit()
     locations = get_locations()
     return HttpResponse("Success")
