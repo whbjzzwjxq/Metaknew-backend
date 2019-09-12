@@ -1,7 +1,6 @@
 from elasticsearch import Elasticsearch
-from record.logic_class import ErrorRecord
-
-import json
+from subgraph.logic_class import BaseNode, BaseMediaNode
+from typing import *
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
@@ -115,24 +114,55 @@ class EsIndex:
 #         return False
 
 
-def add_node_index(node):
-    root = node.root
+def add_node_index(node: BaseNode):
+    ctrl = node.ctrl
     info = node.info
-    target = "content.%s" % root["Language"]
     body = {
-        "alias": info["Alias"],
-        target: info["Description"],
-        "labels": list(root.labels),
-        "language": root["Language"],
-        "name": {"auto": root["name"],
-                 "zh": root["name_zh"],
-                 "en": root["name_en"]},
-        "p_label": root["PrimaryLabel"],
-        "uuid": root["uuid"]
+        "id": node.id,
+        "language": info.Language,
+        "create_user": ctrl.CreateUser,
+        "update_time": ctrl.UpdateTime,
+        "name": {
+            "zh": node.trans.Name_zh,
+            "en": node.trans.Name_en,
+            "auto": node.trans.Name_auto
+        },
+        "tags": {
+            "p_label": node.label,
+            "alias": info.Alias,
+            "labels": info.Labels,
+            "topic": info.Topic
+        },
+        "description": {
+            "zh": node.trans.Des_zh,
+            "en": node.trans.Des_en,
+            "auto": node.trans.Des_auto
+        },
+        "level": {
+            "imp": ctrl.Imp,
+            "hard_level": ctrl.HardLevel,
+            "useful": ctrl.Useful,
+            "star": ctrl.Star,
+            "hot": ctrl.Hot,
+            "total_time": ctrl.TotalTime
+        }
     }
     result = es.index(index="nodes", body=body, doc_type="_doc")
     if result["_shards"]["successful"] == 1:
         return True
     else:
-        # todo record 记录索引失败 level: 2
+        node.warn.WarnContent.append({"field": "index", "warn_type": "index_create_failed"})
         return False
+
+
+def add_text_index(node: Union[BaseMediaNode]):
+    body = {
+        "id": node.id,
+        "language": "auto",
+        "keywords": node.media_type.split("/")[0],
+        "text": {
+            "zh": "",
+            "en": "",
+            "auto": ""
+        }
+    }

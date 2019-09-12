@@ -1,17 +1,16 @@
 from py2neo.data import Node, Relationship, walk
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from tools import base_tools
-from django.db.models import Max, QuerySet
-from record.logic_class import EWRecord, field_check
+from django.db.models import Max
+from record.logic_class import field_check
 from record.models import NodeVersionRecord, WarnRecord
-from subgraph.models import NodeCtrl, NodeInfo, Translate, MediaNode, Fragment
-from es_module.logic_class import es
+from subgraph.models import NodeCtrl, NodeInfo, MediaNode, Fragment, Text
 from datetime import datetime
-from tools.id_generator import id_generator, device_id
-from tools.redis_process import set_location_queue, set_translate_queue
+from tools.id_generator import device_id
+from tools.redis_process import set_location_queue
 from record.logic_class import error_check, ObjectAlreadyExist
 from users.models import MediaAuthority, NodeAuthority
-from typing import *
+from typing import Optional, Dict, List, Type
 import mimetypes
 from tools.redis_process import mime_type_query, mime_type_set
 
@@ -25,7 +24,7 @@ create_node_format = {
         "Language": "en",  # 默认auto
         "Alias": [],  # 默认[]
         "Labels": [],  # 默认[]
-        "Description": "this is a test node",
+        "Text": "this is a test node",
         "Topic": [],
         "MainPic": "123456",
         "IncludedMedia": ["123456", "345678", "324561"],
@@ -34,14 +33,12 @@ create_node_format = {
         "BirthPlace": "Beijing, China",
         "Nation": "China",
         "Translate": {
-            "Name_auto": "Test",
             "Name_zh": "测试",
             "Name_en": "Test",
-            "Names": {},
-            "Des_auto": "this is a test node",
-            "Des_zh": "这是测试节点",
-            "Des_en": "this is a test node",
-            "Descriptions": {}
+            "Name_es": "",
+            "Text_zh": "这是测试节点",
+            "Text_en": "this is a test node",
+            "Text_es": ""
         },
         "ExtraProps": {
             "LiveIn": "New York"
@@ -131,7 +128,6 @@ class BaseFragment:
             setattr(field.model, field.name, new_prop)
 
 
-# todo 各种权限表生成与实现 level: 0  bulk_create level: 0
 class BaseNode:
 
     def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
@@ -140,11 +136,12 @@ class BaseNode:
         self.node: Optional[Node] = None
         self.info: Optional[Type[NodeInfo]] = None
         self.ctrl: Optional[NodeCtrl] = None
-        self.trans: Optional[Translate] = None
+        self.text: Optional[Text] = None
         self.loading_history: Optional[NodeVersionRecord] = None
-        self.history = NodeVersionRecord.objects.none()
         self.authority: Optional[NodeAuthority] = None
         self.warn: Optional[WarnRecord] = None
+
+        self.history = NodeVersionRecord.objects.none()
 
         # 以下是值
         self.collector = collector  # neo4j连接池
@@ -179,7 +176,7 @@ class BaseNode:
         success = self.query_base()
         if success:
             self.__query_node()
-            self.__query_translate()
+            self.__query_text()
             self.__query_history()
         return self
 
@@ -198,13 +195,6 @@ class BaseNode:
         except ObjectDoesNotExist:
             return None
 
-    # 查询历史 / 翻译 / 节点 todo 查询超时设置 level: 2
-    def __query_translate(self):
-        try:
-            self.trans = Translate.objects.get(FileId=self.id)
-        except ObjectDoesNotExist:
-            self.lack.append("trans")
-
     def __query_history(self):
         self.history = NodeVersionRecord.objects.filter(SourceId=self.id)
         if len(self.history) == 0:
@@ -215,6 +205,13 @@ class BaseNode:
             self.node = self.collector.Nmatcher.match(_id=self.id).first()
         except ObjectDoesNotExist:
             self.lack.append("node")
+
+    def __query_text(self):
+        if not self.text:
+            try:
+                self.text = Text.objects.get(NodeId=self.id)
+            except ObjectDoesNotExist:
+                self.lack.append("text")
 
     # ---------------- create ----------------
     @error_check
@@ -227,10 +224,10 @@ class BaseNode:
         self.warn = WarnRecord(SourceId=self.id, SourceLabel=self.label, BugType="None", CreateUser=self.user_id)
 
         self.__history_create(data=data)  # done 09-05
-        self.__translation_create(data=data)  # done 09-05
 
         self.__ctrl_create(data=data)  # done 09-10
         self.__info_create(data=data)  # done 09-10
+        self.__text_update(data=data)  # done 09-11
         self.__auth_create(data=data)  # done 09-10
         props = {"_id": self.id, "Name": data["Name"], "Imp": data["BaseImp"], "HardLevel": data["BaseHardLevel"]}
         self.node = neo4j_create_node(_type="Node", labels=data["Labels"] + data["Topic"], plabel=self.label,
@@ -255,6 +252,8 @@ class BaseNode:
         self.info = base_tools.node_init(self.label)()
         self.info.NodeId = self.id
         self.info.PrimaryLabel = self.label
+        self.info.Translate = {key[4:len(key)]: value for key, value in data["Translate"].items() if
+                               key[0:5] == "Name_"}
         # 初始化
         self.info_update(data)
         self.main_pic_setter(data["MainPic"])
@@ -291,9 +290,20 @@ class BaseNode:
                                                  Is_Draft=self.is_draft
                                                  )
 
-    def __translation_create(self, data):
-        self.trans = Translate(FileId=self.id)
-        self.translation_setter(data)
+    def __text_update(self, data: dict):
+        if self.is_create:
+            self.text = Text(NodeId=self.id,
+                             Is_Bound=True,
+                             Language=data["Language"])
+        else:
+            self.__query_text()
+
+        text = {key[4:len(key)]: value for key, value in data["Translate"].items() if key[0:5] == "Text_"}
+        self.text.Translate = text
+        self.text.Keywords = data["Labels"]
+        self.text.Text = data["Text"]
+        self.text.Star = self.ctrl.Star
+        self.text.Hot = self.ctrl.Hot
         return self
 
     def __auth_create(self, data):
@@ -308,23 +318,6 @@ class BaseNode:
             Vip=False,
             HighVip=False
         )
-
-    def translation_setter(self, data):
-        self.trans.Name_auto = data["Name"]
-        self.trans.Des_auto = data["Description"]
-        trans = data["Translate"]
-        fields = ["Name_zh", "Name_en", "Des_zh", "Des_en"]
-        for prop, value in trans.items():
-            if prop in fields:
-                setattr(self.trans, prop, value)
-            else:
-                if prop[0: 4] == "Name":
-                    self.trans.Names.update({prop: value})
-                else:
-                    if prop[0: 4] == "Des_":
-                        self.trans.Descriptions.update({prop: value})
-        set_translate_queue(data["Name"], self.id)
-        return self
 
     @field_check
     def __update_prop(self, field, new_prop, old_prop):
@@ -390,7 +383,7 @@ class BaseNode:
         pass
 
     def output_table_create(self):
-        return self.ctrl, self.info, self.warn, self.loading_history
+        return self.ctrl, self.info, self.warn, self.loading_history, self.authority, self.text
 
 
 class BaseMediaNode:
@@ -399,22 +392,26 @@ class BaseMediaNode:
         self.id = _id
         self.user_id = user_id
         self.media_type = "unknown"
-
+        self.is_create = False
         self.collector = collector
         self.media = MediaNode()
         self.node = Node()
         self.authority = MediaAuthority()
+        self.text = Text()
 
     def create(self, data):
+        self.is_create = True
         self.media_type = self.get_media_type(data["Format"])
         self.media = MediaNode(MediaId=self.id,
                                MediaType=self.media_type,
                                FileName=data["Name"],
                                Format=data["Format"],
                                UploadUser=self.user_id,
-                               Description=data["Description"]
                                )
-        self.node = neo4j_create_node(_type="Media", labels=[], plabel=self.media_type, props={"_id": self.id})
+        self.node = neo4j_create_node(_type="Media",
+                                      labels=data["Labels"],
+                                      plabel=self.media_type.split("/")[0],
+                                      props={"_id": self.id})
         self.collector.tx.create(self.node)
         self.authority = MediaAuthority(
             SourceId=self.id,
@@ -426,12 +423,28 @@ class BaseMediaNode:
             Vip=False,
             HighVip=False
         )
+        self.__text_update(data)
+        return self
 
+    def __text_update(self, data: dict):
+        if self.is_create:
+            self.text = Text(NodeId=self.id,
+                             Is_Bound=True,
+                             Language=data["Language"])
+        else:
+            self.__query_text()
+
+        self.text.Translate = data["Translate"]
+        self.text.Keywords = data["Labels"]
+        self.text.Text = data["Text"]
+        self.text.Star = self.media.Star
+        self.text.Hot = self.media.Hot
         return self
 
     def save(self):
         self.media.save()
         self.authority.save()
+        self.text.save()
         self.collector.tx.commit()
 
     @staticmethod
@@ -454,6 +467,13 @@ class BaseMediaNode:
             return self
         except ObjectDoesNotExist:
             return None
+
+    def __query_text(self):
+        if not self.text:
+            try:
+                self.text = Text.objects.get(NodeId=self.id)
+            except ObjectDoesNotExist:
+                pass
 
 
 # todo Link 重构 level: 0

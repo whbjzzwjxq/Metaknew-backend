@@ -2,7 +2,7 @@ from django.contrib.postgres.fields import ArrayField, JSONField, HStoreField
 from django.db import models
 from users.models import User
 from django.utils.timezone import now
-from tools.models import LevelField, TopicField
+from tools.models import LevelField, TopicField, HotField
 
 
 # 将可能的模板写在前面
@@ -16,12 +16,10 @@ def feature_vector():
             "label_embedding": []}
 
 
-def text():
+def translation():
     return {
-        "auto": "",
         "zh": "",
         "en": "",
-        "text": {}
     }
 
 
@@ -51,7 +49,7 @@ class NodeCtrl(models.Model):
     HardLevel = LevelField()  # 难易度
     Useful = models.IntegerField(db_column="Useful", default=-1)  # 有用的程度
     Star = models.IntegerField(db_column="Star", default=0)  # 收藏数量
-    Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
+    Hot = HotField()
     Contributor = JSONField(default=contributor)  # 贡献者
     UserLabels = ArrayField(models.TextField(), db_column="UserLabels", default=list)  # 用户打的标签
 
@@ -72,6 +70,7 @@ class NodeInfo(models.Model):
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
     Name = models.TextField(db_column="Name")
+    Translate = HStoreField(default=translation)
     Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
     BaseImp = LevelField()  # 基础重要度
     BaseHardLevel = LevelField()  # 基础难易度
@@ -132,9 +131,9 @@ class MediaNode(models.Model):
     # 用户相关
     Useful = models.SmallIntegerField(db_column='Useful', default=0)
     Star = models.BigIntegerField(db_column='Star', default=0)
+    Hot = HotField()
     Topic = TopicField()
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    Description = models.TextField(db_column="Description", default="")
 
     class Meta:
         db_table = "graph_media_base"
@@ -159,9 +158,12 @@ class Text(models.Model):
     NodeId = models.BigIntegerField(primary_key=True)
     Language = models.TextField(default="auto")
     Keywords = ArrayField(models.TextField(), default=list)
-    Text = JSONField(default=text())
-    Star = models.IntegerField(db_column="Star", default=0)  # 收藏数量
-    Hot = models.IntegerField(db_column="Hot", default=1)  # 热度统计
+    Text = models.TextField(default="")
+    Translate = HStoreField(default=translation)
+    # 是否与一个实体绑定
+    Is_Bound = models.BooleanField(default=False)
+    Star = models.BigIntegerField(default=0)
+    Hot = HotField()
 
     class Meta:
         db_table = "graph_node_text"
@@ -188,22 +190,6 @@ class LocationDoc(models.Model):
 
     class Meta:
         db_table = "graph_source_location_doc"
-
-
-# done
-class Translate(models.Model):
-    FileId = models.BigIntegerField(primary_key=True)
-    Name_auto = models.TextField(db_column="Name", db_index=True, default="")
-    Name_zh = models.TextField(db_column="Name_zh", default="")
-    Name_en = models.TextField(db_column="Name_en", default="")
-    Names = HStoreField(db_column="Name_more", default=dict)
-    Des_auto = models.TextField(db_column="Description", db_index=True, default="")
-    Des_zh = models.TextField(db_column="Description_zh", default="")
-    Des_en = models.TextField(db_column="Description_en", default="")
-    Descriptions = HStoreField(db_column="Description_more", default=dict)
-
-    class Meta:
-        db_table = "graph_source_translate"
 
 
 class Chronology(models.Model):

@@ -1,12 +1,21 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
 
 # 预定义的Field和Checker
 
 max_value = MaxValueValidator(limit_value=100)
 min_value = MinValueValidator(limit_value=-1)
+
+
+class HotField(models.IntegerField):
+
+    description = "热度的Field"
+
+    def __init__(self, *args, **kwargs):
+        kwargs["default"] = 100
+        kwargs["validators"] = [MinValueValidator(limit_value=1)]
+        super().__init__(*args, **kwargs)
 
 
 class LevelField(models.SmallIntegerField):

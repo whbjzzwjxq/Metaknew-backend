@@ -1,20 +1,21 @@
-from django.http import HttpResponse
-from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
-from document.logic_class import BaseDoc
-from tools.base_tools import NeoSet, get_update_props, get_special_props
-from tools.id_generator import id_generator
-from tools.base_tools import basePath
 import json
-from users.logic_class import BaseUser
-from subgraph.models import NodeCtrl, NodeInfo
-from record.logic_class import EWRecord, History
 import numpy as np
-from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
-from django.db.models import Field
-from django.views.decorators.csrf import csrf_exempt
-from record.models import WarnRecord, NodeVersionRecord
 import base64
 import typing
+
+from django.http import HttpResponse
+from django.db.models import Field
+from django.views.decorators.csrf import csrf_exempt
+from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
+from document.logic_class import BaseDoc
+from subgraph.models import Text, NodeCtrl, NodeInfo
+from users.logic_class import BaseUser
+from users.models import NodeAuthority
+from record.models import WarnRecord, NodeVersionRecord
+
+from tools.base_tools import NeoSet, get_special_props, basePath
+from tools.id_generator import id_generator
+from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 
 # NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
 
@@ -251,6 +252,12 @@ def bulk_create_node(request):
         # 保存history
         history = list(output[:, 3])
         NodeVersionRecord.objects.bulk_create(history)
+        # 保存authority
+        authority = list(output[:, 4])
+        NodeAuthority.objects.bulk_create(authority)
+        # 保存
+        text = list(output[:, 5])
+        Text.objects.bulk_create(text)
         collector.tx.commit()
 
         return HttpResponse(content='创建成功', status=200)
@@ -268,10 +275,13 @@ def upload_main_pic(request):
     _id = id_generator(number=1, method='node', content='Media', jump=2)[0]
     data = {"Format": file_format,
             "Name": request.POST.get("name"),
-            "Description": request.POST.get("description"),
+            "Text": request.POST.get("description"),
             "$_IsCommon": True,
             "$_IsShared": True,
-            "Payment": False
+            "Payment": False,
+            "Language": "auto",
+            "Labels": [],
+            "Translate": {}
             }
     # 写入文件
     with open(basePath + "/fileUploadCache/" + str(_id) + "." + file_format, "wb+") as target:
