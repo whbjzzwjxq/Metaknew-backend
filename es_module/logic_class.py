@@ -1,6 +1,7 @@
 from elasticsearch import Elasticsearch
-from subgraph.logic_class import BaseNode, BaseMediaNode
-from typing import *
+from subgraph.logic_class import BaseNode
+from subgraph.models import Text
+from tools.redis_process import set_un_index_text
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
@@ -123,20 +124,15 @@ def add_node_index(node: BaseNode):
         "create_user": ctrl.CreateUser,
         "update_time": ctrl.UpdateTime,
         "name": {
-            "zh": node.trans.Name_zh,
-            "en": node.trans.Name_en,
-            "auto": node.trans.Name_auto
+            "zh": "",
+            "en": "",
+            "auto": info.Name
         },
         "tags": {
             "p_label": node.label,
             "alias": info.Alias,
             "labels": info.Labels,
             "topic": info.Topic
-        },
-        "description": {
-            "zh": node.trans.Des_zh,
-            "en": node.trans.Des_en,
-            "auto": node.trans.Des_auto
         },
         "level": {
             "imp": ctrl.Imp,
@@ -147,6 +143,12 @@ def add_node_index(node: BaseNode):
             "total_time": ctrl.TotalTime
         }
     }
+    for lang in body["name"]:
+        if lang in info.Translate:
+            body["name"][lang] = info.Translate[lang]
+        else:
+            body["name"][lang] = ""
+
     result = es.index(index="nodes", body=body, doc_type="_doc")
     if result["_shards"]["successful"] == 1:
         return True
@@ -155,14 +157,29 @@ def add_node_index(node: BaseNode):
         return False
 
 
-def add_text_index(node: Union[BaseMediaNode]):
+# todo bulk_create
+def add_text_index(text: Text):
     body = {
-        "id": node.id,
-        "language": "auto",
-        "keywords": node.media_type.split("/")[0],
+        "id": text.id,
+        "language": text.Language,
+        "keywords": text.Keywords,
         "text": {
             "zh": "",
             "en": "",
-            "auto": ""
-        }
+            "auto": text.Text
+        },
+        "hot": text.Hot,
+        "star": text.Star
     }
+    for lang in body["text"]:
+        if lang in text.Translate:
+            body["text"][lang] = text.Translate[lang]
+        else:
+            body["text"][lang] = ""
+
+    result = es.index(index="nodes", body=body, doc_type="_doc")
+    if result["_shards"]["successful"] == 1:
+        return True
+    else:
+        set_un_index_text([text.id])
+        return False

@@ -194,3 +194,7 @@ def mime_type_query():
 
 def mime_type_set(mime_type_dict):
     redis.hmset("mime_type", mime_type_dict)
+
+
+def set_un_index_text(id_list: list):
+    return redis.sadd("un_index_text", *id_list)
