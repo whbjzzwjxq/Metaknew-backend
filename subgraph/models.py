@@ -35,7 +35,7 @@ pictures = ["jpg", "png", "gif"]
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     # 不传回的控制性内容
-    CountCacheTime = models.DateTimeField(db_column="CacheTime")  # 最后统计的时间
+    CountCacheTime = models.DateTimeField(db_column="CacheTime", default=now)  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
     ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")  # 导入方式
     CreateTime = models.DateField(db_column="CreateTime", auto_now_add=True, editable=False)  # 创建时间
@@ -66,7 +66,7 @@ class NodeCtrl(models.Model):
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
-    MainPic = models.BigIntegerField(db_column="Main")  # 缩略图/主要图片, 注意储存的是id
+    MainPic = models.BigIntegerField(db_column="Main", null=True)  # 缩略图/主要图片, 注意储存的是id
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
     Name = models.TextField(db_column="Name")
@@ -74,14 +74,14 @@ class NodeInfo(models.Model):
     Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
     BaseImp = LevelField()  # 基础重要度
     BaseHardLevel = LevelField()  # 基础难易度
-    Description = models.TextField(db_column="Description")
-    Language = models.TextField(db_column="Language")
+    Language = models.TextField(db_column="Language", default="auto")
     Topic = TopicField()
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     ExtraProps = JSONField(db_column="ExtraProps", default=dict)
 
     class Meta:
-        db_table = "graph_node_base"
+        abstract = True
+        db_table = "graph_node_info"
 
 
 # todo 更多标签 level: 1
@@ -107,12 +107,22 @@ class Project(NodeInfo):
         db_table = "graph_node_project"
 
 
-class ArchProject(Project):
+class ArchProject(NodeInfo):
+    PeriodStart = models.TextField(db_column="Period_Start")
+    PeriodEnd = models.TextField(db_column="Period_End")
+    Nation = models.TextField(db_column="Nation", max_length=30)
+    Leader = ArrayField(models.TextField(), db_column="Leader", default=list)  # 领头人
     Location = models.TextField(db_column="Location", default="Beijing")
     WorkTeam = ArrayField(models.TextField(), db_column="WorkTeam", default=list)
 
     class Meta:
         db_table = "graph_node_arch_project"
+
+
+class NodeNormal(NodeInfo):
+
+    class Meta:
+        db_table = "graph_node_normal"
 
 
 # todo 更多media  level: 2
@@ -136,7 +146,7 @@ class MediaNode(models.Model):
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
 
     class Meta:
-        db_table = "graph_media_base"
+        db_table = "graph_node_media_base"
 
 
 class Fragment(models.Model):
@@ -176,7 +186,7 @@ class BaseDoc(NodeInfo):
     Complete = LevelField()  # 计算得出
 
     class Meta:
-        db_table = "graph_doc_base"
+        db_table = "graph_node_doc_base"
 
 
 # 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录

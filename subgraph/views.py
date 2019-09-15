@@ -13,7 +13,8 @@ from users.logic_class import BaseUser
 from users.models import NodeAuthority
 from record.models import WarnRecord, NodeVersionRecord
 
-from tools.base_tools import NeoSet, get_special_props, basePath
+from es_module.logic_class import add_node_index, add_text_index, bulk_add_node_index
+from tools.base_tools import NeoSet, get_special_props, basePath, node_init
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 
@@ -177,7 +178,6 @@ from tools.redis_process import query_needed_prop, set_needed_prop, query_availa
 #     return HttpResponse("Create Document Success")
 
 
-# todo js缓存 level: 3
 def query_frontend_prop(request):
     labels = query_available_plabel()
     label_prop_dict = {}
@@ -233,34 +233,40 @@ def bulk_create_node(request):
         # 创建node object
         nodes = [BaseNode(_id=_id, collector=collector, user_id=user_id) for _id in id_list]
         # 注入数据
-        nodes = [node.create(node=data) for node, data in zip(nodes, data_list)]
+        nodes = [node.create(data=data) for node, data in zip(nodes, data_list)]
         # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None
         nodes: typing.List[BaseNode] = [node for node in nodes if node]
-        nodes_id = {node.id: "Node" for node in nodes}
-        user_model.bulk_create_source(nodes_id)
-        # 保存
-        output = np.array([node.output_table_create() for node in nodes])
-        # 保存ctrl
-        ctrl = list(output[:, 0])
-        NodeCtrl.objects.bulk_create(ctrl, batch_size=batch_size)
-        # 保存info
-        info = list(output[:, 1])
-        NodeInfo.objects.bulk_create(info, batch_size=batch_size)
-        # 保存warn
-        warn = list(output[:, 2])
-        WarnRecord.objects.bulk_create(warn)
-        # 保存history
-        history = list(output[:, 3])
-        NodeVersionRecord.objects.bulk_create(history)
-        # 保存authority
-        authority = list(output[:, 4])
-        NodeAuthority.objects.bulk_create(authority)
-        # 保存
-        text = list(output[:, 5])
-        Text.objects.bulk_create(text)
-        collector.tx.commit()
+        if nodes:
+            nodes_id = {node.id: "Node" for node in nodes}
+            user_model.bulk_create_source(nodes_id)
+            # 保存
+            output = np.array([node.output_table_create() for node in nodes])
+            # 保存ctrl
+            ctrl = list(output[:, 0])
+            NodeCtrl.objects.bulk_create(ctrl)
+            # 保存info
+            info = list(output[:, 1])
+            node_init(plabel).objects.bulk_create(info)
+            # 保存warn
+            warn = list(output[:, 2])
+            WarnRecord.objects.bulk_create(warn)
+            # 保存history
+            history = list(output[:, 3])
+            NodeVersionRecord.objects.bulk_create(history)
+            # 保存authority
+            authority = list(output[:, 4])
+            NodeAuthority.objects.bulk_create(authority)
+            # 保存neo4j节点
+            collector.tx.commit()
+            texts = []
+            bulk_add_node_index(nodes)
+            for node in nodes:
+                if node.text:
+                    texts.append(node.text)
+                    add_text_index(node.text)
+            Text.objects.bulk_create(texts)
 
-        return HttpResponse(content='创建成功', status=200)
+        return HttpResponse(content='创建成功 %s个节点 ' % len(nodes), status=200)
     else:
         return HttpResponse(content='用户不存在', status=400)
 
@@ -290,6 +296,7 @@ def upload_main_pic(request):
     media = BaseMediaNode(_id=_id, user_id=user_id, collector=collector).create(data)
     user_model.bulk_create_source({media.id: "Media"})
     media.save()
+
     return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)
 
 
@@ -303,9 +310,43 @@ def query_main_pic(request):
         image = base64.b64encode(image).decode()
         result = {
             "name": media.media.FileName,
-            "description": media.media.Description,
             "image": "data:%s;base64," % media.media.MediaType + image
         }
         return HttpResponse(json.dumps(result), status=200)
     else:
         return HttpResponse(status=404)
+
+
+def upload_media(request):
+    collector = NeoSet()
+    user_id = request.GET.get("user_id")
+    user_model = BaseUser(_id=user_id)
+    file = request.FILES["file"]
+    file_format = str(file.name).split(".")[-1].lower()
+    _id = id_generator(number=1, method='node', content='Media', jump=2)[0]
+    data = {"Format": file_format,
+            "Name": request.POST.get("name"),
+            "Text": request.POST.get("description"),
+            "$_IsCommon": True,
+            "$_IsShared": True,
+            "Payment": False,
+            "Language": request.POST.get("Language"),
+            "Labels": json.loads(request.POST.get("Labels")),
+            "Translate": json.loads(request.POST.get("Translate"))
+            }
+    if request.POST.get("$_IsCommon") == "false":
+        data["$_IsCommon"] = False
+    if request.POST.get("$_IsShared") == "false":
+        data["$_IsShared"] = False
+
+    # 写入文件
+    with open(basePath + "/fileUploadCache/" + str(_id) + "." + file_format, "wb+") as target:
+        target.write(file.read())
+    media = BaseMediaNode(_id=_id, user_id=user_id, collector=collector).create(data)
+    user_model.bulk_create_source({media.id: "Media"})
+    media.save()
+    if media.text:
+        media.text.save()
+        add_text_index(text=media.text)
+    return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)
+

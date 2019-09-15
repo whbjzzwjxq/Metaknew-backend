@@ -115,7 +115,6 @@ def login_cookie(request):
             if not user:
                 return HttpResponse(content="非法的用户名", status=400)
             else:
-                # 需不需要刷新状态 todo level: 3
                 return user.login_success()
     else:
         return HttpResponse(content="以游客身份登录", status=200)

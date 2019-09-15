@@ -5,13 +5,14 @@ from django.db.models import Max
 from record.logic_class import field_check
 from record.models import NodeVersionRecord, WarnRecord
 from subgraph.models import NodeCtrl, NodeInfo, MediaNode, Fragment, Text
-from datetime import datetime
+from datetime import datetime, timezone
 from tools.id_generator import device_id
 from tools.redis_process import set_location_queue
 from record.logic_class import error_check, ObjectAlreadyExist
 from users.models import MediaAuthority, NodeAuthority
 from typing import Optional, Dict, List, Type
 import mimetypes
+import json
 from tools.redis_process import mime_type_query, mime_type_set
 
 # 创建的时候使用的是Info
@@ -50,8 +51,8 @@ create_node_format = {
 }
 
 
-def neo4j_create_node(_type: str, labels: List[str], plabel: str, props: Dict,
-                      is_user_made=True, is_common=True, collector=base_tools.NeoSet()) -> Node:
+def neo4j_create_node(_type: str, labels: List[str], plabel: str, props: Dict, collector: base_tools.NeoSet(),
+                      is_user_made=True, is_common=True) -> Node:
     """
 
     :param _type: Node | Media | Document | Fragment
@@ -214,7 +215,7 @@ class BaseNode:
                 self.lack.append("text")
 
     # ---------------- create ----------------
-    @error_check
+    # @error_check
     def create(self, data):
         self.is_draft = False
         self.is_create = True
@@ -227,8 +228,9 @@ class BaseNode:
 
         self.__ctrl_create(data=data)  # done 09-10
         self.__info_create(data=data)  # done 09-10
-        self.__text_update(data=data)  # done 09-11
+        self.name_checker()  # done 09-13
         self.__auth_create(data=data)  # done 09-10
+        self.__text_update(data=data)  # done 09-11
         props = {"_id": self.id, "Name": data["Name"], "Imp": data["BaseImp"], "HardLevel": data["BaseHardLevel"]}
         self.node = neo4j_create_node(_type="Node", labels=data["Labels"] + data["Topic"], plabel=self.label,
                                       props=props,
@@ -252,11 +254,12 @@ class BaseNode:
         self.info = base_tools.node_init(self.label)()
         self.info.NodeId = self.id
         self.info.PrimaryLabel = self.label
-        self.info.Translate = {key[4:len(key)]: value for key, value in data["Translate"].items() if
+        self.info.Translate = {key[5:len(key)]: value for key, value in data["Translate"].items() if
                                key[0:5] == "Name_"}
         # 初始化
         self.info_update(data)
         self.main_pic_setter(data["MainPic"])
+        self.media_setter(data["IncludedMedia"])
         return self
 
     # 设置控制信息 done
@@ -267,7 +270,7 @@ class BaseNode:
             contributor = {"create": data["$_UserName"], "update": []}
         self.ctrl = NodeCtrl(
             NodeId=self.id,
-            CountCacheTime=datetime.now().replace(microsecond=0),
+            CountCacheTime=datetime.now(tz=timezone.utc).replace(microsecond=0),
             Is_UserMade=self.is_user_made,
             CreateUser=self.user_id,
             PrimaryLabel=self.label,
@@ -291,19 +294,22 @@ class BaseNode:
                                                  )
 
     def __text_update(self, data: dict):
-        if self.is_create:
-            self.text = Text(NodeId=self.id,
-                             Is_Bound=True,
-                             Language=data["Language"])
-        else:
-            self.__query_text()
+        if self.authority.Common and data["Text"] != "":
+            if self.is_create:
+                self.text = Text(NodeId=self.id,
+                                 Is_Bound=True,
+                                 Language=data["Language"])
+            else:
+                self.__query_text()
 
-        text = {key[4:len(key)]: value for key, value in data["Translate"].items() if key[0:5] == "Text_"}
-        self.text.Translate = text
-        self.text.Keywords = data["Labels"]
-        self.text.Text = data["Text"]
-        self.text.Star = self.ctrl.Star
-        self.text.Hot = self.ctrl.Hot
+            text = {key[5:len(key)]: value for key, value in data["Translate"].items() if key[0:5] == "Text_"}
+            self.text.Translate = text
+            self.text.Keywords = data["Labels"]
+            self.text.Text = data["Text"]
+            self.text.Star = self.ctrl.Star
+            self.text.Hot = self.ctrl.Hot
+        else:
+            self.text = None
         return self
 
     def __auth_create(self, data):
@@ -343,6 +349,12 @@ class BaseNode:
     def node_status(self):
         pass
 
+    def name_checker(self):
+        similar_node = base_tools.node_init(self.label).objects.filter(Name=self.info.Name)
+        if len(similar_node) > 0:
+            warn = {"field": "Name", "warn_type": "similar_node_id" + json.dumps([node.NodeId for node in similar_node])}
+            self.warn.WarnContent.append(warn)
+
     # todo 媒体相关field 改为 MediaField level: 3
     def main_pic_setter(self, media):
         try:
@@ -355,6 +367,16 @@ class BaseNode:
         except ObjectDoesNotExist:
             warn = {"field": "MainPic", "warn_type": "empty_prop"}
             self.warn.WarnContent.append(warn)
+        return self
+
+    def media_setter(self, media_list):
+        for media_id in media_list:
+            try:
+                record = MediaNode.objects.get(pk=media_id)
+                if record:
+                    self.info.IncludedMedia.append(media_id)
+            except ObjectDoesNotExist:
+                pass
         return self
 
     def delete(self):
@@ -374,10 +396,7 @@ class BaseNode:
         注意尽量不要使用单个Node保存
         :return:
         """
-        self.collector.tx.push(self.node)
-        self.collector.tx.commit()
-        self.info.save()
-        self.ctrl.save()
+        pass
 
     def handle_for_frontend(self):
         pass
@@ -411,8 +430,8 @@ class BaseMediaNode:
         self.node = neo4j_create_node(_type="Media",
                                       labels=data["Labels"],
                                       plabel=self.media_type.split("/")[0],
-                                      props={"_id": self.id})
-        self.collector.tx.create(self.node)
+                                      props={"_id": self.id, "Name": data["Name"]},
+                                      collector=self.collector)
         self.authority = MediaAuthority(
             SourceId=self.id,
             Used=True,
@@ -444,7 +463,6 @@ class BaseMediaNode:
     def save(self):
         self.media.save()
         self.authority.save()
-        self.text.save()
         self.collector.tx.commit()
 
     @staticmethod
@@ -464,6 +482,7 @@ class BaseMediaNode:
         try:
             self.media = MediaNode.objects.get(pk=self.id)
             self.media_type = self.media.MediaType
+            self.__query_text()
             return self
         except ObjectDoesNotExist:
             return None
@@ -473,7 +492,7 @@ class BaseMediaNode:
             try:
                 self.text = Text.objects.get(NodeId=self.id)
             except ObjectDoesNotExist:
-                pass
+                self.text = None
 
 
 # todo Link 重构 level: 0

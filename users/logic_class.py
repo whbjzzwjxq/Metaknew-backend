@@ -6,7 +6,6 @@ from tools.encrypt import make_token
 from tools.redis_process import *
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
-from django.db.models import Model
 import typing
 from tools.base_tools import model_to_dict
 
@@ -117,6 +116,7 @@ class BaseUser:
                 else:
                     raise AttributeError("Unknown Source Type")
             self.repository.save()
+            self.privilege.save()
 
     def save(self):
         self.user.save()

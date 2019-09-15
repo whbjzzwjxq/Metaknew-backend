@@ -11,6 +11,12 @@ re_label_id = regex.compile("(\w*)(\|)(\d*)(h{0,15})")
 
 
 def make_token(user_name, user_id):
+    """
+    登录用的令牌
+    :param user_name:
+    :param user_id:
+    :return:
+    """
     secret = "f0ba2016d24c545a" + "".join(random.sample(string.ascii_letters + string.digits, 8))
     # secret = "f0ba2016d24c545a"
     content = {
@@ -23,7 +29,12 @@ def make_token(user_name, user_id):
 
 
 def padding(text, char):
-
+    """
+    AES加密 本来是设计加密id的
+    :param text:
+    :param char:
+    :return:
+    """
     bytes_length = len(bytes(text, encoding="utf-8"))
     padding_length = block_size - bytes_length % block_size
     padding_text = bytes(char, encoding="utf-8") * padding_length

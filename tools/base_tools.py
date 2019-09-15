@@ -24,12 +24,11 @@ class NeoSet:
 
 
 node_model_dict: Dict[str, Type[NodeInfo]] = {
-    "BaseNode": NodeInfo,
+    "BaseNode": NodeNormal,
     "Person": Person,
     "Project": Project,
     "ArchProject": ArchProject,
     "Document": BaseDoc,
-    "Fragment": Fragment
 }
 
 link_model_dict: Dict[str, Type[Relationship]] = {
@@ -52,7 +51,7 @@ def node_init(label) -> Type[NodeInfo]:
     if label in node_model_dict:
         return node_model_dict[label]
     else:
-        return NodeInfo
+        return NodeNormal
 
 
 def link_init(label) -> Type[Relationship]:

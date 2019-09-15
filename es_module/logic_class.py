@@ -1,8 +1,8 @@
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
 from subgraph.logic_class import BaseNode
 from subgraph.models import Text
-from tools.redis_process import set_un_index_text
-
+from tools.redis_process import set_un_index_text, set_un_index_node
+from typing import List
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
 
@@ -79,43 +79,7 @@ class EsQuery:
         return self.get_uuid_from_result(self.auto_complete(target=target, index="documents"))
 
 
-class EsIndex:
-
-    def __init__(self, index):
-        self.index = index
-        self.es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
-
-
-# # todo 消息队列处理 level :1
-# async def add_node_index(node: BaseNode):
-#     assert node.already
-#     root = node.root
-#     info = node.info
-#     target = "content.%s" % root["Language"]
-#     body = {
-#         "alias": info["Alias"],
-#         target: info["Description"],
-#         "labels": list(root.labels),
-#         "language": root["Language"],
-#         "name": {"auto": root["name"],
-#                  "zh": root["name_zh"],
-#                  "en": root["name_en"]},
-#         "p_label": root["PrimaryLabel"],
-#         "uuid": root["uuid"]
-#     }
-#     result = es.index(index="nodes", body=body, doc_type="_doc")
-#     if result["_shards"]["successful"] == 1:
-#         return True
-#     else:
-#         a = AddRecord()
-#         content = {"result": result,
-#                    "status": "Failed",
-#                    "type": "es_upload"}
-#         a.add_record(False, True, uuid, p_label, json.dumps(content))
-#         return False
-
-
-def add_node_index(node: BaseNode):
+def node_index(node: BaseNode):
     ctrl = node.ctrl
     info = node.info
     body = {
@@ -146,21 +110,13 @@ def add_node_index(node: BaseNode):
     for lang in body["name"]:
         if lang in info.Translate:
             body["name"][lang] = info.Translate[lang]
-        else:
-            body["name"][lang] = ""
 
-    result = es.index(index="nodes", body=body, doc_type="_doc")
-    if result["_shards"]["successful"] == 1:
-        return True
-    else:
-        node.warn.WarnContent.append({"field": "index", "warn_type": "index_create_failed"})
-        return False
+    return body
 
 
-# todo bulk_create
-def add_text_index(text: Text):
+def text_index(text: Text):
     body = {
-        "id": text.id,
+        "id": text.NodeId,
         "language": text.Language,
         "keywords": text.Keywords,
         "text": {
@@ -169,17 +125,64 @@ def add_text_index(text: Text):
             "auto": text.Text
         },
         "hot": text.Hot,
-        "star": text.Star
+        "star": text.Star,
+        "is_bound": text.Is_Bound
     }
     for lang in body["text"]:
         if lang in text.Translate:
             body["text"][lang] = text.Translate[lang]
-        else:
-            body["text"][lang] = ""
+    return body
 
-    result = es.index(index="nodes", body=body, doc_type="_doc")
-    if result["_shards"]["successful"] == 1:
-        return True
+
+def add_node_index(node: BaseNode):
+    if node.authority.Common:
+        body = node_index(node)
+        result = es.index(id=node.id, index="nodes", body=body)
+        if result["_shards"]["successful"] == 1:
+            return True
+        else:
+            set_un_index_node([node.id])
+            return False
     else:
-        set_un_index_text([text.id])
         return False
+
+
+def add_text_index(text: Text):
+    if text:
+        body = text_index(text)
+        result = es.index(index="texts", body=body, doc_type="_doc")
+        if result["_shards"]["successful"] == 1:
+            return True
+        else:
+            set_un_index_text([text.NodeId])
+            return False
+
+
+def bulk_add_node_index(nodes: List[BaseNode]):
+    def index_nodes():
+        for node in nodes:
+            if node.authority.Common:
+                body = node_index(node)
+                yield {
+                    "_op_type": "create",
+                    "_index": "nodes",
+                    "_id": node.id,
+                    "doc": body
+                }
+    result = helpers.bulk(es, index_nodes())
+    return result
+
+
+def bulk_add_text_index(texts: List[Text]):
+    def index_texts():
+        for text in texts:
+            if text:
+                body = text_index(text)
+                yield {
+                    "_op_type": "create",
+                    "_index": "texts",
+                    "_id": text.NodeId,
+                    "doc": body
+                }
+    result = helpers.bulk(es, index_texts())
+    return result

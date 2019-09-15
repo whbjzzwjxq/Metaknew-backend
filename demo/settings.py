@@ -70,7 +70,6 @@ INSTALLED_APPS = [
     "users",
     "subgraph",
     "document",
-    "search",
     "record",
     "tools",
     "es_module"

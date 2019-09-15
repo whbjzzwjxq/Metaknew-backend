@@ -21,7 +21,7 @@ def error_check(_func):
             name = type(e).__name__
             EWRecord.add_error_record(user=self.user_id,
                                       source_id=self.id,
-                                      source_label=self.__class__.__name__,
+                                      source_label=self.label,
                                       data=node,
                                       bug_type=name)
             return None

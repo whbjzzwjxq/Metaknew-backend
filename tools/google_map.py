@@ -17,7 +17,7 @@ def get_locations():
     return True
 
 
-# done 07-24 todo 看一下api能不能批量处理 level: 2
+# todo 看一下api能不能批量处理 level: 2
 def get_location(location):
     loc = str(location)
     try:

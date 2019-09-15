@@ -129,7 +129,7 @@ class UserDocProgress(models.Model):
 # 5 SharedTo 是指可以进行查询级别操作的用户
 
 
-# done in 07-22
+# done 07-22
 # 控制主题
 class BaseAuthority(models.Model):
     SourceId = models.BigIntegerField(primary_key=True, db_index=True)  # 资源id

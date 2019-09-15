@@ -24,8 +24,6 @@ urlpatterns = [
     # path("admin/", admin.site.urls),
     path("document/", include("document.urls")),
     path("user/", include("users.urls")),
-    url(r"media/(?P<path>.*)", serve, {"document_root": settings.BASE_DIR}),
-    path("search/", include("search.urls")),
     path("subgraph/", include("subgraph.urls")),
     path("es_query/", include("es_module.urls")),
     path("tools/", include("tools.urls"))

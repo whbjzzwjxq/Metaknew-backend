@@ -9,7 +9,7 @@ week = 7 * 24 * 3600
 month = 30 * 24 * 3600
 
 pool = redis.ConnectionPool(host="39.96.10.154", port=6379, db=1, decode_responses=True)
-redis = redis.StrictRedis(connection_pool=pool)
+redis_instance = redis.StrictRedis(connection_pool=pool)
 
 
 # 集中redis的原因是防止误设置键值
@@ -18,11 +18,11 @@ redis = redis.StrictRedis(connection_pool=pool)
 
 # ----------------user登录相关
 def user_set_message(phone, message):
-    return redis.setex(name="phone_" + phone, time=5 * minute, value=message)
+    return redis_instance.setex(name="phone_" + phone, time=5 * minute, value=message)
 
 
 def user_check_message(phone):
-    current = redis.ttl("phone_" + phone)
+    current = redis_instance.ttl("phone_" + phone)
     if current >= 120:
         return True
     else:
@@ -30,13 +30,13 @@ def user_check_message(phone):
 
 
 def user_query_message(phone):
-    return redis.get("phone_" + phone)
+    return redis_instance.get("phone_" + phone)
 
 
 def user_login_set(user: User, privilege: Privilege, token):
     name = user.UserName
     _id = user.UserId
-    with redis.pipeline(transaction=True) as pipe:
+    with redis_instance.pipeline(transaction=True) as pipe:
         pipe.multi()
         pipe.set(_id, token, ex=week)
         pipe.set("user_" + name, _id, ex=week)
@@ -69,7 +69,7 @@ def user_login_set(user: User, privilege: Privilege, token):
 
 
 def group_privilege_set(_id, privilege):
-    with redis.pipeline(transaction=True) as pipe:
+    with redis_instance.pipeline(transaction=True) as pipe:
         pipe.multi()
         for field in Privilege._meta.get_fields():
             if field.name != "UserId":
@@ -82,7 +82,7 @@ def group_privilege_set(_id, privilege):
 
 def user_group_privilege_info_query(_id):
     result = {}
-    with redis.pipeline() as pipe:
+    with redis_instance.pipeline() as pipe:
         pipe.multi()
         for field in Privilege._meta.get_fields():
             if field.name != "UserId":
@@ -95,8 +95,8 @@ def user_group_privilege_info_query(_id):
 
 def user_query_by_name(username):
     # todo 事务操作 level: 2
-    _id = redis.get("user_" + username)
-    token = redis.get(_id)
+    _id = redis_instance.get("user_" + username)
+    token = redis_instance.get(_id)
     return _id, token
 
 
@@ -106,46 +106,46 @@ def user_query_info_by_id(_id):
         return None
     else:
         # info 定义 上方cache_info
-        info = redis.hgetall("info_" + str(_id))
+        info = redis_instance.hgetall("info_" + str(_id))
         info = {key: bool(value) for key, value in info.items()}
 
         # join_group定义 上方
-        join_group = redis.hgetall("join_group_" + str(_id))
+        join_group = redis_instance.hgetall("join_group_" + str(_id))
         privilege = {}
         for field in Privilege._meta.get_fields():
             if field.name != "UserId":
                 name = field.name + "_" + str(_id)
-                value = redis.smembers(name)
+                value = redis_instance.smembers(name)
                 privilege.update({field.name: value})
         return {"bool_info": info, "joint_group": join_group, "privilege": privilege}
 
 
 # ----------------名字翻译 地名转译相关
 def query_location_queue():
-    return redis.smembers("location_queue")
+    return redis_instance.smembers("location_queue")
 
 
 def remove_location_queue(locations):
-    return redis.srem("location_queue", locations)
+    return redis_instance.srem("location_queue", locations)
 
 
 def set_location_queue(locations):
-    return redis.sadd("location_queue", *locations)
+    return redis_instance.sadd("location_queue", *locations)
 
 
 def set_translate_queue(name, _id):
-    return redis.set("translation_" + _id, name)
+    return redis_instance.set("translation_" + _id, name)
 
 
 # ----------------word_index相关
 
 def query_word_index(word_list):
-    index = redis.hmget("word_index", word_list)
+    index = redis_instance.hmget("word_index", word_list)
     return index
 
 
 def query_index_word(indexes):
-    word_list = redis.hmget("index_word", indexes)
+    word_list = redis_instance.hmget("index_word", indexes)
     return word_list
 
 
@@ -155,8 +155,8 @@ def set_word_index(word_list, index_list):
     if len(word_list) > 0:
         word_index = {word: index for word, index in zip(word_list, index_list)}
         index_word = {index: word for word, index in zip(word_list, index_list)}
-        a = redis.hmset("word_index", word_index)
-        b = redis.hmset("index_word", index_word)
+        a = redis_instance.hmset("word_index", word_index)
+        b = redis_instance.hmset("index_word", index_word)
         return a and b
     else:
         return True
@@ -164,7 +164,7 @@ def set_word_index(word_list, index_list):
 
 # ----------------标签-属性
 def query_needed_prop(plabel):
-    prop_dict = redis.hgetall("plabel_" + plabel)
+    prop_dict = redis_instance.hgetall("plabel_" + plabel)
     if prop_dict:
         return prop_dict
     else:
@@ -173,15 +173,15 @@ def query_needed_prop(plabel):
 
 def set_needed_prop(plabel, prop_dict):
     key = "plabel_" + plabel
-    current = redis.hkeys(key)
+    current = redis_instance.hkeys(key)
     if len(current) > 0:
-        redis.hdel(key, *current)
-    redis.hmset(key, prop_dict)
+        redis_instance.hdel(key, *current)
+    redis_instance.hmset(key, prop_dict)
     return True
 
 
 def query_available_plabel():
-    plabel_list = redis.smembers("plabel_list")
+    plabel_list = redis_instance.smembers("plabel_list")
     if plabel_list:
         return plabel_list
     else:
@@ -189,12 +189,16 @@ def query_available_plabel():
 
 
 def mime_type_query():
-    return redis.hgetall("mime_type")
+    return redis_instance.hgetall("mime_type")
 
 
 def mime_type_set(mime_type_dict):
-    redis.hmset("mime_type", mime_type_dict)
+    redis_instance.hmset("mime_type", mime_type_dict)
 
 
 def set_un_index_text(id_list: list):
-    return redis.sadd("un_index_text", *id_list)
+    return redis_instance.sadd("un_index_text", *id_list)
+
+
+def set_un_index_node(id_list: list):
+    return redis_instance.sadd("un_index_node", *id_list)
