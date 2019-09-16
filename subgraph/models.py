@@ -172,6 +172,7 @@ class Text(models.Model):
     Translate = HStoreField(default=translation)
     # 是否与一个实体绑定
     Is_Bound = models.BooleanField(default=False)
+    SourceType = models.TextField(default="Node")
     Star = models.BigIntegerField(default=0)
     Hot = HotField()
 

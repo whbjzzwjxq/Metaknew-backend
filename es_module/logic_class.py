@@ -186,3 +186,7 @@ def bulk_add_text_index(texts: List[Text]):
                 }
     result = helpers.bulk(es, index_texts())
     return result
+
+
+def query_name(keyword):
+    pass
