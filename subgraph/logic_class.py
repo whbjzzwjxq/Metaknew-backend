@@ -13,6 +13,7 @@ from users.models import MediaAuthority, NodeAuthority
 from typing import Optional, Dict, List, Type
 import mimetypes
 import json
+import base64
 from tools.redis_process import mime_type_query, mime_type_set
 
 # 创建的时候使用的是Info
@@ -158,16 +159,14 @@ class BaseNode:
 
     def query_base(self):
         """
-        查询info和ctrl的内容
+        查询info,ctrl,text, authority的内容 也就是前端 索引的基本内容
         :return:
         """
-        try:
-            self.ctrl = NodeCtrl.objects.get(pk=self.id)
-            self.label = self.ctrl.PrimaryLabel
-            self.info = base_tools.node_init(self.label).objects.get(pk=self.id)
-            return self
-        except ObjectDoesNotExist:
-            return None
+        result = self.query_ctrl()
+        result &= self.query_info()
+        result &= self.query_text()
+
+        return result
 
     def query_all(self):
         """
@@ -176,9 +175,8 @@ class BaseNode:
         """
         success = self.query_base()
         if success:
-            self.__query_node()
-            self.__query_text()
-            self.__query_history()
+            self.query_node()
+            self.query_history()
         return self
 
     def query_with_label(self, label):
@@ -196,23 +194,61 @@ class BaseNode:
         except ObjectDoesNotExist:
             return None
 
-    def __query_history(self):
+    def query_ctrl(self) -> bool:
+        if not self.ctrl:
+            try:
+                self.ctrl = NodeCtrl.objects.get(NodeId=self.id)
+                self.label = self.ctrl.PrimaryLabel
+                return True
+            except ObjectDoesNotExist:
+                return False
+        else:
+            self.label = self.ctrl.PrimaryLabel
+            return True
+
+    def query_info(self) -> bool:
+        if not self.ctrl:
+            return False
+        elif not self.info:
+            try:
+                self.info = base_tools.node_init(self.label).objects.get(NodeId=self.id)
+                return True
+            except ObjectDoesNotExist:
+                return False
+        else:
+            return True
+
+    def query_history(self):
         self.history = NodeVersionRecord.objects.filter(SourceId=self.id)
         if len(self.history) == 0:
             self.lack.append("history")
 
-    def __query_node(self):
-        try:
-            self.node = self.collector.Nmatcher.match(_id=self.id).first()
-        except ObjectDoesNotExist:
+    def query_node(self):
+        self.node = self.collector.Nmatcher.match(_id=self.id).first()
+        if not self.node:
             self.lack.append("node")
 
-    def __query_text(self):
+    def query_text(self) -> bool:
         if not self.text:
             try:
                 self.text = Text.objects.get(NodeId=self.id)
+                return True
             except ObjectDoesNotExist:
                 self.lack.append("text")
+                return False
+        else:
+            return True
+
+    def query_authority(self) -> bool:
+        if not self.authority:
+            try:
+                self.authority = NodeAuthority.objects.get(SourceId=self.id)
+                return True
+            except ObjectDoesNotExist:
+                self.lack.append("authority")
+                return False
+        else:
+            return True
 
     # ---------------- create ----------------
     # @error_check
@@ -333,7 +369,6 @@ class BaseNode:
 
     def info_update(self, data):
         # todo 把 地理识别的内容 改写为LocationField level: 3
-        # todo 尝试重构一下info_update
         needed_props = base_tools.get_update_props(self.label)
         for field in needed_props:
             old_prop = getattr(self.info, field.name)
@@ -352,7 +387,8 @@ class BaseNode:
     def name_checker(self):
         similar_node = base_tools.node_init(self.label).objects.filter(Name=self.info.Name)
         if len(similar_node) > 0:
-            warn = {"field": "Name", "warn_type": "similar_node_id" + json.dumps([node.NodeId for node in similar_node])}
+            warn = {"field": "Name",
+                    "warn_type": "similar_node_id" + json.dumps([node.NodeId for node in similar_node])}
             self.warn.WarnContent.append(warn)
 
     # todo 媒体相关field 改为 MediaField level: 3
@@ -451,7 +487,7 @@ class BaseMediaNode:
                              Is_Bound=True,
                              Language=data["Language"])
         else:
-            self.__query_text()
+            self.query_text()
 
         self.text.Translate = data["Translate"]
         self.text.Keywords = data["Labels"]
@@ -478,25 +514,43 @@ class BaseMediaNode:
         else:
             return "unknown"
 
-    def query(self):
-        try:
-            self.media = MediaNode.objects.get(pk=self.id)
-            self.media_type = self.media.MediaType
-            self.__query_text()
-            return self
-        except ObjectDoesNotExist:
-            return None
+    def query_all(self):
+        result = True
+        result &= self.query_media()
+        result &= self.query_text()
+        return result
 
-    def __query_text(self):
+    def query_media(self):
+        if not self.media:
+            try:
+                self.media = MediaNode.objects.get(pk=self.id)
+                self.media_type = self.media.MediaType
+                return True
+            except ObjectDoesNotExist:
+                return False
+
+    def query_text(self):
         if not self.text:
             try:
                 self.text = Text.objects.get(NodeId=self.id)
+                return True
             except ObjectDoesNotExist:
                 self.text = None
+                return False
+
+    def query_as_main_pic(self):
+        self.query_all()
+        if self.media.MediaType[0:5] == "image":
+            with open(base_tools.basePath + "/fileUploadCache/" + str(self.id) + "." + self.media.Format, "rb") as f:
+                image = f.read()
+            image = base64.b64encode(image).decode()
+            return "data:%s;base64," % self.media.MediaType + image
+        else:
+            return ""
 
 
 # todo Link 重构 level: 0
-class BaseLink(object):
+class BaseLink:
     def __init__(self, link_type, collector=base_tools.NeoSet(), user=0):
         self._id = 0
         self.r_type = link_type

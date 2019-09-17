@@ -66,7 +66,7 @@ class NodeCtrl(models.Model):
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
-    MainPic = models.BigIntegerField(db_column="Main", null=True)  # 缩略图/主要图片, 注意储存的是id
+    MainPic = models.BigIntegerField(db_column="Main", default=-1)  # 缩略图/主要图片, 注意储存的是id
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
     Name = models.TextField(db_column="Name")

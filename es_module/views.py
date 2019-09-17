@@ -1,9 +1,10 @@
 from elasticsearch import Elasticsearch
-from es_module.logic_class import EsQuery
+from es_module.logic_class import bulk_add_node_index, es
+from subgraph.logic_class import BaseNode, BaseMediaNode
+from users.models import NodeAuthority
 import json
 from django.shortcuts import HttpResponse
 
-es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 hits_format = {"took": 1,
                "timed_out": False,
                "_shards": {"total": 1, "successful": 1, "skipped": 0, "failed": 0},
@@ -20,7 +21,19 @@ def query_for_home_page(request):
     """
     if request.method == "POST":
         request_params = json.loads(request.body)
-
+        # todo 综合查询 level: 2
+        return_template = {
+            "name": "test",
+            "score": 10,
+            "star": 20,
+            "labels": ["ArchProject", "Architecture", "Recent"],
+            "total_time": 60,
+            "main_pic": BaseMediaNode(_id=2, user_id=2).query_as_main_pic()
+        }
+        results = {"nodes": [return_template],
+                   "documents": [return_template, return_template],
+                   "course": [return_template]}
+        return HttpResponse(json.dumps(results))
 
 
 def query_name_similarity(request):
@@ -30,7 +43,7 @@ def query_name_similarity(request):
         query_index = json.dumps({"index": "nodes"}) + "\n"
         query_object = json.dumps({
             "id": "single_name_query",
-            "params": {"field": "doc.name.%s.keyword" % language_support(lang), "name": name}}) + "\n "
+            "params": {"field": "name.%s" % language_support(lang), "name": name}}) + "\n "
         return query_index + query_object
 
     def handle_hit(result):
@@ -58,3 +71,17 @@ def language_support(lang):
     else:
         field = "auto"
     return field
+
+
+def reindex_nodes(request):
+    def query_common_node(auth):
+        _id = auth.SourceId
+        base_node = BaseNode(_id=_id, user_id=user_id)
+        base_node.authority = auth
+        base_node.query_base()
+        return base_node
+    user_id = request.GET.get("user_id")
+    authorities = NodeAuthority.objects.filter(Common=True, Used=True)
+    base_nodes = [query_common_node(auth)for auth in authorities]
+    bulk_add_node_index(base_nodes)
+    return HttpResponse(status=200)

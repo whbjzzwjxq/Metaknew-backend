@@ -1,11 +1,8 @@
 import json
 import numpy as np
-import base64
 import typing
 
 from django.http import HttpResponse
-from django.db.models import Field
-from django.views.decorators.csrf import csrf_exempt
 from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
 from subgraph.models import Text, NodeCtrl, NodeInfo
@@ -17,9 +14,6 @@ from es_module.logic_class import add_node_index, add_text_index, bulk_add_node_
 from tools.base_tools import NeoSet, get_special_props, basePath, node_init
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
-
-# NeoNode: 存在neo4j里的部分 node: 数据源 NewNode: 存在postgre的部分  已经测试过
-
 
 # def check_node_exist(node, collector):
 #     if "uuid" in node:
@@ -191,7 +185,7 @@ def query_frontend_prop(request):
     return HttpResponse(json.dumps(label_prop_dict))
 
 
-def query_field_type(field: Field) -> str:
+def query_field_type(field) -> str:
     field_type = type(field).__name__
     return field_type
 
@@ -271,7 +265,7 @@ def bulk_create_node(request):
         return HttpResponse(content='用户不存在', status=400)
 
 
-@csrf_exempt
+# todo 图片缩放 level: 1
 def upload_main_pic(request):
     collector = NeoSet()
     user_id = request.GET.get("user_id")
@@ -303,14 +297,11 @@ def upload_main_pic(request):
 def query_main_pic(request):
     user_id = request.GET.get("user_id")
     media_id = request.GET.get("media_id")
-    media = BaseMediaNode(_id=media_id, user_id=user_id).query()
+    media = BaseMediaNode(_id=media_id, user_id=user_id).query_all()
     if media:
-        with open(basePath + "/fileUploadCache/" + str(media_id) + "." + media.media.Format, "rb") as target:
-            image = target.read()
-        image = base64.b64encode(image).decode()
         result = {
             "name": media.media.FileName,
-            "image": "data:%s;base64," % media.media.MediaType + image
+            "image": media.query_as_main_pic()
         }
         return HttpResponse(json.dumps(result), status=200)
     else:

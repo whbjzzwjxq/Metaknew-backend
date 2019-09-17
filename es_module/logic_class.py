@@ -87,13 +87,14 @@ def node_index(node: BaseNode):
         "language": info.Language,
         "create_user": ctrl.CreateUser,
         "update_time": ctrl.UpdateTime,
+        "main_pic": info.MainPic,
         "name": {
             "zh": "",
             "en": "",
             "auto": info.Name
         },
         "tags": {
-            "p_label": node.label,
+            "p_label": info.PrimaryLabel,
             "alias": info.Alias,
             "labels": info.Labels,
             "topic": info.Topic
@@ -167,7 +168,7 @@ def bulk_add_node_index(nodes: List[BaseNode]):
                     "_op_type": "create",
                     "_index": "nodes",
                     "_id": node.id,
-                    "doc": body
+                    "_source": body
                 }
     result = helpers.bulk(es, index_nodes())
     return result
@@ -182,11 +183,7 @@ def bulk_add_text_index(texts: List[Text]):
                     "_op_type": "create",
                     "_index": "texts",
                     "_id": text.NodeId,
-                    "doc": body
+                    "_source": body
                 }
     result = helpers.bulk(es, index_texts())
     return result
-
-
-def query_name(keyword):
-    pass

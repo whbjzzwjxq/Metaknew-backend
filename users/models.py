@@ -144,6 +144,9 @@ class BaseAuthority(models.Model):
     HighVip = models.BooleanField(db_column="high_vip", default=False)
 
     class Meta:
+        indexes = [
+            models.Index(fields=["Used", "Common"])
+        ]
         abstract = True
 
 

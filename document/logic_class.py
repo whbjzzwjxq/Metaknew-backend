@@ -75,7 +75,6 @@ class BaseDoc:
         self.is_draft = False
         self.is_creator = True
         self.personal_notes = []
-        # todo 权限验证 level: 0
         self.node = BaseNode(_id=self._id, user=self.user, collector=self.collector).query_with_label("Document")
         if self.node:
             if self.node.info.Has_Paper:
