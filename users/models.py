@@ -95,9 +95,11 @@ class UserConcern(models.Model):
     Imp = LevelField()
     HardLevel = LevelField()
     Useful = LevelField()
-    Is_Star = models.BooleanField(default=False)
-    Is_Tag = models.BooleanField(default=False)
-
+    Is_Star = models.BooleanField(default=False)  # 是否收藏
+    Is_Good = models.BooleanField(default=False)  # 是否点赞
+    Is_Shared = models.BooleanField(default=False)  # 是否分享给别人
+    SpendTime = models.IntegerField(db_column="SpendTime", default=0)  # 花费的时间
+    
     class Meta:
         indexes = [
             models.Index(fields=["SourceId", "SourceType"])

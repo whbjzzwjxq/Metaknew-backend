@@ -1,7 +1,6 @@
 # -*-coding=utf-8 -*-
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
-from tools.models import LevelField
 from subgraph.models import NodeInfo
 
 
@@ -44,10 +43,10 @@ def node_setting():
 def link_setting():
     setting = {
         "_id": 0,  # id
-        "Width": 1,  # 宽度
-        "Color": "000000",  # 颜色
-        "Type": 1,  # 这个type具体定义一下
-        "Show": True
+        "width": 1,  # 宽度
+        "color": "#000000",  # 颜色
+        "type": "",  # 这个type具体定义一下
+        "show": True
     }
     return [setting]
 
@@ -59,7 +58,7 @@ def note_setting():
         "Conf": {"x": 0.5,
                  "y": 0.5,
                  "opacity": 0.5,
-                 "background": "000000"
+                 "background": "#000000"
                  },
         "Content": "",
         "TagType": "normal",
@@ -73,7 +72,7 @@ def note_setting():
 def card_setting():
     setting = {
         "_id": 0,
-        "Type": "Graph",
+        "Type": "Graph",  # Graph | Node | Sheet | Video | Picture | Text .etc
         "Group": {
             "group": 0,
             "order": 2
@@ -142,7 +141,7 @@ class DocGraph(models.Model):
     Nodes = ArrayField(JSONField(), db_column="Nodes", default=node_setting)  # json里包含节点在该专题下的设置
     Links = ArrayField(JSONField(), db_column="Relationships", default=link_setting)  # json里包含关系在该专题下的设置
     CommonNotes = ArrayField(JSONField(), db_column="Notes", default=note_setting)  # json里包含便签在该专题下的设置
-    Conf = JSONField(db_column="CONF", default=graph_setting)  # json里包含专题本身的设置
+    Conf = JSONField(db_column="Conf", default=graph_setting)  # json里包含专题本身的设置
 
     class Meta:
         db_table = "document_graph"

@@ -96,8 +96,11 @@ def user_group_privilege_info_query(_id):
 def user_query_by_name(username):
     # todo 事务操作 level: 2
     _id = redis_instance.get("user_" + username)
-    token = redis_instance.get(_id)
-    return _id, token
+    if _id:
+        token = redis_instance.get(_id)
+        return _id, token
+    else:
+        return None, None
 
 
 def user_query_info_by_id(_id):

@@ -24,15 +24,22 @@ def query_for_home_page(request):
         # todo 综合查询 level: 2
         return_template = {
             "name": "test",
+            "id": 0,
             "score": 10,
             "star": 20,
-            "labels": ["ArchProject", "Architecture", "Recent"],
-            "total_time": 60,
-            "main_pic": BaseMediaNode(_id=2, user_id=2).query_as_main_pic()
+            "type": "node",
+            "pLabel": "ArchProject",
+            "topic": ["Architecture"],
+            "labels": ["Recent", "Latin-America"],
+            "totalTime": 60,
+            "mainPic": BaseMediaNode(_id=2, user_id=2).query_as_main_pic()
         }
-        results = {"nodes": [return_template],
-                   "documents": [return_template, return_template],
-                   "course": [return_template]}
+        templates = [return_template] * 5
+        for index, temp in enumerate(templates):
+            temp["id"] = index
+        results = {"Nodes": [templates[0]],
+                   "Documents": [templates[1], templates[2], templates[3]],
+                   "Course": [templates[4]]}
         return HttpResponse(json.dumps(results))
 
 

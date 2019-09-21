@@ -9,9 +9,8 @@ from subgraph.models import Text, NodeCtrl, NodeInfo
 from users.logic_class import BaseUser
 from users.models import NodeAuthority
 from record.models import WarnRecord, NodeVersionRecord
-
 from es_module.logic_class import add_node_index, add_text_index, bulk_add_node_index
-from tools.base_tools import NeoSet, get_special_props, basePath, node_init
+from tools.base_tools import NeoSet, get_special_props, basePath, node_init, DateTimeEncoder
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 
@@ -341,3 +340,13 @@ def upload_media(request):
         add_text_index(text=media.text)
     return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)
 
+
+def query_single_node(request):
+    _id = request.GET.get("source_id")
+    _type = request.GET.get("source_type")
+    user_id = request.GET.get("user_id")
+    if _type == 'node':
+        result = BaseNode(_id=_id, user_id=user_id).handle_for_frontend()
+        return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
+    else:
+        return HttpResponse(404)

@@ -18,37 +18,30 @@ from tools.redis_process import mime_type_query, mime_type_set
 
 # 创建的时候使用的是Info
 create_node_format = {
-    "Ctrl": {},
-    "Info": {
-        "_id": "111",
-        "Name": "Test",
-        "PrimaryLabel": "Person",
-        "Language": "en",  # 默认auto
-        "Alias": [],  # 默认[]
-        "Labels": [],  # 默认[]
-        "Text": "this is a test node",
-        "Topic": [],
-        "MainPic": "123456",
-        "IncludedMedia": ["123456", "345678", "324561"],
-        "DateOfBirth": "1900-01-01",
-        "DateOfDeath": "2000-01-01",
-        "BirthPlace": "Beijing, China",
-        "Nation": "China",
-        "Translate": {
-            "Name_zh": "测试",
-            "Name_en": "Test",
-            "Name_es": "",
-            "Text_zh": "这是测试节点",
-            "Text_en": "this is a test node",
-            "Text_es": ""
-        },
-        "ExtraProps": {
-            "LiveIn": "New York"
-        },
-        "$_IsCommon": True,
-        "$_UserName": True,
-        "$_IsShare": True,
-    }
+    "Name": "Test",
+    "PrimaryLabel": "Person",
+    "Language": "en",  # 默认auto
+    "Alias": [],  # 默认[]
+    "Labels": [],  # 默认[]
+    "Text": "this is a test node",
+    "Topic": [],
+    "MainPic": "123456",
+    "IncludedMedia": ["123456", "345678", "324561"],
+    "DateOfBirth": "1900-01-01",
+    "DateOfDeath": "2000-01-01",
+    "BirthPlace": "Beijing, China",
+    "Nation": "China",
+    "Translate": {
+        "Name_zh": "测试",
+        "Name_en": "Test",
+        "Name_es": ""
+    },
+    "ExtraProps": {
+        "LiveIn": "New York"
+    },
+    "$_IsCommon": True,
+    "$_UserName": True,
+    "$_IsShare": True,
 }
 
 
@@ -287,6 +280,11 @@ class BaseNode:
 
     # ---------------- __private_create ----------------
     def __info_create(self, data):
+        """
+        info创建过程 注意Translate和Text把翻译放在了两个位置存储
+        :param data:
+        :return:
+        """
         self.info = base_tools.node_init(self.label)()
         self.info.NodeId = self.id
         self.info.PrimaryLabel = self.label
@@ -317,7 +315,7 @@ class BaseNode:
         if self.is_create:
             version_id = 1
         else:
-            self.__query_history()
+            self.query_history()
             version_id = self.history.aggregate(Max("VersionId"))
             version_id += 1
         self.loading_history = NodeVersionRecord(VersionId=version_id,
@@ -336,7 +334,7 @@ class BaseNode:
                                  Is_Bound=True,
                                  Language=data["Language"])
             else:
-                self.__query_text()
+                self.query_text()
 
             text = {key[5:len(key)]: value for key, value in data["Translate"].items() if key[0:5] == "Text_"}
             self.text.Translate = text
@@ -435,7 +433,29 @@ class BaseNode:
         pass
 
     def handle_for_frontend(self):
-        pass
+        """
+        前端所用格式
+        :return:
+        """
+        unused_props = ["CountCacheTime", "Is_Used", "ImportMethod", "CreateTime", "NodeId", "Translate", "CreateUser"]
+        self.query_base()
+        ctrl_fields = self.ctrl._meta.get_fields()
+        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
+                            for field in ctrl_fields if field.name not in unused_props}
+        info_fields = self.info._meta.get_fields()
+        output_info_dict = {field.name: getattr(self.info, field.name)
+                            for field in info_fields if field.name not in unused_props}
+        output_info_dict.update({"Translate": {}, "_id": self.id, "type": "node"})
+        # todo 重写一下翻译文件的读/取注释 level: 2
+        for lang in self.info.Translate:
+            output_info_dict["Translate"].update({"Name_%s" % lang: self.info.Translate[lang]})
+        if self.text:
+            output_info_dict.update({"Text": self.text.Text})
+            for lang in self.text.Translate:
+                output_info_dict["Translate"].update({"Text_%s" % lang: self.text.Translate[lang]})
+        else:
+            output_info_dict.update({"Text": ""})
+        return {"Ctrl": output_ctrl_dict, "Info": output_info_dict}
 
     def output_table_create(self):
         return self.ctrl, self.info, self.warn, self.loading_history, self.authority, self.text
@@ -449,10 +469,10 @@ class BaseMediaNode:
         self.media_type = "unknown"
         self.is_create = False
         self.collector = collector
-        self.media = MediaNode()
-        self.node = Node()
-        self.authority = MediaAuthority()
-        self.text = Text()
+        self.media: Optional[MediaNode] = None
+        self.node: Optional[Node] = None
+        self.authority: Optional[MediaAuthority] = None
+        self.text: Optional[Text] = None
 
     def create(self, data):
         self.is_create = True
@@ -528,6 +548,8 @@ class BaseMediaNode:
                 return True
             except ObjectDoesNotExist:
                 return False
+        else:
+            return True
 
     def query_text(self):
         if not self.text:
@@ -537,6 +559,8 @@ class BaseMediaNode:
             except ObjectDoesNotExist:
                 self.text = None
                 return False
+        else:
+            return True
 
     def query_as_main_pic(self):
         self.query_all()

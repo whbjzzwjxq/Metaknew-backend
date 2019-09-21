@@ -79,12 +79,13 @@ class EsQuery:
         return self.get_uuid_from_result(self.auto_complete(target=target, index="documents"))
 
 
-def node_index(node: BaseNode):
+def node_index(node: BaseNode, _type: str):
     ctrl = node.ctrl
     info = node.info
     body = {
         "id": node.id,
         "language": info.Language,
+        "type": _type,
         "create_user": ctrl.CreateUser,
         "update_time": ctrl.UpdateTime,
         "main_pic": info.MainPic,
@@ -137,7 +138,7 @@ def text_index(text: Text):
 
 def add_node_index(node: BaseNode):
     if node.authority.Common:
-        body = node_index(node)
+        body = node_index(node, _type='node')
         result = es.index(id=node.id, index="nodes", body=body)
         if result["_shards"]["successful"] == 1:
             return True
@@ -163,7 +164,7 @@ def bulk_add_node_index(nodes: List[BaseNode]):
     def index_nodes():
         for node in nodes:
             if node.authority.Common:
-                body = node_index(node)
+                body = node_index(node, _type="node")
                 yield {
                     "_op_type": "create",
                     "_index": "nodes",

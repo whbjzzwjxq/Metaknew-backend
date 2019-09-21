@@ -7,6 +7,9 @@ from django.db.models import Model
 from django.db.models import Field
 from typing import List, Dict, Type
 import os
+import datetime
+import json
+from datetime import date
 
 re_for_uuid = re.compile(r"\w{8}(-\w{4}){3}-\w{12}")
 re_for_ptr = re.compile(r".*_ptr")
@@ -129,3 +132,12 @@ def model_to_dict(model: Model):
     fields = model._meta.get_fields()
     result = {field.name: getattr(model, field) for field in fields if not field.auto_created}
     return result
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(obj, date):
+            return obj.strftime('%Y-%m-%d')
+        return json.JSONEncoder.default(self, obj)
