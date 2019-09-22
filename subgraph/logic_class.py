@@ -437,7 +437,15 @@ class BaseNode:
         前端所用格式
         :return:
         """
-        unused_props = ["CountCacheTime", "Is_Used", "ImportMethod", "CreateTime", "NodeId", "Translate", "CreateUser"]
+        unused_props = ["CountCacheTime",
+                        "Is_Used",
+                        "ImportMethod",
+                        "CreateTime",
+                        "NodeId",
+                        "Translate",
+                        "CreateUser",
+                        "BaseImp",
+                        "BaseHardLevel"]
         self.query_base()
         ctrl_fields = self.ctrl._meta.get_fields()
         output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
@@ -445,7 +453,7 @@ class BaseNode:
         info_fields = self.info._meta.get_fields()
         output_info_dict = {field.name: getattr(self.info, field.name)
                             for field in info_fields if field.name not in unused_props}
-        output_info_dict.update({"Translate": {}, "_id": self.id, "type": "node"})
+        output_info_dict.update({"Translate": {}})
         # todo 重写一下翻译文件的读/取注释 level: 2
         for lang in self.info.Translate:
             output_info_dict["Translate"].update({"Name_%s" % lang: self.info.Translate[lang]})

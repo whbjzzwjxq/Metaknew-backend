@@ -92,22 +92,20 @@ def graph_setting():
         "Base": {
             "theme": 0,  # 这个需要商定一下
             "background": "",  # 背景图URL/id
-            "color": "000000",  # 背景颜色
+            "color": "#000000",  # 背景颜色
             "opacity": 0,  # 背景透明度
-            "mode": 0,  # 0 normal 1 time 2 geo 3 imp 4...
+            "default_mode": 0,  # 0 normal 1 time 2 geo 3 imp
         },
         "Group": [
             {
-                "scale": 1,
                 "show": True,
                 "color": "",
-                "move_together": "",
             }
         ],
-        "Order": [
-            {"_id": 0,
-             "time": 10}
-        ]
+        "Path": {
+            "Exist": True,
+            "Order": [0, 1, 5, 12]
+        }
     }
     return setting
 

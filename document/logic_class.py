@@ -22,48 +22,6 @@ types = ["StrNode", "InfNode", "Media", "Document"]
 # Privilege: BaseSource: self.user, self._id 可以捕获异常和错误 统一生成权限表
 # HistoryRecord: UpdateField 可以记录每个Field的变化
 
-document_frontend_normal = {
-    "node": {
-        "info": {},
-        "ctrl": {},
-        "conf": {},
-    },
-    "graph": {
-        "Nodes": [],
-        "Links": [],
-        "CommonNotes": []
-    },
-    "paper": {
-
-    }
-}
-
-document_frontend_editable = {
-    "node": {
-        "info": {},
-        "ctrl": {},
-        "conf": {},
-    },
-    "graph": {
-        "AddNodes": [],
-        "AddLinks": [],
-        "RemoveNodes": [],
-        "RemoveLinks": [],
-        "RefNodes": [],
-        "RefLinks": [],
-        "Conf": [],
-        "Notes": {
-            "AddNotes": [],
-            "RemoveNotes": [],
-            "RefNotes": [],
-            "CommonNotes": []
-        }
-    },
-    "paper": {
-
-    }
-}
-
 
 class BaseDoc:
 
@@ -321,7 +279,7 @@ class BaseDoc:
         self.node.IncludedMedia.extend(medias)
 
     def update_media_by_doc_id(self, doc_id, include_media):
-        self.node = DocInfo.objects.filter(doc_id=doc_id).update(IncludedMedia=include_media)
+        pass
         return self
 
     def remove_media(self, medias):
