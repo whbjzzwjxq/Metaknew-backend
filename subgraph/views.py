@@ -14,6 +14,7 @@ from tools.base_tools import NeoSet, get_special_props, basePath, node_init, Dat
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 
+
 # def check_node_exist(node, collector):
 #     if "uuid" in node:
 #         remote = BaseNode(collector=collector)
@@ -295,16 +296,15 @@ def upload_main_pic(request):
 
 def query_main_pic(request):
     user_id = request.GET.get("user_id")
-    media_id = request.GET.get("media_id")
-    media = BaseMediaNode(_id=media_id, user_id=user_id).query_all()
-    if media:
-        result = {
-            "name": media.media.FileName,
-            "image": media.query_as_main_pic()
-        }
-        return HttpResponse(json.dumps(result), status=200)
-    else:
-        return HttpResponse(status=404)
+    media_ids = json.loads(request.body)["_idList"]
+    result = []
+    for _id in media_ids:
+        media = BaseMediaNode(_id=_id, user_id=user_id).query_all()
+        if media:
+            result.append({"name": media.media.FileName, "image": media.query_as_main_pic()})
+        else:
+            result.append(None)
+    return HttpResponse(json.dumps(result), status=200)
 
 
 def upload_media(request):

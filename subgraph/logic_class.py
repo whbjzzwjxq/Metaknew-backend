@@ -472,7 +472,7 @@ class BaseNode:
 class BaseMediaNode:
 
     def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
-        self.id = _id
+        self.id = int(_id)
         self.user_id = user_id
         self.media_type = "unknown"
         self.is_create = False
@@ -546,7 +546,10 @@ class BaseMediaNode:
         result = True
         result &= self.query_media()
         result &= self.query_text()
-        return result
+        if result:
+            return self
+        else:
+            return None
 
     def query_media(self):
         if not self.media:

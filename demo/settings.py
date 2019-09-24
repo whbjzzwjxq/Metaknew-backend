@@ -181,6 +181,5 @@ CELERYBEAT_SCHEDULER = "djcelery.schedulers.DatabaseScheduler"
 BROKER_URL = "amqp://guest:guest@39.96.10.154:5672//"
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/2.1/howto/static-files/
+STATIC_URL = "/fileUploadCache/"
 
-STATIC_URL = "/static/"
