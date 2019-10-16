@@ -131,7 +131,6 @@ class BaseNode:
         self.node: Optional[Node] = None
         self.info: Optional[Type[NodeInfo]] = None
         self.ctrl: Optional[NodeCtrl] = None
-        self.text: Optional[Text] = None
         self.loading_history: Optional[NodeVersionRecord] = None
         self.authority: Optional[NodeAuthority] = None
         self.warn: Optional[WarnRecord] = None
@@ -221,17 +220,6 @@ class BaseNode:
         if not self.node:
             self.lack.append("node")
 
-    def query_text(self) -> bool:
-        if not self.text:
-            try:
-                self.text = Text.objects.get(NodeId=self.id)
-                return True
-            except ObjectDoesNotExist:
-                self.lack.append("text")
-                return False
-        else:
-            return True
-
     def query_authority(self) -> bool:
         if not self.authority:
             try:
@@ -251,7 +239,12 @@ class BaseNode:
         assert "Name" in data
         assert "PrimaryLabel" in data
         self.label = data["PrimaryLabel"]
-        self.warn = WarnRecord(SourceId=self.id, SourceLabel=self.label, BugType="None", CreateUser=self.user_id)
+        self.warn = WarnRecord(
+            SourceId=self.id,
+            SourceLabel=self.label,
+            BugType="None",
+            CreateUser=self.user_id
+        )
 
         self.__history_create(data=data)  # done 09-05
 
@@ -259,7 +252,6 @@ class BaseNode:
         self.__info_create(data=data)  # done 09-10
         self.name_checker()  # done 09-13
         self.__auth_create(data=data)  # done 09-10
-        self.__text_update(data=data)  # done 09-11
         props = {"_id": self.id, "Name": data["Name"], "Imp": data["BaseImp"], "HardLevel": data["BaseHardLevel"]}
         self.node = neo4j_create_node(_type="Node", labels=data["Labels"] + data["Topic"], plabel=self.label,
                                       props=props,
@@ -281,19 +273,19 @@ class BaseNode:
     # ---------------- __private_create ----------------
     def __info_create(self, data):
         """
-        info创建过程 注意Translate和Text把翻译放在了两个位置存储
+        info创建过程
         :param data:
         :return:
         """
+        # 初始化
         self.info = base_tools.node_init(self.label)()
         self.info.NodeId = self.id
         self.info.PrimaryLabel = self.label
-        self.info.Translate = {key[5:len(key)]: value for key, value in data["Translate"].items() if
-                               key[0:5] == "Name_"}
-        # 初始化
-        self.info_update(data)
         self.main_pic_setter(data["MainPic"])
         self.media_setter(data["IncludedMedia"])
+
+        # update其他数据
+        self.info_update(data)
         return self
 
     # 设置控制信息 done
@@ -327,25 +319,6 @@ class BaseNode:
                                                  Is_Draft=self.is_draft
                                                  )
 
-    def __text_update(self, data: dict):
-        if self.authority.Common and data["Text"] != "":
-            if self.is_create:
-                self.text = Text(NodeId=self.id,
-                                 Is_Bound=True,
-                                 Language=data["Language"])
-            else:
-                self.query_text()
-
-            text = {key[5:len(key)]: value for key, value in data["Translate"].items() if key[0:5] == "Text_"}
-            self.text.Translate = text
-            self.text.Keywords = data["Labels"]
-            self.text.Text = data["Text"]
-            self.text.Star = self.ctrl.Star
-            self.text.Hot = self.ctrl.Hot
-        else:
-            self.text = None
-        return self
-
     def __auth_create(self, data):
 
         self.authority = MediaAuthority(
@@ -366,7 +339,6 @@ class BaseNode:
                 setattr(self.info, field.name, new_prop)
 
     def info_update(self, data):
-        # todo 把 地理识别的内容 改写为LocationField level: 3
         needed_props = base_tools.get_update_props(self.label)
         for field in needed_props:
             old_prop = getattr(self.info, field.name)
@@ -375,8 +347,7 @@ class BaseNode:
             else:
                 new_prop = type(old_prop)()
             self.__update_prop(field, new_prop, old_prop)
-            if field.name == "Location":
-                set_location_queue([new_prop])
+            # todo field resolve
         return self
 
     def node_status(self):
@@ -586,24 +557,24 @@ class BaseMediaNode:
 
 # todo Link 重构 level: 0
 class BaseLink:
-    def __init__(self, link_type, collector=base_tools.NeoSet(), user=0):
-        self._id = 0
-        self.r_type = link_type
-        if user == 0:
-            self.user_id = device_id
-            self.is_user_made = False
-        else:
-            self.user_id = user
-            self.is_user_made = True
+    def __init__(self, obj_id: int, _id: int, link_type: str, collector=base_tools.NeoSet()):
+        """
 
-        self.is_create = False
-        self.warn = WarnRecord()
+        :param obj_id:用户/设备id
+        :param _id: link id
+        :param link_type: link type 是更加深化的type
+        :param collector: Neo4j连接池
+        """
+        self._id = _id
+        self.r_type = link_type
+        self.obj_id = obj_id
+
         self.link_info = base_tools.link_init(link_type)
         self.collector = collector
-        self.link = Relationship()
-        self.walk = walk()
-        self.start = Node()
-        self.end = Node()
+        self.link: Optional[Relationship] = None
+        self.walk:  Optional[walk] = None
+        self.start: Optional[Node] = None
+        self.end: Optional[Node] = None
 
     def query_single_by_id(self, _id):
         try:
@@ -634,62 +605,75 @@ class BaseLink:
         self.start = self.walk.start_node
         self.end = self.walk.end_node
 
+    def base_create(self, start, end, is_user_made):
+        """
+        收集基础信息
+        :param start: 起点
+        :param end:  终点
+        :param is_user_made: 是否是用户生成
+        :return:
+        """
+        self.link = Relationship(start, self.r_type, end)
+        neo4j_prop = {"Is_UserMade": is_user_made, "CreateTime": datetime.now().strftime('%a, %b %d %H:%M')}
+        self.link.update(neo4j_prop)
+        self.link_info.LinkId = self._id
+        self.link_info.Start = start["_id"]
+        self.link_info.End = end["_id"]
+        self.link_info.Is_UserMade = is_user_made
+        self.link_info.CreatorId = self.obj_id
+        self.link_info.Type = self.r_type
+
 
 class SystemMade(BaseLink):
 
-    @error_check
-    def create(self, link):
+    def create(self, start, end, data):
         # 注意start end就已经是Node()而不是_id了
-        result = self.query_single_by_start_end(link["Start"], link["End"])
+        result = self.query_single_by_start_end(start, end)
         if result:
             raise ObjectAlreadyExist
         else:
-            assert "_id" in link
-            self.link = Relationship(link["Start"], self.r_type, link["End"])
-            props = base_tools.get_system_link_props(self.r_type)
-            for prop in props:
-                value = getattr(link, prop.name)
-                self.link.update({prop.name: value})
-                self.link_info.objects.update({prop.name: value})
+            self.base_create(start, end, False)
+            self.update_props(data)
             self.do_walk()
             self.collector.tx.push(self.link)
         return self
 
+    def update_props(self, data):
+        props = base_tools.get_system_link_props(self.r_type)
+        for prop in props:
+            if prop.name in data:
+                value = data[prop.name]
+                self.link_info.objects.update({prop.name: value})
+            else:
+                pass
+
 
 class KnowLedge(BaseLink):
 
-    @error_check
-    def create(self, link):
-        self.is_create = True
-        assert "_id" in link
-        result = self.query_single_by_start_end(link["Start"], link["End"])
+    def create(self, start, end, data):
+        result = self.query_single_by_start_end(start, end)
         if result:
-            self.update_props(link)
+            self.update_props(data)
         else:
-            self.link = Relationship(link["Start"], self.r_type, link["End"])
-            self.link_info = self.link_info()
-            self.update_props(link)
+            self.link = Relationship(start, self.r_type, end)
+            self.base_create(start, end, data["Is_UserMade"])
+            self.update_props(data)
+            if "Confidence" not in data:
+                confidence = 50 + int(data["Is_UserMade"]) * 50
+                self.update_confidence(confidence)
         self.do_walk()
         self.collector.tx.push(self.link)
         return self
 
-    @field_check
-    def __update_prop(self, field, new_prop, old_prop):
-        self.link.update({field.name: new_prop})
-        setattr(self.link_info, field.name, new_prop)
-
-    def update_props(self, link):
+    def update_props(self, data):
         props = base_tools.get_system_link_props(self.r_type)
         for prop in props:
-            if prop.name in link:
-                new_prop = getattr(link, prop.name)
-                old_prop = getattr(self.link_info, prop.name)
-                self.__update_prop(prop, new_prop, old_prop)
+            if prop.name in data:
+                value = data[prop.name]
+                self.link_info.objects.update({prop.name: value})
             else:
                 pass
-        if self.is_create:
-            confidence = 50 + int(self.is_user_made) * 50
-            # test
-            self.__update_prop(self.link_info.objects.Is_UserMade, self.is_user_made, False)
-            self.__update_prop(self.link_info.objects.CreateUser, self.user_id, 0)
-            self.__update_prop(self.link_info.objects.Confidence, confidence, 50)
+
+    def update_confidence(self, value):
+        self.link_info.Confidence = value
+        self.link.update({"Confidence": value})

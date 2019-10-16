@@ -69,7 +69,7 @@ def get_update_props(p_label: str) -> List[Field]:
     :param p_label: PrimaryLabel
     :return: 该主标签下需要用户/前端提交的属性
     """
-    remove_list = ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia", "Translate"]
+    remove_list = ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia"]
     try:
         # 目标包含的域
         target = node_model_dict[p_label]._meta.get_fields()

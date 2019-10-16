@@ -18,8 +18,10 @@ def feature_vector():
 
 def translation():
     return {
-        "zh": "",
-        "en": "",
+        "Name_zh": "",
+        "Name_en": "",
+        "Text_zh": "",
+        "Text_en": ""
     }
 
 
@@ -70,6 +72,7 @@ class NodeInfo(models.Model):
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
     Name = models.TextField(db_column="Name")
+    Description = models.TextField(default="")
     Translate = HStoreField(default=translation)
     Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
     BaseImp = LevelField()  # 基础重要度
@@ -120,7 +123,6 @@ class ArchProject(NodeInfo):
 
 
 class NodeNormal(NodeInfo):
-
     class Meta:
         db_table = "graph_node_normal"
 
@@ -222,6 +224,8 @@ class Relationship(models.Model):
     LinkId = models.BigIntegerField(primary_key=True)
     Start = models.BigIntegerField(db_column="Start", db_index=True)
     End = models.BigIntegerField(db_column="End", db_index=True)
+    Is_UserMade = models.BooleanField(db_column="Is_UserMade", db_index=True, default=True)
+    CreatorId = models.BigIntegerField(db_column="CreatorId", db_index=True, default=0)
     CreateTime = models.DateTimeField(db_column="CreateTime", auto_now_add=True)
     Type = models.TextField(db_index=True)
 
@@ -236,6 +240,7 @@ class Relationship(models.Model):
 class FrequencyCount(Relationship):
     Count = models.IntegerField(db_column="Count", default=1)
     Frequency = models.FloatField(db_column="Frequency", default=0)
+    UpdateTime = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
@@ -268,7 +273,6 @@ class Topic2Topic(Relationship):
     class Meta:
         db_table = "graph_link_topic2topic"
 
-
 # 话题与节点的连接
 class Topic2Node(Relationship):
     Is_Main = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
@@ -283,6 +287,7 @@ class Topic2Node(Relationship):
 class Doc2Node(Relationship):
     Is_Main = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
     Correlation = models.IntegerField(db_column="Correlation", default=1)  # 相关度
+    DocImp = models.IntegerField(db_column="DocImp", default=1)  # 节点在该话题下的重要度
 
     class Meta:
         db_table = "graph_link_doc2node"
@@ -290,12 +295,10 @@ class Doc2Node(Relationship):
 
 # 图谱上的关系
 class KnowLedge(Relationship):
-    Is_UserMade = models.BooleanField(db_column="Is_UserMade", db_index=True)
-    CreateUser = models.BigIntegerField(db_column="CreateUser", db_index=True)
     Confidence = models.SmallIntegerField(db_column="Confidence", default=50)
+    Labels = ArrayField(models.TextField(), default=list)
     Props = JSONField(db_column="Props", default=dict)
     Content = models.TextField(db_column="Content", default="")
-    LinkedSource = models.BigIntegerField(db_column="Linked", default=0)
 
     class Meta:
         db_table = "graph_link_knowledge"

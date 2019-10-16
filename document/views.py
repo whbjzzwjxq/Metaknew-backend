@@ -139,3 +139,7 @@ def query_document_graph(request):
         },
     }
     return HttpResponse(json.dumps(result))
+
+
+def create_graph(request):
+    pass

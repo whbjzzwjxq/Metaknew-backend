@@ -15,7 +15,8 @@ default_request_info = {
 # done 09-13
 class AuthMiddleware:
     accurate_match_url = {
-        "/subgraph/media_node_create": {"user_type": "user", "method": "create"}
+        "/subgraph/media_node_create": {"user_type": "user", "method": "create"},
+        "/document/create/graph": {"user_type": "user", "method": "create"}
     }
     regex_match_url = {}
     default_checker = {

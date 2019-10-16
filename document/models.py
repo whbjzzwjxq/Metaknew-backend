@@ -93,7 +93,6 @@ def graph_setting():
             "theme": 0,  # 这个需要商定一下
             "background": "",  # 背景图URL/id
             "color": "#000000",  # 背景颜色
-            "opacity": 0,  # 背景透明度
             "default_mode": 0,  # 0 normal 1 time 2 geo 3 imp
         },
         "Group": [
@@ -136,8 +135,8 @@ def paper_setting():
 # DocGraph相关的内容 也就是在svg绘制的时候请求的内容 done in 07-22
 class DocGraph(models.Model):
     DocId = models.BigIntegerField(primary_key=True, editable=False)  # 专题ID
-    Nodes = ArrayField(JSONField(), db_column="Nodes", default=node_setting)  # json里包含节点在该专题下的设置
-    Links = ArrayField(JSONField(), db_column="Relationships", default=link_setting)  # json里包含关系在该专题下的设置
+    Nodes = JSONField(db_column="Nodes", default=node_setting)  # json里包含节点在该专题下的设置
+    Links = JSONField(db_column="Relationships", default=link_setting)  # json里包含关系在该专题下的设置
     CommonNotes = ArrayField(JSONField(), db_column="Notes", default=note_setting)  # json里包含便签在该专题下的设置
     Conf = JSONField(db_column="Conf", default=graph_setting)  # json里包含专题本身的设置
 

@@ -18,6 +18,7 @@ redis_instance = redis.StrictRedis(connection_pool=pool)
 
 # ----------------user登录相关
 def user_set_message(phone, message):
+    print(message)
     return redis_instance.setex(name="phone_" + phone, time=5 * minute, value=message)
 
 

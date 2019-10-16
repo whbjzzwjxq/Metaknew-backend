@@ -86,7 +86,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "users.authority.AuthMiddleware"
+    # "users.authority.AuthMiddleware"
 ]
 
 ROOT_URLCONF = "demo.urls"
@@ -181,5 +181,6 @@ CELERYBEAT_SCHEDULER = "djcelery.schedulers.DatabaseScheduler"
 BROKER_URL = "amqp://guest:guest@39.96.10.154:5672//"
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = "/fileUploadCache/"
+# changed
+STATIC_URL = "/static/"
 

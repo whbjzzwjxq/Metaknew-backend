@@ -2,6 +2,7 @@ import json
 import numpy as np
 import typing
 
+from django.shortcuts import render
 from django.http import HttpResponse
 from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
@@ -308,6 +309,7 @@ def query_main_pic(request):
 
 
 def upload_media(request):
+    print(request)
     collector = NeoSet()
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id)
@@ -350,3 +352,4 @@ def query_single_node(request):
         return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
     else:
         return HttpResponse(404)
+
