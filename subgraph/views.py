@@ -309,12 +309,10 @@ def query_main_pic(request):
 
 
 def upload_media(request):
-    print(request)
     collector = NeoSet()
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id)
-    file = request.FILES["file"]
-    file_format = str(file.name).split(".")[-1].lower()
+    file_data = json.loads(request.body.decode())
     _id = id_generator(number=1, method='node', content='Media', jump=2)[0]
     data = {"Format": file_format,
             "Name": request.POST.get("name"),

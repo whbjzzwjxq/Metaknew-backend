@@ -15,25 +15,10 @@ def feature_vector():
             "word_embedding": [],
             "label_embedding": []}
 
-
-def translation():
-    return {
-        "Name_zh": "",
-        "Name_en": "",
-        "Text_zh": "",
-        "Text_en": ""
-    }
-
-
-pictures = ["jpg", "png", "gif"]
-
-
-# todo 媒体文件格式 level: 1
-
 # global_word 储存不使用 可以使用在前后端交互节约流量 level: 1
 
 
-# 控制属性 不会直接update done
+# remake 20191017
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     # 不传回的控制性内容
@@ -64,23 +49,25 @@ class NodeCtrl(models.Model):
         db_table = "graph_node_ctrl"
 
 
-# Node直接允许简单写入/传回的属性 done
+# remake 20191017
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
     MainPic = models.BigIntegerField(db_column="Main", default=-1)  # 缩略图/主要图片, 注意储存的是id
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     # 以上不是自动处理
+
     Name = models.TextField(db_column="Name")
-    Description = models.TextField(default="")
-    Translate = HStoreField(default=translation)
+    Text = JSONField(default=dict)
+    Translate = JSONField(default=dict)
     Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
     BaseImp = LevelField()  # 基础重要度
     BaseHardLevel = LevelField()  # 基础难易度
     Language = models.TextField(db_column="Language", default="auto")
     Topic = TopicField()
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    ExtraProps = JSONField(db_column="ExtraProps", default=dict)
+
+    ExtraProps = HStoreField(db_column="ExtraProps", default=dict)
 
     class Meta:
         abstract = True
@@ -130,8 +117,13 @@ class NodeNormal(NodeInfo):
 # todo 更多media  level: 2
 class MediaNode(models.Model):
     MediaId = models.BigIntegerField(primary_key=True)
-    FileName = models.TextField(db_column="Name")
-    Format = models.TextField(db_column="Format")
+    FileName = models.TextField(db_column="Name")  # 储存在阿里云OSS里的Name
+
+    Title = models.TextField(db_index=True, default="NewMedia")
+    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
+    Text = JSONField(default=dict)
+
+    Format = models.TextField(db_column="Format", db_index=True)
     MediaType = models.TextField(db_column="Type")
 
     # 控制属性
@@ -144,8 +136,6 @@ class MediaNode(models.Model):
     Useful = models.SmallIntegerField(db_column='Useful', default=0)
     Star = models.BigIntegerField(db_column='Star', default=0)
     Hot = HotField()
-    Topic = TopicField()
-    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
 
     class Meta:
         db_table = "graph_node_media_base"
@@ -168,13 +158,10 @@ class Fragment(models.Model):
 
 class Text(models.Model):
     NodeId = models.BigIntegerField(primary_key=True)
-    Language = models.TextField(default="auto")
+    Title = models.TextField(default="NewText")
+    Text = JSONField(default=dict)
     Keywords = ArrayField(models.TextField(), default=list)
-    Text = models.TextField(default="")
-    Translate = HStoreField(default=translation)
-    # 是否与一个实体绑定
-    Is_Bound = models.BooleanField(default=False)
-    SourceType = models.TextField(default="Node")
+    Useful = models.SmallIntegerField(db_column='Useful', default=0)
     Star = models.BigIntegerField(default=0)
     Hot = HotField()
 
@@ -241,46 +228,13 @@ class FrequencyCount(Relationship):
     Count = models.IntegerField(db_column="Count", default=1)
     Frequency = models.FloatField(db_column="Frequency", default=0)
     UpdateTime = models.DateTimeField(auto_now=True)
+    Action = models.TextField(default="SearchTogether")
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["Start", "End", "Type"], name="unique_count_type")
         ]
         abstract = True
-
-
-class SearchTogether(FrequencyCount):
-    class Meta:
-        db_table = "graph_link_search_tog"
-
-
-class AfterVisit(FrequencyCount):
-    class Meta:
-        db_table = "graph_link_visit_tog"
-
-
-class MentionTogether(FrequencyCount):
-    class Meta:
-        db_table = "graph_link_mention_tog"
-
-
-# start是father end是child
-class Topic2Topic(Relationship):
-    Is_Parent = models.BooleanField(db_column="Parent", default=False)
-    Correlation = models.IntegerField(db_column="Correlation", default=1)
-    CommonSource = models.IntegerField(db_column="CommonSource", default=0)
-
-    class Meta:
-        db_table = "graph_link_topic2topic"
-
-# 话题与节点的连接
-class Topic2Node(Relationship):
-    Is_Main = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
-    Correlation = models.IntegerField(db_column="Correlation", default=1)  # 相关度
-    TopicImp = models.IntegerField(db_column="TopicImp", default=1)  # 节点在该话题下的重要度
-
-    class Meta:
-        db_table = "graph_link_topic2node"
 
 
 # 专题和节点的连接
@@ -296,9 +250,10 @@ class Doc2Node(Relationship):
 # 图谱上的关系
 class KnowLedge(Relationship):
     Confidence = models.SmallIntegerField(db_column="Confidence", default=50)
+    PrimaryLabel = models.TextField(default="Include")
     Labels = ArrayField(models.TextField(), default=list)
-    Props = JSONField(db_column="Props", default=dict)
-    Content = models.TextField(db_column="Content", default="")
+    ExtraProps = HStoreField(default=dict)
+    Text = models.TextField(db_column="Content", default="")
 
     class Meta:
         db_table = "graph_link_knowledge"

@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
-import djcelery
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
@@ -66,7 +65,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.postgres",
     "django.contrib.sites",
-    "djcelery",
     "users",
     "subgraph",
     "document",
@@ -173,12 +171,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-
-djcelery.setup_loader()
-# 数据库调度
-CELERYBEAT_SCHEDULER = "djcelery.schedulers.DatabaseScheduler"
-# celery setting
-BROKER_URL = "amqp://guest:guest@39.96.10.154:5672//"
 
 # Static files (CSS, JavaScript, Images)
 # changed
