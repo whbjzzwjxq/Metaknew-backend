@@ -1,8 +1,8 @@
-from django.contrib.postgres.fields import ArrayField, JSONField, HStoreField
+from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from users.models import User
 from django.utils.timezone import now
-from tools.models import LevelField, TopicField, HotField
+from tools.models import LevelField, TopicField, HotField, NameField, TranslateField, TimeField, LocationField
 
 
 # 将可能的模板写在前面
@@ -14,8 +14,6 @@ def feature_vector():
     return {"group_vector": [],
             "word_embedding": [],
             "label_embedding": []}
-
-# global_word 储存不使用 可以使用在前后端交互节约流量 level: 1
 
 
 # remake 20191017
@@ -31,11 +29,17 @@ class NodeCtrl(models.Model):
     UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签 注意干燥
 
-    # 从用户(UserConcern)那里统计的内容 更新频率 高
+    # 有意义的评价
     Imp = LevelField()  # 重要度
     HardLevel = LevelField()  # 难易度
-    Useful = models.IntegerField(db_column="Useful", default=-1)  # 有用的程度
-    Star = models.IntegerField(db_column="Star", default=0)  # 收藏数量
+    Useful = LevelField()  # 有用的程度
+    Star = models.IntegerField(default=0)  # 收藏数量
+
+    # 简易的评价
+    IsGood = models.IntegerField(default=0)
+    IsBad = models.IntegerField(default=0)
+
+    # 其余参数
     Hot = HotField()
     Contributor = JSONField(default=contributor)  # 贡献者
     UserLabels = ArrayField(models.TextField(), db_column="UserLabels", default=list)  # 用户打的标签
@@ -53,21 +57,21 @@ class NodeCtrl(models.Model):
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
-    MainPic = models.BigIntegerField(db_column="Main", default=-1)  # 缩略图/主要图片, 注意储存的是id
+    MainPic = models.TextField(db_column="Main", default="")  # 缩略图/主要图片, 注意储存的是url
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
+    ExtraProps = JSONField(db_column="ExtraProps", default=dict)  # 额外的属性
     # 以上不是自动处理
 
+    # 直接迭代处理的Field
     Name = models.TextField(db_column="Name")
-    Text = JSONField(default=dict)
-    Translate = JSONField(default=dict)
-    Alias = ArrayField(models.TextField(), db_column="Alias", default=list)
+    Alias = ArrayField(NameField(), db_column="Alias", default=list)
+    Topic = TopicField()
+    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
+    Text = TranslateField(default=dict)  # Description
+    Translate = JSONField(default=dict)  # 名字的翻译
     BaseImp = LevelField()  # 基础重要度
     BaseHardLevel = LevelField()  # 基础难易度
     Language = models.TextField(db_column="Language", default="auto")
-    Topic = TopicField()
-    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-
-    ExtraProps = HStoreField(db_column="ExtraProps", default=dict)
 
     class Meta:
         abstract = True
@@ -75,35 +79,36 @@ class NodeInfo(models.Model):
 
 
 # todo 更多标签 level: 1
+# remake 2019-10-17
 class Person(NodeInfo):
-    DateOfBirth = models.TextField(db_column="DateOfBirth")
-    DateOfDeath = models.TextField(db_column="DateOfDeath")
-    BirthPlace = models.TextField(db_column="BirthPlace", max_length=30)
+    DateOfBirth = TimeField(db_column="DateOfBirth")
+    DateOfDeath = TimeField(db_column="DateOfDeath")
+    BirthPlace = LocationField(db_column="BirthPlace", max_length=30)
     Nation = models.TextField(db_column="Nation", max_length=30)
     Job = models.TextField(db_column='Job', default='')
-    Gender = models.TextField(db_column='Gender', default='Man')
+    Gender = models.TextField(db_column='Gender', default='Man', db_index=True)
 
     class Meta:
         db_table = "graph_node_person"
 
 
 class Project(NodeInfo):
-    PeriodStart = models.TextField(db_column="Period_Start")
-    PeriodEnd = models.TextField(db_column="Period_End")
+    PeriodStart = TimeField(db_column="Period_Start")
+    PeriodEnd = TimeField(db_column="Period_End")
     Nation = models.TextField(db_column="Nation", max_length=30)
-    Leader = ArrayField(models.TextField(), db_column="Leader", default=list)  # 领头人
+    Leader = ArrayField(NameField(), db_column="Leader", default=list)  # 领头人
 
     class Meta:
         db_table = "graph_node_project"
 
 
 class ArchProject(NodeInfo):
-    PeriodStart = models.TextField(db_column="Period_Start")
-    PeriodEnd = models.TextField(db_column="Period_End")
+    PeriodStart = TimeField(db_column="Period_Start")
+    PeriodEnd = TimeField(db_column="Period_End")
     Nation = models.TextField(db_column="Nation", max_length=30)
-    Leader = ArrayField(models.TextField(), db_column="Leader", default=list)  # 领头人
-    Location = models.TextField(db_column="Location", default="Beijing")
-    WorkTeam = ArrayField(models.TextField(), db_column="WorkTeam", default=list)
+    Leader = ArrayField(NameField(), db_column="Leader", default=list)  # 领头人
+    Location = LocationField(db_column="Location", default="Beijing")
+    WorkTeam = ArrayField(NameField(), db_column="WorkTeam", default=list)
 
     class Meta:
         db_table = "graph_node_arch_project"
@@ -118,59 +123,65 @@ class NodeNormal(NodeInfo):
 class MediaNode(models.Model):
     MediaId = models.BigIntegerField(primary_key=True)
     FileName = models.TextField(db_column="Name")  # 储存在阿里云OSS里的Name
-
+    Format = models.TextField(db_column="Format", db_index=True)  # 储存在阿里云OSS里的format
+    # info
     Title = models.TextField(db_index=True, default="NewMedia")
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    Text = JSONField(default=dict)
-
-    Format = models.TextField(db_column="Format", db_index=True)
-    MediaType = models.TextField(db_column="Type")
+    Text = TranslateField()
+    MediaType = models.TextField(db_column="Type", db_index=True)
 
     # 控制属性
     UploadUser = models.BigIntegerField(db_column="UploadUser")
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
-    TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间
+    TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间 主要是给音频和视频用的
 
     # 用户相关
-    Useful = models.SmallIntegerField(db_column='Useful', default=0)
-    Star = models.BigIntegerField(db_column='Star', default=0)
+    IsGood = models.BigIntegerField(default=0)
+    IsBad = models.BigIntegerField(default=0)
+    Star = models.BigIntegerField(default=0)
     Hot = HotField()
 
     class Meta:
         db_table = "graph_node_media_base"
 
 
+# remake 2019-10-17
 class Fragment(models.Model):
     NodeId = models.BigIntegerField(primary_key=True)
-    Keywords = ArrayField(models.TextField(), default=list)
-    Content = models.TextField(default="")
-    Props = JSONField(default=dict)
     Labels = ArrayField(models.TextField(), default=list)
+    Content = ArrayField(models.TextField(), default=list)  # 少于16个字符作为Keyword处理
+    ExtraProps = JSONField(default=dict)  # 主要是NLP识别用
 
     OriginSource = models.BigIntegerField(default=0)
     CreateTime = models.DateField(default=now)
-    CreateUser = models.BigIntegerField()
+    CreateUser = models.BigIntegerField(db_index=True)
 
     class Meta:
         db_table = "graph_node_fragment"
 
 
+# remake 2019-10-17
 class Text(models.Model):
     NodeId = models.BigIntegerField(primary_key=True)
+    # info
     Title = models.TextField(default="NewText")
     Text = JSONField(default=dict)
     Keywords = ArrayField(models.TextField(), default=list)
-    Useful = models.SmallIntegerField(db_column='Useful', default=0)
-    Star = models.BigIntegerField(default=0)
+
+    # count
+    IsGood = models.IntegerField(default=0)
+    IsBad = models.IntegerField(default=0)
+    Star = models.IntegerField(default=0)
     Hot = HotField()
 
     class Meta:
         db_table = "graph_node_text"
 
 
-# done 08-16
+# remake 2019-10-17
 class BaseDoc(NodeInfo):
+    # 主要是给Cache使用 也就是请求Graph信息可能用到
     MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
     Size = models.IntegerField(db_column="Size", default=1)  # 专题的规模
     Complete = LevelField()  # 计算得出
@@ -202,11 +213,7 @@ class Chronology(models.Model):
         db_table = "graph_source_chronology"
 
 
-# 系统生成的控制性关系 done
-SystemMade = ["Topic2Topic", "Topic2Node", "Doc2Node",
-              "SearchTogether", "AfterVisit", "MentionTogether"]
-
-
+# remake 2019-10-17
 class Relationship(models.Model):
     LinkId = models.BigIntegerField(primary_key=True)
     Start = models.BigIntegerField(db_column="Start", db_index=True)
@@ -252,7 +259,7 @@ class KnowLedge(Relationship):
     Confidence = models.SmallIntegerField(db_column="Confidence", default=50)
     PrimaryLabel = models.TextField(default="Include")
     Labels = ArrayField(models.TextField(), default=list)
-    ExtraProps = HStoreField(default=dict)
+    ExtraProps = JSONField(default=dict)
     Text = models.TextField(db_column="Content", default="")
 
     class Meta:

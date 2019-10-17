@@ -44,7 +44,6 @@ class BaseUser:
         return response
 
     def resource_auth_for_ali_oss(self):
-        # todo 把文件存取权限转写到aliyun-oss上 level: 2
         regionId = 'cn-beijing'
         endpoint = 'sts-vpc.cn-beijing.aliyuncs.com'
         authorityKeys = {
@@ -71,6 +70,8 @@ class BaseUser:
             expire = datetime.datetime.strptime(response["Credentials"]["Expiration"], '%Y-%m-%dT%H:%M:%SZ')
             response["Credentials"]["Expiration"] = expire.timestamp()
             return response
+        else:
+            raise AttributeError
 
     def create(self, info, concern, status):
         password = info["password"]
@@ -133,7 +134,7 @@ class BaseUser:
     def bulk_create_source(self, id_type_dict: typing.Dict[int, str]):
         """
         source的定义:Node Media Document
-        :param id_type_dict: 创建的内容的id-source dict
+        :param id_type_dict: 创建的内容 key-value形式: id: Node
         :return:
         """
         self.query_repository()
@@ -141,14 +142,14 @@ class BaseUser:
         if id_type_dict:
             for _id, source_type in id_type_dict.items():
                 self.privilege.Is_Owner.append(_id)
-                if source_type == "Node":
-                    self.repository.CreateNode.append(_id)
-                elif source_type == "Media":
-                    self.repository.UploadFile.append(_id)
-                elif source_type == "Document":
-                    self.repository.CreateDoc.append(_id)
-                elif source_type == "Fragment":
-                    self.repository.Fragment.append(_id)
+                repositoryList = {
+                    "Node": self.repository.CreateNode,
+                    "Media": self.repository.UploadFile,
+                    "Document": self.repository.CreateDoc,
+                    "Fragment": self.repository.Fragment
+                }
+                if source_type in repositoryList:
+                    repositoryList[source_type].append(_id)
                 else:
                     raise AttributeError("Unknown Source Type")
             self.repository.save()

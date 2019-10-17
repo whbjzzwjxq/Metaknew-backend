@@ -1,20 +1,20 @@
-from py2neo.data import Node, Relationship, walk
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
-from tools import base_tools
-from django.db.models import Max
-from record.logic_class import field_check
-from record.models import NodeVersionRecord, WarnRecord
-from subgraph.models import NodeCtrl, NodeInfo, MediaNode, Fragment, Text
-from datetime import datetime, timezone
-from tools.id_generator import device_id
-from tools.redis_process import set_location_queue
-from record.logic_class import error_check, ObjectAlreadyExist
-from users.models import MediaAuthority, NodeAuthority
-from typing import Optional, Dict, List, Type
-import mimetypes
 import json
-import base64
+import mimetypes
+import oss2
+from datetime import datetime, timezone
+from typing import Optional, Dict, List, Type
+
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.db.models import Max
+from py2neo.data import Node, Relationship, walk
+
+from record.logic_class import error_check, ObjectAlreadyExist, field_check
+from record.models import NodeVersionRecord, WarnRecord
+from subgraph.models import NodeCtrl, NodeInfo, MediaNode, Fragment
+from tools import base_tools
+from tools.aliyun import authorityKeys
 from tools.redis_process import mime_type_query, mime_type_set
+from users.models import MediaAuthority, NodeAuthority
 
 # 创建的时候使用的是Info
 create_node_format = {
@@ -45,8 +45,10 @@ create_node_format = {
 }
 
 
-def neo4j_create_node(_type: str, labels: List[str], plabel: str, props: Dict, collector: base_tools.NeoSet(),
-                      is_user_made=True, is_common=True) -> Node:
+def neo4j_create_node(
+        _type: str, labels: List[str], plabel: str,
+        props: Dict, collector: base_tools.NeoSet(),
+        is_user_made=True, is_common=True) -> Node:
     """
 
     :param _type: Node | Media | Document | Fragment
@@ -76,7 +78,7 @@ def neo4j_create_node(_type: str, labels: List[str], plabel: str, props: Dict, c
 
 
 def check_is_user_made(user_id):
-    if user_id == 2:
+    if user_id != 3:
         return True
     else:
         return False
@@ -156,7 +158,6 @@ class BaseNode:
         """
         result = self.query_ctrl()
         result &= self.query_info()
-        result &= self.query_text()
 
         return result
 
@@ -441,32 +442,48 @@ class BaseNode:
 
 
 class BaseMediaNode:
+    access_key_id = authorityKeys["developer"]["access_key_id"]
+    access_key_secret = authorityKeys["developer"]["access_key_secret"]
+    bucket_name = authorityKeys["developer"]["bucket_name"]
+    endpoint = authorityKeys["developer"]["endpoint"]
 
     def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
         self.id = int(_id)
         self.user_id = user_id
         self.media_type = "unknown"
         self.is_create = False
+
         self.collector = collector
+        self.oss_manager: Optional[oss2.Bucket] = None
         self.media: Optional[MediaNode] = None
         self.node: Optional[Node] = None
         self.authority: Optional[MediaAuthority] = None
-        self.text: Optional[Text] = None
 
-    def create(self, data):
+    # remake 2019-10-17
+    def create(self, data: dict, remote_file: str):
         self.is_create = True
-        self.media_type = self.get_media_type(data["Format"])
-        self.media = MediaNode(MediaId=self.id,
-                               MediaType=self.media_type,
-                               FileName=data["Name"],
-                               Format=data["Format"],
-                               UploadUser=self.user_id,
-                               )
-        self.node = neo4j_create_node(_type="Media",
-                                      labels=data["Labels"],
-                                      plabel=self.media_type.split("/")[0],
-                                      props={"_id": self.id, "Name": data["Name"]},
-                                      collector=self.collector)
+        self.media_type = data["PrimaryLabel"]
+        self.media = MediaNode(
+            MediaId=self.id,
+            FileName=remote_file,
+            Format=remote_file.split(".")[1],
+            Title=data["Name"],
+            Labels=data["Labels"],
+            MediaType=self.media_type,
+            UploadUser=self.user_id,
+        )
+        # 注意这里还是写了名字的 但是之后如果移动了文件位置那么还是会重新给名字的
+        if data["Text"]:
+            self.media.Text = data["Text"]
+        else:
+            self.media.Text = {"auto": ""}
+        self.node = neo4j_create_node(
+            _type="Media",
+            labels=data["Labels"],
+            plabel=self.media_type,
+            props={"_id": self.id, "Title": data["Name"]},
+            collector=self.collector
+        )
         self.authority = MediaAuthority(
             SourceId=self.id,
             Used=True,
@@ -477,22 +494,6 @@ class BaseMediaNode:
             Vip=False,
             HighVip=False
         )
-        self.__text_update(data)
-        return self
-
-    def __text_update(self, data: dict):
-        if self.is_create:
-            self.text = Text(NodeId=self.id,
-                             Is_Bound=True,
-                             Language=data["Language"])
-        else:
-            self.query_text()
-
-        self.text.Translate = data["Translate"]
-        self.text.Keywords = data["Labels"]
-        self.text.Text = data["Text"]
-        self.text.Star = self.media.Star
-        self.text.Hot = self.media.Hot
         return self
 
     def save(self):
@@ -500,8 +501,39 @@ class BaseMediaNode:
         self.authority.save()
         self.collector.tx.commit()
 
+    def set_oss_manager(self):
+        if not self.oss_manager:
+            auth = oss2.Auth(self.access_key_id, self.access_key_secret)
+            self.oss_manager = oss2.Bucket(auth, self.endpoint, bucket_name=self.bucket_name, connect_timeout=10000)
+        else:
+            pass
+
+    def check_remote_file(self) -> bool:
+        """
+        查看远端文件
+        :return: bool
+        """
+        self.set_oss_manager()
+        return self.oss_manager.object_exists(self.media.FileName)
+
+    def move_remote_file(self, new_location):
+        """
+        移动远端文件
+        :param new_location:
+        :return:
+        """
+        if self.check_remote_file():
+            return self.oss_manager.copy_object(self.bucket_name, self.media.FileName, new_location)
+        else:
+            raise FileNotFoundError
+
     @staticmethod
     def get_media_type(file_format) -> str:
+        """
+        注意返回的是完整的mime_type不是json, image之类的
+        :param file_format: str such as 'jpg'
+        :return: mime_type: str such as 'application/json'
+        """
         mime_type_dict = mime_type_query()
         if mime_type_dict == {}:
             mime_type_dict = mimetypes.read_mime_types(base_tools.basePath + "/tools/mime.types")
@@ -512,15 +544,6 @@ class BaseMediaNode:
             return media_type
         else:
             return "unknown"
-
-    def query_all(self):
-        result = True
-        result &= self.query_media()
-        result &= self.query_text()
-        if result:
-            return self
-        else:
-            return None
 
     def query_media(self):
         if not self.media:
@@ -533,26 +556,9 @@ class BaseMediaNode:
         else:
             return True
 
-    def query_text(self):
-        if not self.text:
-            try:
-                self.text = Text.objects.get(NodeId=self.id)
-                return True
-            except ObjectDoesNotExist:
-                self.text = None
-                return False
-        else:
-            return True
-
+    @staticmethod
     def query_as_main_pic(self):
-        self.query_all()
-        if self.media.MediaType[0:5] == "image":
-            with open(base_tools.basePath + "/fileUploadCache/" + str(self.id) + "." + self.media.Format, "rb") as f:
-                image = f.read()
-            image = base64.b64encode(image).decode()
-            return "data:%s;base64," % self.media.MediaType + image
-        else:
-            return ""
+        pass
 
 
 # todo Link 重构 level: 0
@@ -572,7 +578,7 @@ class BaseLink:
         self.link_info = base_tools.link_init(link_type)
         self.collector = collector
         self.link: Optional[Relationship] = None
-        self.walk:  Optional[walk] = None
+        self.walk: Optional[walk] = None
         self.start: Optional[Node] = None
         self.end: Optional[Node] = None
 

@@ -51,7 +51,6 @@ class LocationsRecord(models.Model):
         db_table = "history_loc_record"
 
 
-# todo version branch level: 2 todo 压缩记录 level: 1
 class NodeVersionRecord(models.Model):
     CreateUser = models.BigIntegerField(db_column="User", editable=False)
     CreateTime = models.DateTimeField(auto_now_add=True, editable=False)

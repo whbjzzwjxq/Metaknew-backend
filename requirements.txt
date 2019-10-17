@@ -1,3 +1,4 @@
+oss2
 Pillow
 googlemaps
 redis

@@ -2,14 +2,15 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from subgraph.models import NodeInfo
-from tools.models import LevelField
+from tools.models import SettingField
 
 
+# 设置的详情在前端查看
 # done 08-16 remake 2019-10-17
 def node_setting():
     setting = {
         "_id": 0,
-        "_type": "node",
+        "_type": "node",  # "node" "media" "link"
         "_label": "DocGraph",
         "Base": {},
         "Border": {},
@@ -32,42 +33,25 @@ def link_setting():
     return [setting]
 
 
-# todo level: 1 Card设置
+# remake 2019-10-17
 def card_setting():
     setting = {
         "_id": 0,
-        "Type": "Graph",  # Graph | Node | Sheet | Video | Picture | Text .etc
-        "Group": {
-            "group": 0,
-            "order": 2
-        },
-        "Show": {
-            "isMain": False,
-            "width": 100,
-            "height": -1
-        }
+        "_type": "node",  # "node" "media" "link"
+        "_label": "",
+        "Base": {},
+        "Border": {},
+        "Show": {},
+        "Text": {}
     }
     return [setting]
 
 
-# todo level: 1 Graph设置
+# remake 2019-10-17
 def graph_setting():
     setting = {
         "Base": {
-            "theme": 0,  # 这个需要商定一下
-            "background": "",  # 背景图URL/id
-            "color": "#000000",  # 背景颜色
-            "default_mode": 0,  # 0 normal 1 time 2 geo 3 imp
-        },
-        "Group": [
-            {
-                "show": True,
-                "color": "",
-            }
-        ],
-        "Path": {
-            "Exist": True,
-            "Order": [0, 1, 5, 12]
+
         }
     }
     return setting
@@ -96,15 +80,14 @@ def paper_setting():
     return setting
 
 
-# DocGraph相关的内容 也就是在svg绘制的时候请求的内容 done in 07-22
+# done in 07-22 remake 2019-10-17
+# todo Path 设计 Level:2
 class DocGraph(models.Model):
     DocId = models.BigIntegerField(primary_key=True, editable=False)  # 专题ID
-    MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
-    Complete = LevelField()  # 计算得出
-    Nodes = JSONField(db_column="Nodes", default=node_setting)  # json里包含节点在该专题下的设置
-    Links = JSONField(db_column="Relationships", default=link_setting)  # json里包含关系在该专题下的设置
-    Paths = ArrayField()
-    Conf = JSONField(db_column="Conf", default=graph_setting)  # json里包含专题本身的设置
+    Nodes = ArrayField(SettingField(), default=node_setting)  # json里包含节点在该专题下的设置
+    Links = ArrayField(SettingField(), default=link_setting)  # json里包含关系在该专题下的设置
+    Paths = ArrayField(JSONField(default=dict))
+    Conf = JSONField(default=graph_setting)  # json里包含专题本身的设置
 
     class Meta:
         db_table = "document_graph"
@@ -112,8 +95,10 @@ class DocGraph(models.Model):
 
 # todo paper具体的产品形式 level: 1
 class DocPaper(models.Model):
-    DocId = models.BigIntegerField(primary_key=True, editable=False)  # 专题ID
-    Nodes = ArrayField(JSONField(), db_column="Nodes", default=card_setting)  # json里包含节点在该专题下的设置
+    DocId = models.BigIntegerField(primary_key=True, editable=False)
+    Nodes = ArrayField(SettingField(), default=card_setting)
+    Links = ArrayField(SettingField(), default=link_setting)
+    Paths = ArrayField(JSONField(default=dict))
     Conf = JSONField(default=paper_setting)  # 设置
 
     class Meta:

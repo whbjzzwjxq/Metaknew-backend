@@ -35,12 +35,7 @@ node_model_dict: Dict[str, Type[NodeInfo]] = {
 }
 
 link_model_dict: Dict[str, Type[Relationship]] = {
-    "Topic2Topic": Topic2Topic,
-    "Topic2Node": Topic2Node,
     "Doc2Node": Doc2Node,
-    "SearchTogether": SearchTogether,
-    "AfterVisit": AfterVisit,
-    "MentionTogether": MentionTogether,
     "KnowLedge": KnowLedge,
 }
 

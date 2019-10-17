@@ -2,7 +2,6 @@ import json
 import numpy as np
 import typing
 
-from django.shortcuts import render
 from django.http import HttpResponse
 from subgraph.logic_class import BaseNode, BaseLink, BaseMediaNode
 from document.logic_class import BaseDoc
@@ -267,7 +266,7 @@ def bulk_create_node(request):
 
 
 # todo 图片缩放 level: 1
-def upload_main_pic(request):
+def set_main_pic(request):
     collector = NeoSet()
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id)
@@ -295,50 +294,42 @@ def upload_main_pic(request):
     return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)
 
 
-def query_main_pic(request):
-    user_id = request.GET.get("user_id")
-    media_ids = json.loads(request.body)["_idList"]
-    result = []
-    for _id in media_ids:
-        media = BaseMediaNode(_id=_id, user_id=user_id).query_all()
-        if media:
-            result.append({"name": media.media.FileName, "image": media.query_as_main_pic()})
-        else:
-            result.append(None)
-    return HttpResponse(json.dumps(result), status=200)
-
-
-def upload_media(request):
+# remake 2019-10-17
+def upload_media_by_user(request):
+    """
+        file_data_example = {
+        'name': 'userFileCache/5fdf0145-e538-668a-6f9d-38f83b27904b.jpg',
+        'Info': {
+            'id': '$_1',
+            'type': 'media',
+            'PrimaryLabel': 'image',
+            'Name': '1.jpg',
+            'Text': {},
+            'Labels': [],
+            '$_IsCommon': True,
+            '$_IsShard': True
+        }
+    }
+    :param request:
+    :return: HttpResponse
+    """
     collector = NeoSet()
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id)
     file_data = json.loads(request.body.decode())
     _id = id_generator(number=1, method='node', content='Media', jump=2)[0]
-    data = {"Format": file_format,
-            "Name": request.POST.get("name"),
-            "Text": request.POST.get("description"),
-            "$_IsCommon": True,
-            "$_IsShared": True,
-            "Payment": False,
-            "Language": request.POST.get("Language"),
-            "Labels": json.loads(request.POST.get("Labels")),
-            "Translate": json.loads(request.POST.get("Translate"))
-            }
-    if request.POST.get("$_IsCommon") == "false":
-        data["$_IsCommon"] = False
-    if request.POST.get("$_IsShared") == "false":
-        data["$_IsShared"] = False
-
-    # 写入文件
-    with open(basePath + "/fileUploadCache/" + str(_id) + "." + file_format, "wb+") as target:
-        target.write(file.read())
-    media = BaseMediaNode(_id=_id, user_id=user_id, collector=collector).create(data)
-    user_model.bulk_create_source({media.id: "Media"})
-    media.save()
-    if media.text:
-        media.text.save()
-        add_text_index(text=media.text)
-    return HttpResponse(json.dumps({"_id": _id, "format": media.media_type}), status=200)
+    media = BaseMediaNode(_id=_id, user_id=user_id, collector=collector)
+    media = media.create(data=file_data["Info"], remote_file=file_data["name"])
+    result = media.move_remote_file('userResource/' + str(media.id) + "." + media.media.Format)
+    if result.status == 200:
+        user_model.bulk_create_source({media.id: "Media"})
+        media.save()
+        if media.media.Text != {}:
+            pass
+        # todo index for text 
+        return HttpResponse(content=_id, status=200)
+    else:
+        return HttpResponse(status=500)
 
 
 def query_single_node(request):
@@ -350,4 +341,3 @@ def query_single_node(request):
         return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
     else:
         return HttpResponse(404)
-

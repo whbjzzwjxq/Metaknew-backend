@@ -39,7 +39,7 @@ class AuthMiddleware:
     def __call__(self, request: HttpRequest()):
         request_info = self.confirm_login_status(request)
         if not request_info["status"]:
-            return HttpResponse(status=400, content=request_info["content"])
+            return HttpResponse(status=401, content=request_info["content"])
         else:
             _checker = self.match_url(request)
             if _checker == {}:
@@ -52,7 +52,7 @@ class AuthMiddleware:
 
                     # 如果是游客 就拒绝
                     if not user_info:
-                        return HttpResponse(status=400, content='当前操作不支持游客访问')
+                        return HttpResponse(status=401, content='当前操作不支持游客访问')
                     else:
                         status, content = self.check_user_type(_checker, user_info)
                         request_info["content"] = content
@@ -99,30 +99,34 @@ class AuthMiddleware:
     @staticmethod
     def confirm_login_status(request: HttpRequest()) -> default_request_info:
         # 默认情况下视为游客
-        request_info = default_request_info
-        token = request.headers["Token"]
-        user_name = request.headers["User-Name"]
-        if token != "null" and user_name != "null":
-            user_id, saved_token = user_query_by_name(user_name)
-            if not saved_token:
-                request_info["content"] = "登录信息过期，请重新登录"
-                request_info["status"] = False
-            elif token != saved_token and token != 'w1e4r5t6l8ka1jh':
-                request_info["content"] = "已经在别处登录了"
-                request_info["status"] = False
-            else:
-                request_info["content"] = ""
-                request_info["status"] = True
-                request_info["user_id"] = user_id
+        login_list = ["/user/login_normal"]
+        if request.path_info not in login_list:
+            request_info = default_request_info
+            token = request.headers["Token"]
+            user_name = request.headers["User-Name"]
+            if token != "null" and user_name != "null":
+                user_id, saved_token = user_query_by_name(user_name)
+                if not saved_token:
+                    request_info["content"] = "登录信息过期，请重新登录"
+                    request_info["status"] = False
+                elif token != saved_token and token != 'w1e4r5t6l8ka1jh':
+                    request_info["content"] = "已经在别处登录了"
+                    request_info["status"] = False
+                else:
+                    request_info["content"] = ""
+                    request_info["status"] = True
+                    request_info["user_id"] = user_id
 
-                request.GET._mutable = True
-                request.GET.update({"user_id": user_id})
-                request.GET._mutable = False
+                    request.GET._mutable = True
+                    request.GET.update({"user_id": user_id})
+                    request.GET._mutable = False
+            else:
+                request_info["content"] = "以游客身份登录"
+                request_info["status"] = True
+                request_info["user_id"] = 0
+            return request_info
         else:
-            request_info["content"] = "以游客身份登录"
-            request_info["status"] = True
-            request_info["user_id"] = 0
-        return request_info
+            return default_request_info
 
     @staticmethod
     def check_user_type(_checker, user_info) -> (bool, str):

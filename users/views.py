@@ -1,18 +1,20 @@
 # -*-coding=utf-8 -*-
+import json
+import random
 import time
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-import random
-from django.http import HttpResponse
-import json
 from django.contrib.auth.hashers import check_password
-from users.models import User
-from users.logic_class import BaseUser
-from tools.redis_process import *
 from django.db.models import ObjectDoesNotExist
+from django.http import HttpResponse
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
 from tools.id_generator import id_generator, device_id
+from tools.aliyun import authorityKeys
+from tools.redis_process import *
+from users.logic_class import BaseUser
 
 
 # 发送验证码短信
@@ -36,7 +38,9 @@ def send_message(request):
     else:
         user_set_message(phone, message_code)
         params = {"code": str(message_code)}
-        client = AcsClient("LTAITKweDYoqN2cH", "jU3QemPN4KbpHbz2qQ8Z3kNkgtTeSB", "default")
+        client = AcsClient(ak=authorityKeys["developer"]["access_key_id"],
+                           secret=authorityKeys["developer"]["access_key_secret"],
+                           region_id="default")
         ali_request = ali_dayu_api("SendSms", "MetaKnew", "SMS_163847373")
         ali_request.add_query_param("TemplateParam", params)
         ali_request.add_query_param("PhoneNumbers", phone)
@@ -118,6 +122,28 @@ def login_cookie(request):
                 return user.login_success()
     else:
         return HttpResponse(content="以游客身份登录", status=200)
+
+
+def query_user_token(request):
+    token = request.headers["Token"]
+    user_name = request.headers["User-Name"]
+    if token != "null" and user_name != "null":
+        _id, saved_token = user_query_by_name(user_name)
+        if not saved_token:
+            return HttpResponse(content="login cookie out of date", status=401)
+        elif not token == saved_token:
+            return HttpResponse(content="login other place", status=401)
+        else:
+            user = BaseUser(_id=_id).query_user()
+            if not user:
+                return HttpResponse(content="illegal user name", status=401)
+            else:
+                user.is_login = True
+                file_token = user.resource_auth_for_ali_oss()["Credentials"]
+                result = {"fileToken": file_token}
+                return HttpResponse(json.dumps(result), content_type='application/json', status=200)
+    else:
+        return HttpResponse(content="login as guest", status=200)
 
 
 @csrf_exempt

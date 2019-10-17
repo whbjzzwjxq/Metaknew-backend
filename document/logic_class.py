@@ -134,7 +134,7 @@ class BaseDoc:
             ref_nodes = map(self.update_node, graph["RefNodes"])
             ref_links = map(self.update_link, graph["RefLinks"])
 
-    def add_node(self, node):  # done
+    def add_node(self, node):
         self.loading_history.GraphContent["AddNodes"].append(node)
         if node["Plabel"] == "Document":
             if self.reference(node["_id"]):
@@ -158,12 +158,12 @@ class BaseDoc:
         link = SystemMade(link_type="Doc2Node", collector=self.collector, user=self.user)
         link.create(new_link)
 
-    def add_link(self, link):  # done
+    def add_link(self, link):
         self.loading_history.GraphContent["AddLinks"].append(link)
         self.graph.Links.append(link)
         return True
 
-    def remove_node(self, conf):  # done
+    def remove_node(self, conf):
         index = self.check_for_exist(conf["_id"], self.graph.Nodes)
         if index >= 0:
             node = self.graph.Nodes[index]

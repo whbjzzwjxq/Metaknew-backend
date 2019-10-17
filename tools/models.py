@@ -1,15 +1,27 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.fields import ArrayField, HStoreField, JSONField
+from django.core.exceptions import ValidationError
 
 # 预定义的Field和Checker
-
 max_value = MaxValueValidator(limit_value=100)
 min_value = MinValueValidator(limit_value=-1)
 
 
-class HotField(models.IntegerField):
+def setting_check(value):
+    required_list = ["_id", "_type", "_label"]
+    for word in required_list:
+        if word not in value:
+            raise ValidationError('setting need param %(key)s', params={'key': word})
 
+
+def default_text():
+    return {
+        "auto": ""
+    }
+
+
+class HotField(models.IntegerField):
     description = "热度的Field"
 
     def __init__(self, *args, **kwargs):
@@ -19,7 +31,6 @@ class HotField(models.IntegerField):
 
 
 class LevelField(models.SmallIntegerField):
-
     description = "0-100百分制Field"
 
     def __init__(self, *args, **kwargs):
@@ -29,8 +40,7 @@ class LevelField(models.SmallIntegerField):
 
 
 class TopicField(ArrayField):
-
-    description = "资源等使用的Topic, key是Topic value是用户对Topic感兴趣的程度/资源跟Topic的相关度"
+    description = "资源等使用的Topic, element是Topic"
 
     def __init__(self, *args, **kwargs):
         kwargs["default"] = list
@@ -39,18 +49,42 @@ class TopicField(ArrayField):
         super().__init__(*args, **kwargs)
 
 
-class MediaIdField(models.BigIntegerField):
+class TranslateField(HStoreField):
+    description = "允许翻译文本的Field"
 
-    description = "储存媒体文件使用的_id"
+    def __init__(self, *args, **kwargs):
+        kwargs["default"] = default_text
+        super().__init__(*args, **kwargs)
 
 
-class GlobalWordIndex(models.Model):
+class SettingField(JSONField):
+    description = "样式设置的Field"
 
-    WordIndex = models.AutoField(db_column="Index", primary_key=True)
-    Word = models.TextField(db_column="Word", db_index=True, unique=True, editable=False)
+    def __init__(self, *args, **kwargs):
+        kwargs["validators"] = [setting_check]
+        super().__init__(*args, **kwargs)
 
-    class Meta:
-        db_table = "global_word_index"
+
+# resolveField
+class NameField(models.TextField):
+    description = "可能与名字有关的Field"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class LocationField(models.TextField):
+    description = "可能与地名有关的Field"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class TimeField(models.TextField):
+    description = "可能与地名有关的Field"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 # block_size = 65535
@@ -59,7 +93,6 @@ class GlobalWordIndex(models.Model):
 # Document, Comment之类的功能内容使用device作为划分依据
 # Record之类的事务内容使用time作为划分依据
 class BaseBlockManager(models.Model):
-
     BlockId = models.AutoField(db_column="BlockId", primary_key=True)
     Classifier = models.IntegerField(db_column="LabelContent", db_index=True)
     RegisterTime = models.DateTimeField(db_column="RegisterTime", auto_now_add=True)
@@ -85,7 +118,6 @@ class RecordBlockManager(BaseBlockManager):
 
 # 每个Block的管理记录 例如Block5 OutId 20 就是第五个Block的id=20位置已经使用
 class BlockIdRecord(models.Model):
-
     BlockId = models.IntegerField(db_column="BLOCK_ID", db_index=True)
     OutId = models.BigIntegerField(db_column="OUT_ID", primary_key=True)
 
@@ -99,12 +131,19 @@ class NodeBlockIdRecord(BlockIdRecord):
 
 
 class DeviceBlockIdRecord(BlockIdRecord):
-
     class Meta:
         db_table = "device_device_block"
 
 
 class RecordBlockIdRecord(BlockIdRecord):
-
     class Meta:
         db_table = "device_time_block"
+
+
+# 暂时未使用 word的Index
+class GlobalWordIndex(models.Model):
+    WordIndex = models.AutoField(db_column="Index", primary_key=True)
+    Word = models.TextField(db_column="Word", db_index=True, unique=True, editable=False)
+
+    class Meta:
+        db_table = "global_word_index"
