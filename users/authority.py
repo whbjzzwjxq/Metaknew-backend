@@ -1,9 +1,8 @@
 from django.http import HttpResponse, HttpRequest
 from tools.redis_process import *
-from users.models import BaseAuthority, DocAuthority, NodeAuthority, MediaAuthority, CourseAuthority
 from users.logic_class import BaseGroup
 from functools import reduce
-import typing
+from subgraph.models import BaseAuthority
 
 default_request_info = {
     "status": True,
@@ -25,12 +24,6 @@ class AuthMiddleware:
         "common_source": False,  # True || False
         "source_type": "node",  # node || media || document || course  公有资源
         # link || comment || note || fragment  私有资源
-    }
-    auth_sheet = {
-        "document": DocAuthority,
-        "node": NodeAuthority,
-        "media": MediaAuthority,
-        "course": CourseAuthority
     }
 
     def __init__(self, get_response):
@@ -187,8 +180,7 @@ class AuthMiddleware:
         :return: (bool, str)
         """
         method = _checker["method"]
-        source_type = _checker["source_type"]
-        record = self.auth_sheet[source_type].objects.filter(SourceId=_id)
+        record = BaseAuthority.objects.filter(SourceId=_id)
         if len(record) == 0:
             self.__anti_spider()
             return HttpResponse(status=404)
@@ -225,7 +217,8 @@ class AuthMiddleware:
                     if group_privilege:
                         privileges.append(group_privilege)
 
-                result = [self.__privilege_source_check(privilege, _id, record, _checker["method"]) for privilege in privileges]
+                result = [self.__privilege_source_check(privilege, _id, record, _checker["method"])
+                          for privilege in privileges]
                 result = reduce(lambda a, b: a or b, result)
                 if result:
                     return True, ""
@@ -248,7 +241,9 @@ class AuthMiddleware:
             if record.OpenSource:
                 return True
             else:
-                if _id in privilege_info["Is_Owner"] or _id in privilege_info["Is_Manager"] or _id in privilege_info["Is_Collaborator"]:
+                if _id in privilege_info["Is_Owner"] or \
+                        _id in privilege_info["Is_Manager"] or \
+                        _id in privilege_info["Is_Collaborator"]:
                     return True
                 else:
                     return False

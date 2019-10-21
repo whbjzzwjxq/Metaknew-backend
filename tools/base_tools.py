@@ -1,22 +1,30 @@
-import re
-from subgraph.models import *
-from py2neo import Graph, NodeMatcher, RelationshipMatcher
-from subgraph.models import BaseDoc
-from functools import reduce
-from django.db.models import Model
-from django.db.models import Field
-from typing import List, Dict, Type
-import os
 import datetime
 import json
+import os
+import re
 from datetime import date
+from functools import reduce
+from typing import List, Dict, Type, Union, Optional
 
-re_for_uuid = re.compile(r"\w{8}(-\w{4}){3}-\w{12}")
+import numpy as np
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Field, Model
+from py2neo import Graph, NodeMatcher, RelationshipMatcher
+from py2neo.data import Node as NeoNode
+
+from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
+from record.logic_class import field_check
+from record.models import WarnRecord, NodeVersionRecord
+from subgraph.models import *
+from subgraph.models import BaseAuthority
+
+re_for_info = re.compile(r".*Info")
 re_for_ptr = re.compile(r".*_ptr")
 graph = Graph("bolt://39.96.10.154:7687", username="neo4j", password="12345678")
-types = ["StrNode", "InfNode", "Media", "Document"]
 
 basePath = os.path.dirname(os.path.dirname(__file__))
+_types = Union['node', 'link', 'course', 'media']
+info_models = Union[Type[NodeInfo], Type[MediaInfo], Type[RelationshipInfo]]
 
 
 class NeoSet:
@@ -26,82 +34,172 @@ class NeoSet:
         self.Rmatcher = RelationshipMatcher(graph)
 
 
-node_model_dict: Dict[str, Type[NodeInfo]] = {
-    "BaseNode": NodeNormal,
-    "Person": Person,
-    "Project": Project,
-    "ArchProject": ArchProject,
-    "Document": BaseDoc,
-}
-
-link_model_dict: Dict[str, Type[Relationship]] = {
-    "Doc2Node": Doc2Node,
-    "KnowLedge": KnowLedge,
-}
-
-
-def node_init(label) -> Type[NodeInfo]:
+def type_label_to_model(_type: _types, label: str) -> info_models:
     """
-    从主标签返回模型信息
+    可能有多张表继承的模型
+    :param _type:
+    :param label:
+    :return:
+    """
+    if _type in model_dict:
+        if label in model_dict[_type]:
+            return model_dict[_type][label]
+        else:
+            return model_dict[_type]['default']
+    else:
+        raise TypeError('Error Type')
+
+
+ctrl_dict: Dict[str, Type[Union[NodeCtrl, RelationshipCtrl, MediaCtrl]]] = {
+    "node": NodeCtrl,
+    "link": RelationshipCtrl,
+    "document": NodeCtrl,
+    "media": MediaCtrl
+}
+
+model_dict: Dict[str, Dict[str, info_models]] = {
+    "node": {
+        "default": NodeNormal,
+        "Person": Person,
+        "Project": Project,
+        "ArchProject": ArchProject,
+        "DocGraph": BaseDocGraph,
+    },
+    "link": {
+        "default": KnowLedge,
+        "KnowLedge": KnowLedge,
+        "SearchTogether": FrequencyCount,
+        "MentionTogether": FrequencyCount,
+        "VisitAfter": FrequencyCount,
+        "Doc2Node": Doc2Node,
+    },
+    "media": {
+        "default": Text,
+        "Image": Image,
+        "Text": Text,
+        "Audio": Audio,
+        "Video": Video
+    }
+}
+
+
+def bulk_save_base_model(item_list, user_model, _type):
+    info_dict = {}
+    items = [item for item in item_list if item]
+    if items:
+        items_id = {item.id: _type for item in items}
+        user_model.bulk_create_source(items_id)
+        output = np.array([item.output_table_create() for item in items])
+        ctrl = list(output[:, 0])
+        ctrl_dict[_type].objects.bulk_create(ctrl)
+        info_list = list(output[:, 1])
+        for info in info_list:
+            if info.PrimaryLabel not in info_dict:
+                info_dict[info.PrimaryLabel] = []
+            info_dict[info.PrimaryLabel].append(info)
+        for key in info_dict:
+            type_label_to_model(_type, key).objects.bulk_create(info_dict[key])
+
+        if _type == 'node':
+            # 保存authority
+            authority = list(output[:, 2])
+            BaseAuthority.objects.bulk_create(authority)
+            # 保存warn
+            warn = list(output[:, 3])
+            WarnRecord.objects.bulk_create(warn)
+            history = list(output[:, 4])
+            NodeVersionRecord.objects.bulk_create(history)
+            bulk_add_node_index(items)
+        elif _type == 'media':
+            # 保存authority
+            authority = list(output[:, 2])
+            BaseAuthority.objects.bulk_create(authority)
+            # 保存warn
+            warn = list(output[:, 3])
+            WarnRecord.objects.bulk_create(warn)
+            bulk_add_text_index(items)
+
+
+def node_init(label: str) -> Type[NodeInfo]:
+    """
+    从主标签返回模型信息 下同
     :param label: PrimaryLabel
     :return: NodeInfo
     """
-    if label in node_model_dict:
-        return node_model_dict[label]
-    else:
-        return NodeNormal
+    return type_label_to_model('node', label)
 
 
-def link_init(label) -> Type[Relationship]:
-    if label in link_model_dict:
-        return link_model_dict[label]
-    else:
-        return KnowLedge
+def link_init(label: str) -> Type[RelationshipInfo]:
+    return type_label_to_model('link', label)
 
 
-def get_update_props(p_label: str) -> List[Field]:
+def media_init(label: str) -> Type[MediaInfo]:
+    return type_label_to_model('media', label)
+
+
+def get_update_props(_type: _types, p_label: str) -> List[Field]:
     """
-    :param p_label: PrimaryLabel
-    :return: 该主标签下需要用户/前端提交的属性
+    :param _type: type node...
+    :param p_label: PrimaryLabel...
+    :return: 数据可以直接写入的属性
     """
-    remove_list = ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia"]
+    remove_list = {
+        "node": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia",
+                 "HasPaper", "HasGraph", "Size", "MainNodes", "Complete"],
+        "link": ["LinkId", "PrimaryLabel", "Star"],
+        "media": ["MediaId", "PrimaryLabel"],
+    }
     try:
         # 目标包含的域
-        target = node_model_dict[p_label]._meta.get_fields()
+        target = type_label_to_model(_type=_type, label=p_label)._meta.get_fields()
         result = [field for field in target
                   if not field.auto_created
-                  and field.name not in remove_list]
+                  and field.name not in remove_list[_type]]
         return result
     except AttributeError("没有这种标签: %s" % p_label):
         return []
 
 
-def get_special_props(p_label: str) -> List[Field]:
+def get_special_props(_type: _types, p_label: str) -> List[Field]:
     """
+    :param _type: _type
     :param p_label: PrimaryLabel
-    :return: 该标签的特殊属性 不包含NodeInfo
+    :return: 该标签的特殊属性 不包含.*Info
     """
-    if p_label in node_model_dict:
-        result = get_update_props(p_label)
-        result = [field for field in result if field.model.__name__ != 'NodeInfo']
-        return result
-    else:
-        return []
+    result = get_update_props(_type, p_label)
+    result = [field for field in result if re_for_info.match(field.model.__name__)]
+    return result
 
 
-def get_system_link_props(r_type: str) -> List[Field]:
+def neo4j_create_node(_type: _types, labels: List[str], plabel: str,
+                      props: Dict, collector: NeoSet(),
+                      is_user_made=True, is_common=True) -> NeoNode:
     """
-    :param r_type: Link的Type
-    :return: 该link之下需要填充的属性
+
+    :param _type: Node | Media | Document | Fragment
+    :param labels: 标签组
+    :param plabel: 主标签
+    :param props: 属性 ，一定要包含"_id"
+    :param is_user_made: 是否是用户创建的
+    :param is_common: 是否是公开的
+    :param collector: 连接池
+    :return: None | Node
     """
-    try:
-        target = link_model_dict[r_type]._meta.get_fields()
-        result = [field for field in target
-                  if not re_for_ptr.match(field.name)
-                  and field.model != "Relationship"]
-        return result
-    except AttributeError("没有这种标签: %s" % r_type):
-        return []
+    assert "_id" in props
+    node_labels = ["Used"]
+    node_labels.extend(labels)
+    node_labels.append(_type)
+    node_labels.append(plabel),
+    if is_user_made:
+        node_labels.append("UserMade")
+    if is_common:
+        node_labels.append("Common")
+    node = NeoNode(*node_labels, **props)
+    node.__primarylabel__ = plabel
+    node.__primarykey__ = "_id"
+    node.__primaryvalue__ = props["_id"]
+    collector.tx.create(node)
+    return node
 
 
 def dict_dryer(node: dict):
@@ -112,14 +210,194 @@ def dict_dryer(node: dict):
     return node
 
 
+class BaseModel:
+    """
+    提供的方法
+    query_ctrl, query_info, query_node, query_authority, auth_create, info_update
+    """
+
+    def __init__(self, _id: int, user_id: int, _type: _types, collector=NeoSet()):
+        default = 'default'
+        self.node: Optional[NeoNode] = None
+        self.info: Optional[type_label_to_model(_type, default)] = None
+        self.ctrl: Optional[ctrl_dict[_type]] = None
+        self.authority: Optional[BaseAuthority] = None
+        self.warn: Optional[WarnRecord] = None
+        # 以下是值
+        self.collector = collector  # neo4j连接池
+        self.id = _id  # _id
+        self.user_id = int(user_id)
+        self.type = _type
+        self.p_label = ""  # 主标签
+        self.is_draft = False  # 是否是草稿
+        self.is_create = False  # 是否是创建状态
+        self.is_user_made = check_is_user_made(user_id)
+        self.lack = []
+
+    # ----------------- query ----------------
+    def query_base(self):
+        """
+        查询info,ctrl,text, authority的内容 也就是前端 索引的基本内容
+        :return:
+        """
+        result = self.__query_ctrl()
+        result &= self.__query_info()
+
+        return result
+
+    def __query_ctrl(self) -> bool:
+        if not self.ctrl:
+            try:
+                self.ctrl = ctrl_dict[self.type].objects.get(pk=self.id)
+                self.p_label = self.ctrl.PrimaryLabel
+                return True
+            except ObjectDoesNotExist:
+                return False
+        else:
+            self.p_label = self.ctrl.PrimaryLabel
+            return True
+
+    def __query_info(self) -> bool:
+        if not self.ctrl:
+            return False
+        elif not self.info:
+            try:
+                self.info = type_label_to_model(self.type, self.p_label).objects.get(pk=self.id)
+                return True
+            except ObjectDoesNotExist:
+                return False
+        else:
+            return True
+
+    def __query_node(self):
+        if self.type != "link":
+            self.node = self.collector.Nmatcher.match(_id=self.id).first()
+            if not self.node:
+                self.lack.append("node")
+        else:
+            raise TypeError('link does not have NeoNode!')
+
+    def __query_authority(self) -> bool:
+        if self.type != "link":
+            if not self.authority:
+                try:
+                    self.authority = BaseAuthority.objects.get(SourceId=self.id, SourceType=self.type)
+                    return True
+                except ObjectDoesNotExist:
+                    self.lack.append("authority")
+                    return False
+            else:
+                return True
+        else:
+            raise TypeError('link does not have Authority!')
+
+    def auth_create(self, data):
+        self.authority = BaseAuthority(
+            SourceId=self.id,
+            SourceType=self.type,
+            Used=True,
+            Common=data["$_IsCommon"],
+            OpenSource=data["$_IsOpen"],
+            Shared=data["$_IsShared"],
+            Payment=False,
+            Vip=False,
+            HighVip=False
+        )
+
+    @field_check
+    def __update_prop(self, field, new_prop, old_prop):
+        if new_prop != old_prop:
+            if not self.is_draft:
+                setattr(self.info, field.name, new_prop)
+
+    def info_update(self, data):
+        self.warn = WarnRecord(
+            SourceId=self.id,
+            SourceLabel=self.p_label,
+            BugType="None",
+            CreateUser=self.user_id
+        )
+        if self.user_id == self.ctrl.CreateUser:
+            if self.info:
+                needed_props = get_update_props(self.type, self.p_label)
+                for field in needed_props:
+                    old_prop = getattr(self.info, field.name)
+                    if field.name in data:
+                        new_prop = data[field.name]
+                    else:
+                        new_prop = field.default
+                    self.__update_prop(field, new_prop, old_prop)
+                    # todo field resolve
+                return self
+            else:
+                return ErrorContent(status=400, state=False, reason="info dos not query")
+        else:
+            return ErrorContent(status=401, state=False, reason="unAuthorization")
+
+    def text_index(self):
+        if self.type != 'link':
+            body = {
+                "id": self.id,
+                "language": list(self.info.Text.keys())[0],
+                "name": self.info.Name,
+                "keywords": self.info.Labels,
+                "text": {
+                    "zh": "",
+                    "en": "",
+                    "auto": self.info.Text["auto"]
+                },
+                "hot": self.ctrl.Hot,
+                "star": self.ctrl.Star,
+                "is_bound": True
+            }
+            for lang in body["text"]:
+                if lang in self.info.Text:
+                    body["text"][lang] = self.info.Text[lang]
+            return body
+        else:
+            return {}
+
+    def output_table_create(self):
+        return self.ctrl, self.info, self.authority, self.warn
+
+
+class ErrorContent:
+    """
+    适用于不直接返回HttpResponse的情况
+    """
+
+    def __init__(self, status: int, state: bool, reason: str):
+        self.status = status
+        self.state = state
+        self.reason = reason
+
+    def __repr__(self):
+        return {"state": self.state, "reason": self.reason}
+
+    def __bool__(self):
+        return False
+
+
+def check_is_user_made(user_id):
+    if user_id != 1:
+        return True
+    else:
+        return False
+
+
 def merge_list(lists):
+    """
+    合并并去重list
+    :param lists:
+    :return:
+    """
+
     def merge(list1: list, list2: list):
         temp = [ele for ele in list2 if ele not in list1]
         list1.extend(temp)
         return list1
 
     result = reduce(merge, lists)
-
     return result
 
 
@@ -130,6 +408,10 @@ def model_to_dict(model: Model):
 
 
 class DateTimeEncoder(json.JSONEncoder):
+    """
+    DateTime 转为字符串
+    """
+
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
             return obj.strftime('%Y-%m-%d %H:%M:%S')

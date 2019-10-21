@@ -1,7 +1,7 @@
 from elasticsearch import Elasticsearch
 from es_module.logic_class import bulk_add_node_index, es
-from subgraph.logic_class import BaseNode, BaseMediaNode
-from users.models import NodeAuthority
+# from subgraph.logic_class import BaseNode, BaseMediaNode
+from subgraph.models import BaseAuthority
 import json
 from django.shortcuts import HttpResponse
 
@@ -88,7 +88,7 @@ def reindex_nodes(request):
         base_node.query_base()
         return base_node
     user_id = request.GET.get("user_id")
-    authorities = NodeAuthority.objects.filter(Common=True, Used=True)
+    authorities = BaseAuthority.objects.filter(Common=True, Used=True, SourceType='node')
     base_nodes = [query_common_node(auth)for auth in authorities]
     bulk_add_node_index(base_nodes)
     return HttpResponse(status=200)

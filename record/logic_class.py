@@ -13,16 +13,16 @@ class ObjectAlreadyExist(BaseException):
 
 
 def error_check(_func):
-    def wrapped(self, node):
+    def wrapped(self, data):
         try:
-            result = _func(self, node)
+            result = _func(self, data)
             return result
         except Exception as e:
             name = type(e).__name__
             EWRecord.add_error_record(user=self.user_id,
                                       source_id=self.id,
-                                      source_label=self.label,
-                                      data=node,
+                                      source_label=self.p_label,
+                                      data=data,
                                       bug_type=name)
             return None
             # todo 消息队列 level: 1

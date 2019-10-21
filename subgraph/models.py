@@ -1,4 +1,4 @@
-from django.contrib.postgres.fields import ArrayField, JSONField
+from django.contrib.postgres.fields import ArrayField, JSONField, HStoreField
 from django.db import models
 from users.models import User
 from django.utils.timezone import now
@@ -19,6 +19,7 @@ def feature_vector():
 # remake 20191017
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
+    IsUsed = models.BooleanField(default=True)
     # 不传回的控制性内容
     CountCacheTime = models.DateTimeField(db_column="CacheTime", default=now)  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
@@ -57,7 +58,7 @@ class NodeCtrl(models.Model):
 class NodeInfo(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
-    MainPic = models.TextField(db_column="Main", default="")  # 缩略图/主要图片, 注意储存的是url
+    MainPic = models.TextField(default="")  # 缩略图/主要图片, 注意储存的是url
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
     ExtraProps = JSONField(db_column="ExtraProps", default=dict)  # 额外的属性
     # 以上不是自动处理
@@ -73,9 +74,9 @@ class NodeInfo(models.Model):
     BaseHardLevel = LevelField()  # 基础难易度
     Language = models.TextField(db_column="Language", default="auto")
 
+    # 写成abstract的理由 不在Info表里存 减小查询规模
     class Meta:
         abstract = True
-        db_table = "graph_node_info"
 
 
 # todo 更多标签 level: 1
@@ -114,36 +115,82 @@ class ArchProject(NodeInfo):
         db_table = "graph_node_arch_project"
 
 
+# remake 2019-10-17
+class BaseDocGraph(NodeInfo):
+    # 主要是给Cache使用 也就是请求Graph信息可能用到
+    MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
+    Size = models.IntegerField(db_column="Size", default=1)  # 专题的规模
+    Complete = LevelField()  # 计算得出
+
+    class Meta:
+        db_table = "graph_node_doc_base"
+
+
+# 如果pLabel识别不了那么就使用基础模型
 class NodeNormal(NodeInfo):
     class Meta:
         db_table = "graph_node_normal"
 
 
-# todo 更多media  level: 2
-class MediaNode(models.Model):
+class MediaCtrl(models.Model):
     MediaId = models.BigIntegerField(primary_key=True)
+    IsUsed = models.BooleanField(default=True)
+    Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
     FileName = models.TextField(db_column="Name")  # 储存在阿里云OSS里的Name
     Format = models.TextField(db_column="Format", db_index=True)  # 储存在阿里云OSS里的format
-    # info
-    Title = models.TextField(db_index=True, default="NewMedia")
-    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    Text = TranslateField()
-    MediaType = models.TextField(db_column="Type", db_index=True)
-
     # 控制属性
-    UploadUser = models.BigIntegerField(db_column="UploadUser")
+    History = ArrayField(HStoreField(), default=list)  # 储存历史文件名
+    CreateUser = models.BigIntegerField()
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
     TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间 主要是给音频和视频用的
-
     # 用户相关
     IsGood = models.BigIntegerField(default=0)
     IsBad = models.BigIntegerField(default=0)
     Star = models.BigIntegerField(default=0)
     Hot = HotField()
+    UserLabels = ArrayField(models.TextField(), default=list, db_index=True)
 
     class Meta:
-        db_table = "graph_node_media_base"
+        db_table = 'graph_media_ctrl'
+
+
+class MediaInfo(models.Model):
+    MediaId = models.BigIntegerField(primary_key=True)
+    Name = models.TextField(db_index=True, default="NewMedia")
+    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
+    Text = TranslateField()
+    PrimaryLabel = models.TextField(db_index=True)
+
+    class Meta:
+        abstract = True
+
+
+class Image(MediaInfo):
+    Size = models.TextField(default='large')
+    dpiX = models.IntegerField(default=1920)
+    dpiY = models.IntegerField(default=1080)
+    ContainObject = JSONField(default=dict)
+
+    class Meta:
+        db_table = 'graph_media_info_image'
+
+
+class Text(MediaInfo):
+    Pages = models.IntegerField(default=1)
+
+    class Meta:
+        db_table = 'graph_media_info_text'
+
+
+class Audio(MediaInfo):
+    class Meta:
+        db_table = 'graph_media_info_audio'
+
+
+class Video(MediaInfo):
+    class Meta:
+        db_table = 'graph_media_info_video'
 
 
 # remake 2019-10-17
@@ -161,91 +208,47 @@ class Fragment(models.Model):
         db_table = "graph_node_fragment"
 
 
-# remake 2019-10-17
-class Text(models.Model):
-    NodeId = models.BigIntegerField(primary_key=True)
-    # info
-    Title = models.TextField(default="NewText")
-    Text = JSONField(default=dict)
-    Keywords = ArrayField(models.TextField(), default=list)
-
-    # count
-    IsGood = models.IntegerField(default=0)
-    IsBad = models.IntegerField(default=0)
-    Star = models.IntegerField(default=0)
-    Hot = HotField()
-
-    class Meta:
-        db_table = "graph_node_text"
-
-
-# remake 2019-10-17
-class BaseDoc(NodeInfo):
-    # 主要是给Cache使用 也就是请求Graph信息可能用到
-    MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
-    Size = models.IntegerField(db_column="Size", default=1)  # 专题的规模
-    Complete = LevelField()  # 计算得出
-
-    class Meta:
-        db_table = "graph_node_doc_base"
-
-
-# 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录
-# done
-class LocationDoc(models.Model):
-    FileId = models.AutoField(db_column="LocationFile", primary_key=True)
-    Name = models.TextField(db_column="Name", default="Beijing")
-    LocId = models.TextField(db_column="LocId", default="ChIJ58KMhbNLzJQRwfhoMaMlugA", db_index=True)
-    Alias = ArrayField(models.TextField(), db_column="Alias", default=list, db_index=True)
-    Doc = JSONField(db_column="Content", default=dict)
-
-    class Meta:
-        db_table = "graph_source_location_doc"
-
-
-class Chronology(models.Model):
-    FileId = models.BigIntegerField(primary_key=True)
-    PeriodStart = models.DateField(db_column="Start", null=True)
-    PeriodEnd = models.DateField(db_column="End", null=True)
-    Content = models.TextField(db_column="Content")
-
-    class Meta:
-        db_table = "graph_source_chronology"
-
-
-# remake 2019-10-17
-class Relationship(models.Model):
+# remake 2019-10-17 2019-10-20
+class RelationshipCtrl(models.Model):
     LinkId = models.BigIntegerField(primary_key=True)
+    IsUsed = models.BooleanField(default=True)
+    PrimaryLabel = models.TextField(db_index=True)
     Start = models.BigIntegerField(db_column="Start", db_index=True)
     End = models.BigIntegerField(db_column="End", db_index=True)
     Is_UserMade = models.BooleanField(db_column="Is_UserMade", db_index=True, default=True)
-    CreatorId = models.BigIntegerField(db_column="CreatorId", db_index=True, default=0)
+    CreateUser = models.BigIntegerField(db_column="CreatorId", db_index=True, default=0)
     CreateTime = models.DateTimeField(db_column="CreateTime", auto_now_add=True)
-    Type = models.TextField(db_index=True)
 
     class Meta:
         indexes = [
             models.Index(fields=["Start", "End"], name="start_end")
         ]
+        db_table = "graph_link_ctrl"
+
+
+class RelationshipInfo(models.Model):
+    LinkId = models.BigIntegerField(primary_key=True)
+    PrimaryLabel = models.TextField(db_index=True)
+
+    class Meta:
         abstract = True
 
 
 # todo 日志聚合 level: 2
-class FrequencyCount(Relationship):
+class FrequencyCount(RelationshipInfo):
     Count = models.IntegerField(db_column="Count", default=1)
     Frequency = models.FloatField(db_column="Frequency", default=0)
     UpdateTime = models.DateTimeField(auto_now=True)
-    Action = models.TextField(default="SearchTogether")
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["Start", "End", "Type"], name="unique_count_type")
         ]
-        abstract = True
+        db_table = "graph_link_frequency"
 
 
 # 专题和节点的连接
-class Doc2Node(Relationship):
+class Doc2Node(RelationshipInfo):
     Is_Main = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
     Correlation = models.IntegerField(db_column="Correlation", default=1)  # 相关度
     DocImp = models.IntegerField(db_column="DocImp", default=1)  # 节点在该话题下的重要度
@@ -255,12 +258,50 @@ class Doc2Node(Relationship):
 
 
 # 图谱上的关系
-class KnowLedge(Relationship):
+class KnowLedge(RelationshipInfo):
     Confidence = models.SmallIntegerField(db_column="Confidence", default=50)
-    PrimaryLabel = models.TextField(default="Include")
+    # 被他人选中的次数
+    SelectTimes = models.IntegerField(default=0)
+    Star = models.IntegerField(default=0)
     Labels = ArrayField(models.TextField(), default=list)
     ExtraProps = JSONField(default=dict)
     Text = models.TextField(db_column="Content", default="")
 
     class Meta:
         db_table = "graph_link_knowledge"
+
+
+# ----------------用户权限----------------
+
+# 原则:
+# 1 Common=False的Source 不暴露id和内容
+# 2 Used=False的Source 拦截所有API
+# 3 只有Owner才可以delete
+# 4 ChangeState 是指可以改变状态的用户，拥有除了Delete外的全部权限
+# 5 Collaborator 是指可以完全操作的用户
+# 5 SharedTo 是指可以进行查询级别操作的用户
+
+
+# done 07-22 remake 2019-10-21
+# 控制主题
+
+
+class BaseAuthority(models.Model):
+    SourceId = models.BigIntegerField(primary_key=True)  # 资源id
+    SourceType = models.TextField(db_index=True)
+    # 状态
+    Used = models.BooleanField(db_column="used", default=True)
+    Common = models.BooleanField(db_column="common", default=True)
+    Shared = models.BooleanField(db_column="shared", default=False)
+    OpenSource = models.BooleanField(db_column="open", default=False)
+
+    # 暂时默认
+    Payment = models.BooleanField(db_column="payment", default=False)
+    Vip = models.BooleanField(db_column="vip", default=False)
+    HighVip = models.BooleanField(db_column="high_vip", default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["Used", "Common"])
+        ]
+        db_table = "graph_authority"

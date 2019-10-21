@@ -33,6 +33,7 @@ def send_message(request):
     phone = request.GET.get("phone")
     current = user_check_message(phone=phone)
     message_code = random.randint(123456, 898998)
+    print(message_code)
     if current:
         return HttpResponse(content="请隔3分钟再请求验证码")
     else:
@@ -66,7 +67,7 @@ def register(request):
         try:
             User.objects.get(UserPhone=info["phone"])
         except ObjectDoesNotExist:
-            _id = id_generator(number=1, method="device", content=device_id, jump=3)[0]
+            _id = id_generator(number=1, method="device", jump=3)[0]
             new_user = BaseUser(_id=_id).create(info=info, concern=concern, status=status)
             response = new_user.login_success()
             response.content = "注册成功"

@@ -143,10 +143,11 @@ class BaseUser:
             for _id, source_type in id_type_dict.items():
                 self.privilege.Is_Owner.append(_id)
                 repositoryList = {
-                    "Node": self.repository.CreateNode,
-                    "Media": self.repository.UploadFile,
-                    "Document": self.repository.CreateDoc,
-                    "Fragment": self.repository.Fragment
+                    "node": self.repository.CreateNode,
+                    "media": self.repository.CreateFile,
+                    "document": self.repository.CreateDoc,
+                    "fragment": self.repository.Fragments,
+                    "link": self.repository.CreateLink
                 }
                 if source_type in repositoryList:
                     repositoryList[source_type].append(_id)

@@ -89,13 +89,13 @@ class TimeField(models.TextField):
 
 # block_size = 65535
 # BlockManager: 一个体系的全局管理
-# Node, Media使用PrimaryLabel的index作为划分依据
 # Document, Comment之类的功能内容使用device作为划分依据
 # Record之类的事务内容使用time作为划分依据
+# 全局唯一
 class BaseBlockManager(models.Model):
     BlockId = models.AutoField(db_column="BlockId", primary_key=True)
-    Classifier = models.IntegerField(db_column="LabelContent", db_index=True)
     RegisterTime = models.DateTimeField(db_column="RegisterTime", auto_now_add=True)
+    RegisterDevice = models.IntegerField(db_index=True)
 
     class Meta:
         abstract = True
@@ -106,17 +106,23 @@ class NodeBlockManager(BaseBlockManager):
         db_table = "global_node_block_manager"
 
 
+class LinkBlockManager(BaseBlockManager):
+    class Meta:
+        db_table = "global_link_block_manager"
+
+
 class DeviceBlockManager(BaseBlockManager):
     class Meta:
         db_table = "global_device_block_manager"
 
 
-class RecordBlockManager(BaseBlockManager):
+class TimeBlockManager(BaseBlockManager):
     class Meta:
-        db_table = "global_private_block_manager"
+        db_table = "global_time_block_manager"
 
 
 # 每个Block的管理记录 例如Block5 OutId 20 就是第五个Block的id=20位置已经使用
+# 每个机器有一份
 class BlockIdRecord(models.Model):
     BlockId = models.IntegerField(db_column="BLOCK_ID", db_index=True)
     OutId = models.BigIntegerField(db_column="OUT_ID", primary_key=True)
@@ -130,12 +136,17 @@ class NodeBlockIdRecord(BlockIdRecord):
         db_table = "device_node_block"
 
 
+class LinkBlockIdRecord(BlockIdRecord):
+    class Meta:
+        db_table = "device_link_block"
+
+
 class DeviceBlockIdRecord(BlockIdRecord):
     class Meta:
         db_table = "device_device_block"
 
 
-class RecordBlockIdRecord(BlockIdRecord):
+class TimeBlockIdRecord(BlockIdRecord):
     class Meta:
         db_table = "device_time_block"
 
@@ -147,3 +158,26 @@ class GlobalWordIndex(models.Model):
 
     class Meta:
         db_table = "global_word_index"
+
+
+# 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录
+# done
+class LocationDoc(models.Model):
+    FileId = models.AutoField(db_column="LocationFile", primary_key=True)
+    Name = models.TextField(db_column="Name", default="Beijing")
+    LocId = models.TextField(db_column="LocId", default="ChIJ58KMhbNLzJQRwfhoMaMlugA", db_index=True)
+    Alias = ArrayField(models.TextField(), db_column="Alias", default=list, db_index=True)
+    Doc = JSONField(db_column="Content", default=dict)
+
+    class Meta:
+        db_table = "graph_source_location_doc"
+
+
+class Chronology(models.Model):
+    FileId = models.BigIntegerField(primary_key=True)
+    PeriodStart = models.DateField(db_column="Start", null=True)
+    PeriodEnd = models.DateField(db_column="End", null=True)
+    Content = models.TextField(db_column="Content")
+
+    class Meta:
+        db_table = "graph_source_chronology"
