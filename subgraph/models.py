@@ -215,13 +215,25 @@ class RelationshipCtrl(models.Model):
     PrimaryLabel = models.TextField(db_index=True)
     Start = models.BigIntegerField(db_column="Start", db_index=True)
     End = models.BigIntegerField(db_column="End", db_index=True)
+    StartType = models.TextField(db_index=True)
+    EndType = models.TextField(db_index=True)
+    StartPLabel = models.TextField(db_index=True)
+    EndPLabel = models.TextField(db_index=True)
     Is_UserMade = models.BooleanField(db_column="Is_UserMade", db_index=True, default=True)
     CreateUser = models.BigIntegerField(db_column="CreatorId", db_index=True, default=0)
     CreateTime = models.DateTimeField(db_column="CreateTime", auto_now_add=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=["Start", "End"], name="start_end")
+            models.Index(fields=["Start", "End"], name="start_end"),
+            models.Index(fields=[
+                "Start",
+                "End",
+                "StartType",
+                "EndType",
+                "StartPLabel",
+                "EndPLabel"
+            ], name="complete_index")
         ]
         db_table = "graph_link_ctrl"
 
@@ -241,9 +253,6 @@ class FrequencyCount(RelationshipInfo):
     UpdateTime = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["Start", "End", "Type"], name="unique_count_type")
-        ]
         db_table = "graph_link_frequency"
 
 
@@ -263,9 +272,11 @@ class KnowLedge(RelationshipInfo):
     # 被他人选中的次数
     SelectTimes = models.IntegerField(default=0)
     Star = models.IntegerField(default=0)
+    Hot = HotField()
+    Name = models.TextField(default="")
     Labels = ArrayField(models.TextField(), default=list)
     ExtraProps = JSONField(default=dict)
-    Text = models.TextField(db_column="Content", default="")
+    Text = JSONField(default=dict)
 
     class Meta:
         db_table = "graph_link_knowledge"

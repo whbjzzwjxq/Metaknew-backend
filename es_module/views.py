@@ -1,9 +1,10 @@
-from elasticsearch import Elasticsearch
-from es_module.logic_class import bulk_add_node_index, es
-# from subgraph.logic_class import BaseNode, BaseMediaNode
-from subgraph.models import BaseAuthority
 import json
+
 from django.shortcuts import HttpResponse
+
+from es_module.logic_class import bulk_add_node_index, es, EsQuery
+from subgraph.class_node import BaseNode
+from subgraph.models import BaseAuthority
 
 hits_format = {"took": 1,
                "timed_out": False,
@@ -13,34 +14,11 @@ hits_format = {"took": 1,
                         "hits": []}}
 
 
-def query_for_home_page(request):
-    """
-    首页搜索框的请求
-    :param request:
-    :return:
-    """
-    if request.method == "POST":
-        request_params = json.loads(request.body)
-        # todo 综合查询 level: 2
-        return_template = {
-            "name": "test",
-            "id": 0,
-            "score": 10,
-            "star": 20,
-            "type": "node",
-            "pLabel": "ArchProject",
-            "topic": ["Architecture"],
-            "labels": ["Recent", "Latin-America"],
-            "totalTime": 60,
-            "mainPic": BaseMediaNode(_id=2, user_id=2).query_as_main_pic()
-        }
-        templates = [return_template] * 5
-        for index, temp in enumerate(templates):
-            temp["id"] = index
-        results = {"Nodes": [templates[0]],
-                   "Documents": [templates[1], templates[2], templates[3]],
-                   "Course": [templates[4]]}
-        return HttpResponse(json.dumps(results))
+def home_page_search(request):
+    query_object = json.loads(request.body.decode())
+    result = EsQuery().main(query_object)
+
+    return HttpResponse(json.dumps(result), status=200)
 
 
 def query_name_similarity(request):

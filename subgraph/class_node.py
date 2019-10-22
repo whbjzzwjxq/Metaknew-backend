@@ -37,13 +37,13 @@ class BaseNode(base_tools.BaseModel):
             self.query_history()
         return self
 
-    def query_with_label(self, label):
+    def query_with_label(self, p_label):
         """
         带有主标签的查询
-        :param label:
+        :param p_label:
         :return:
         """
-        ctrl_set = NodeCtrl.objects.filter(PrimaryLabel=label)
+        ctrl_set = NodeCtrl.objects.filter(PrimaryLabel=p_label)
         try:
             self.ctrl = ctrl_set.objects.get(pk=self.id)
             self.p_label = self.ctrl.PrimaryLabel
@@ -71,14 +71,15 @@ class BaseNode(base_tools.BaseModel):
         self.__info_create(data=data)  # done 09-10
         self.name_checker()  # done 09-13
         self.auth_create(data=data)  # done 09-10
-        props = {"_id": self.id,
-                 "Name": data["Name"],
-                 "Imp": data["BaseImp"],
-                 "HardLevel": data["BaseHardLevel"]
-                 }
+        props = {
+            "Name": data["Name"],
+            "Imp": data["BaseImp"],
+            "HardLevel": data["BaseHardLevel"]
+        }
         self.node = neo4j_create_node(
-            _type="Node",
             labels=data["Labels"] + data["Topic"],
+            _id=self.id,
+            _type=self.type,
             plabel=self.p_label,
             props=props,
             is_user_made=self.is_user_made,
@@ -221,34 +222,34 @@ class BaseNode(base_tools.BaseModel):
         info = self.info
         body = {
             "id": self.id,
-            "language": info.Language,
             "type": self.type,
-            "create_user": ctrl.CreateUser,
-            "update_time": ctrl.UpdateTime,
-            "main_pic": info.MainPic,
-            "name": {
+            "CreateUser": ctrl.CreateUser,
+            "UpdateTime": ctrl.UpdateTime,
+            "Language": info.Language,
+            "MainPic": info.MainPic,
+            "Name": {
                 "zh": "",
                 "en": "",
                 "auto": info.Name
             },
-            "tags": {
-                "p_label": info.PrimaryLabel,
-                "alias": info.Alias,
-                "labels": info.Labels,
-                "topic": info.Topic
+            "Tags": {
+                "PrimaryLabel": info.PrimaryLabel,
+                "Alias": info.Alias,
+                "Labels": info.Labels,
+                "Topic": info.Topic
             },
-            "level": {
-                "imp": ctrl.Imp,
-                "hard_level": ctrl.HardLevel,
-                "useful": ctrl.Useful,
-                "star": ctrl.Star,
-                "hot": ctrl.Hot,
-                "total_time": ctrl.TotalTime
+            "Level": {
+                "Imp": ctrl.Imp,
+                "HardLevel": ctrl.HardLevel,
+                "Useful": ctrl.Useful,
+                "Star": ctrl.Star,
+                "Hot": ctrl.Hot,
+                "TotalTime": ctrl.TotalTime
             }
         }
-        for lang in body["name"]:
+        for lang in body["Name"]:
             if lang in info.Translate:
-                body["name"][lang] = info.Translate[lang]
+                body["Name"][lang] = info.Translate[lang]
 
         return body
 

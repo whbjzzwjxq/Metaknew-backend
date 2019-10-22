@@ -5,8 +5,9 @@ from py2neo import walk, Relationship
 from py2neo.data import Node as NeoNode
 
 from record.logic_class import ObjectAlreadyExist
+from subgraph.class_node import BaseNode
 from tools import base_tools
-from subgraph.models import RelationshipCtrl
+from subgraph.models import RelationshipCtrl, KnowLedge
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
 
@@ -22,8 +23,8 @@ class BaseLink(base_tools.BaseModel):
         super().__init__(_id, user_id, _type, collector)
 
         self.walk: Optional[walk] = None
-        self.start: Optional[NeoNode] = None
-        self.end: Optional[NeoNode] = None
+        self.start: Optional[BaseNode] = None
+        self.end: Optional[BaseNode] = None
         self.link: Optional[Relationship] = None
 
     def query_by_id(self):
@@ -76,6 +77,7 @@ class BaseLink(base_tools.BaseModel):
         self.p_label = p_label
         # ctrl
         self.__ctrl_create()
+        self.auth_create(data=data)
         # info
         self.info = base_tools.link_init(p_label)()
         self.info.PrimaryLabel = p_label
@@ -85,7 +87,7 @@ class BaseLink(base_tools.BaseModel):
         # link
         self.link = Relationship(self.start, p_label, self.end)
         self.__link_update(data)
-        self.collector.tx.push(self.link)
+        self.collector.tx.create(self.link)
         return self
 
     def __ctrl_create(self):
@@ -93,7 +95,11 @@ class BaseLink(base_tools.BaseModel):
             LinkId=self.id,
             PrimaryLabel=self.p_label,
             Start=self.start["_id"],
+            StartType=self.start["_type"],
+            StartPLabel=self.start["_label"],
             End=self.end["_id"],
+            EndType=self.end["_type"],
+            EndPLabel=self.end["_label"],
             Is_UserMade=self.is_user_made,
             CreateUser=self.user_id
         )
@@ -107,6 +113,37 @@ class BaseLink(base_tools.BaseModel):
     def __link_update(self, data):
         neo4j_props = {"Is_UserMade": self.is_user_made, "CreateTime": datetime.now().strftime('%a, %b %d %H:%M')}
         self.link.update(neo4j_props)
+
+    def handle_for_frontend(self):
+        pass
+
+    def text_index(self):
+        self.info: KnowLedge
+        if len(list(self.info.Text.keys())) > 0:
+            language = list(self.info.Text.keys())[0]
+            text = self.info.Text[language]
+        else:
+            language = "auto"
+            text = ""
+        body = {
+            "id": self.id,
+            "type": self.type,
+            "PrimaryLabel": self.p_label,
+            "Language": language,
+            "Name": self.info.Name,
+            "Labels": self.info.Labels,
+            "Text": {
+                "zh": "",
+                "en": "",
+                "auto": text
+            },
+            "Hot": self.info.Hot,
+            "Star": self.info.Star
+        }
+        for lang in body["Text"]:
+            if lang in self.info.Text:
+                body["Text"][lang] = self.info.Text[lang]
+        return body
 
 
 class SystemMade(BaseLink):
@@ -133,3 +170,9 @@ class SystemMade(BaseLink):
                 neo4j_props[field.name] = data[field.name]
             else:
                 neo4j_props[field.name] = getattr(self.info, field.name)
+
+    def text_index(self):
+        return {}
+
+    def auth_create(self, data):
+        pass

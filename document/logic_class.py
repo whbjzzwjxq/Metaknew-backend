@@ -337,10 +337,10 @@ class BaseDocGraph:
             if self.re_for_new_id.match(str(_id)):
                 _id = self.id_old_new_map[_id]
             cache = [node for node in self.info_change_nodes
-                     if node.id == _id]
-            print([_id, cache])
-            cache =cache[0]
+                     if node.id == _id][0]
             return cache.node
+        else:
+            return node
 
     def change_node(self, node):
         index = self.check_for_exist_in_setting(node["Setting"]["_id"], self.graph.Nodes)

@@ -1,17 +1,14 @@
 import json
 import typing
 
-import numpy as np
 from django.http import HttpResponse
+from django.shortcuts import render
 
 from document.logic_class import BaseDocGraph
-from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
-from record.models import WarnRecord, NodeVersionRecord
-from subgraph.class_link import BaseLink
+from es_module.logic_class import bulk_add_text_index
 from subgraph.class_media import BaseMedia
 from subgraph.class_node import BaseNode
-from subgraph.models import NodeCtrl, NodeInfo, RelationshipCtrl, RelationshipInfo, BaseAuthority
-from tools.base_tools import NeoSet, get_special_props, node_init, DateTimeEncoder, link_init, bulk_save_base_model
+from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from users.logic_class import BaseUser
@@ -111,8 +108,10 @@ def upload_media_by_user(request):
     _id = id_generator(number=1, method='node', jump=2)[0]
     media = BaseMedia(_id=_id, user_id=user_id, collector=collector)
     media = media.create(data=file_data["Info"], remote_file=file_data["name"], is_user_made=True)
-    result = media.move_remote_file('userResource/' + str(media.id) + "." + media.ctrl.Format)
+    new_location = 'userResource/' + str(media.id) + "." + media.ctrl.Format
+    result = media.move_remote_file(new_location)
     if result.status == 200:
+        media.ctrl.FileName = new_location
         user_model.bulk_create_source({media.id: "media"})
         media.save()
         if media.info.Text != {}:

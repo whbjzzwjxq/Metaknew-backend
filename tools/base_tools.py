@@ -99,25 +99,18 @@ def bulk_save_base_model(item_list, user_model, _type):
             info_dict[info.PrimaryLabel].append(info)
         for key in info_dict:
             type_label_to_model(_type, key).objects.bulk_create(info_dict[key])
-
+        bulk_add_text_index(items)
+        # 保存authority
+        authority = list(output[:, 2])
+        authority = [auth for auth in authority if auth]
+        BaseAuthority.objects.bulk_create(authority)
+        # 保存warn
+        warn = list(output[:, 3])
+        WarnRecord.objects.bulk_create(warn)
         if _type == 'node':
-            # 保存authority
-            authority = list(output[:, 2])
-            BaseAuthority.objects.bulk_create(authority)
-            # 保存warn
-            warn = list(output[:, 3])
-            WarnRecord.objects.bulk_create(warn)
             history = list(output[:, 4])
             NodeVersionRecord.objects.bulk_create(history)
             bulk_add_node_index(items)
-        elif _type == 'media':
-            # 保存authority
-            authority = list(output[:, 2])
-            BaseAuthority.objects.bulk_create(authority)
-            # 保存warn
-            warn = list(output[:, 3])
-            WarnRecord.objects.bulk_create(warn)
-            bulk_add_text_index(items)
 
 
 def node_init(label: str) -> Type[NodeInfo]:
@@ -171,21 +164,21 @@ def get_special_props(_type: _types, p_label: str) -> List[Field]:
     return result
 
 
-def neo4j_create_node(_type: _types, labels: List[str], plabel: str,
+def neo4j_create_node(_id: int, _type: _types, labels: List[str], plabel: str,
                       props: Dict, collector: NeoSet(),
                       is_user_made=True, is_common=True) -> NeoNode:
     """
 
+    :param _id: _id
     :param _type: Node | Media | Document | Fragment
     :param labels: 标签组
     :param plabel: 主标签
-    :param props: 属性 ，一定要包含"_id"
+    :param props: 属性
     :param is_user_made: 是否是用户创建的
     :param is_common: 是否是公开的
     :param collector: 连接池
     :return: None | Node
     """
-    assert "_id" in props
     node_labels = ["Used"]
     node_labels.extend(labels)
     node_labels.append(_type)
@@ -195,9 +188,12 @@ def neo4j_create_node(_type: _types, labels: List[str], plabel: str,
     if is_common:
         node_labels.append("Common")
     node = NeoNode(*node_labels, **props)
+    node["_id"] = _id
+    node["_type"] = _type
+    node["_label"] = plabel
     node.__primarylabel__ = plabel
     node.__primarykey__ = "_id"
-    node.__primaryvalue__ = props["_id"]
+    node.__primaryvalue__ = _id
     collector.tx.create(node)
     return node
 
@@ -335,27 +331,31 @@ class BaseModel:
             return ErrorContent(status=401, state=False, reason="unAuthorization")
 
     def text_index(self):
-        if self.type != 'link':
-            body = {
-                "id": self.id,
-                "language": list(self.info.Text.keys())[0],
-                "name": self.info.Name,
-                "keywords": self.info.Labels,
-                "text": {
-                    "zh": "",
-                    "en": "",
-                    "auto": self.info.Text["auto"]
-                },
-                "hot": self.ctrl.Hot,
-                "star": self.ctrl.Star,
-                "is_bound": True
-            }
-            for lang in body["text"]:
-                if lang in self.info.Text:
-                    body["text"][lang] = self.info.Text[lang]
-            return body
+        if len(list(self.info.Text.keys())) > 0:
+            language = list(self.info.Text.keys())[0]
+            text = self.info.Text[language]
         else:
-            return {}
+            language = "auto"
+            text = ""
+        body = {
+            "id": self.id,
+            "type": self.type,
+            "PrimaryLabel": self.p_label,
+            "Language": language,
+            "Name": self.info.Name,
+            "Labels": self.info.Labels,
+            "Text": {
+                "zh": "",
+                "en": "",
+                "auto": text
+            },
+            "Hot": self.ctrl.Hot,
+            "Star": self.ctrl.Star
+        }
+        for lang in body["Text"]:
+            if lang in self.info.Text:
+                body["Text"][lang] = self.info.Text[lang]
+        return body
 
     def output_table_create(self):
         return self.ctrl, self.info, self.authority, self.warn

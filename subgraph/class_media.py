@@ -35,12 +35,14 @@ class BaseMedia(base_tools.BaseModel):
             self.info.Text = {"auto": ""}
 
         self.node = neo4j_create_node(
-            _type="Media",
             labels=data["Labels"],
+            _id=self.id,
+            _type=self.type,
             plabel=self.p_label,
-            props={"_id": self.id, "Name": data["Name"]},
+            props={"Name": data["Name"]},
             collector=self.collector
         )
+        self.collector.tx.create(self.node)
         self.auth_create(data=data)
         return self
 
@@ -57,7 +59,7 @@ class BaseMedia(base_tools.BaseModel):
             MediaId=self.id,
             FileName=remote_file,
             CreateUser=self.user_id,
-            Format=remote_file.split("/")[1],
+            Format=remote_file.split(".")[1],
             Is_UserMade=is_user_made,
             CountCacheTime=datetime.now(tz=timezone.utc).replace(microsecond=0)
         )
@@ -84,7 +86,7 @@ class BaseMedia(base_tools.BaseModel):
                     }
                     self.ctrl.History.append(history)
                     self.ctrl.FileName = remote_name
-                    self.ctrl.Format = remote_name.split("/")[1]
+                    self.ctrl.Format = remote_name.split(".")[1]
                     self.info_update(data)
                 else:
                     return ErrorContent(status=400, state=False, reason='NewFile Dos not Exist')

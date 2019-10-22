@@ -3,7 +3,7 @@ from tools.redis_process import *
 from users.logic_class import BaseGroup
 from functools import reduce
 from subgraph.models import BaseAuthority
-
+import re
 default_request_info = {
     "status": True,
     "content": "",
@@ -92,32 +92,43 @@ class AuthMiddleware:
     @staticmethod
     def confirm_login_status(request: HttpRequest()) -> default_request_info:
         # 默认情况下视为游客
-        login_list = ["/user/login_normal"]
-        if request.path_info not in login_list:
+        un_login_list = [
+            re.compile(r'apis/static/dist/.*'),
+            re.compile(r'apis/index.*'),
+            re.compile(r'apis/user/.*'),
+        ]
+        result = False
+        for regex in un_login_list:
+            if regex.match(request.path_info):
+                result = True
+                break
+        if not result:
             request_info = default_request_info
-            token = request.headers["Token"]
-            user_name = request.headers["User-Name"]
-            if token != "null" and user_name != "null":
-                user_id, saved_token = user_query_by_name(user_name)
-                if not saved_token:
-                    request_info["content"] = "登录信息过期，请重新登录"
-                    request_info["status"] = False
-                elif token != saved_token and token != 'w1e4r5t6l8ka1jh':
-                    request_info["content"] = "已经在别处登录了"
-                    request_info["status"] = False
-                else:
-                    request_info["content"] = ""
-                    request_info["status"] = True
-                    request_info["user_id"] = user_id
+            if "Token" in request.headers and "User-Name" in request.headers:
+                token = request.headers["Token"]
+                user_name = request.headers["User-Name"]
+                if token != "null" and user_name != "null":
+                    user_id, saved_token = user_query_by_name(user_name)
+                    if not saved_token:
+                        request_info["content"] = "登录信息过期，请重新登录"
+                        request_info["status"] = False
+                    elif token != saved_token and token != 'w1e4r5t6l8ka1jh':
+                        request_info["content"] = "已经在别处登录了"
+                        request_info["status"] = False
+                    else:
+                        request_info["content"] = ""
+                        request_info["status"] = True
+                        request_info["user_id"] = user_id
 
-                    request.GET._mutable = True
-                    request.GET.update({"user_id": user_id})
-                    request.GET._mutable = False
-            else:
-                request_info["content"] = "以游客身份登录"
-                request_info["status"] = True
-                request_info["user_id"] = 0
-            return request_info
+                        request.GET._mutable = True
+                        request.GET.update({"user_id": user_id})
+                        request.GET._mutable = False
+                else:
+                    request_info["content"] = "以游客身份登录"
+                    request_info["status"] = True
+                    request_info["user_id"] = 0
+                return request_info
+            return default_request_info
         else:
             return default_request_info
 
