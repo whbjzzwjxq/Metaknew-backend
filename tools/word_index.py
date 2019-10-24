@@ -4,7 +4,8 @@ from django.shortcuts import HttpResponse
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
 
-# done in 07-24 完成了基础工作 todo 词汇查询 level: 2
+# done in 07-24 完成了基础工作
+# todo 词汇查询 level: 2
 def query_word_list(word_list: list):
     """
 

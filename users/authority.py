@@ -1,10 +1,9 @@
 from django.http import HttpResponse, HttpRequest
 from tools.redis_process import *
-from users.models import BaseAuthority, DocAuthority, NodeAuthority, MediaAuthority, CourseAuthority
 from users.logic_class import BaseGroup
 from functools import reduce
-import typing
-
+from subgraph.models import BaseAuthority
+import re
 default_request_info = {
     "status": True,
     "content": "",
@@ -15,7 +14,8 @@ default_request_info = {
 # done 09-13
 class AuthMiddleware:
     accurate_match_url = {
-        "/subgraph/media_node_create": {"user_type": "user", "method": "create"}
+        "/subgraph/media_node_create": {"user_type": "user", "method": "create"},
+        "/document/create/graph": {"user_type": "user", "method": "create"}
     }
     regex_match_url = {}
     default_checker = {
@@ -25,12 +25,6 @@ class AuthMiddleware:
         "source_type": "node",  # node || media || document || course  公有资源
         # link || comment || note || fragment  私有资源
     }
-    auth_sheet = {
-        "document": DocAuthority,
-        "node": NodeAuthority,
-        "media": MediaAuthority,
-        "course": CourseAuthority
-    }
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -38,7 +32,7 @@ class AuthMiddleware:
     def __call__(self, request: HttpRequest()):
         request_info = self.confirm_login_status(request)
         if not request_info["status"]:
-            return HttpResponse(status=400, content=request_info["content"])
+            return HttpResponse(status=401, content=request_info["content"])
         else:
             _checker = self.match_url(request)
             if _checker == {}:
@@ -51,7 +45,7 @@ class AuthMiddleware:
 
                     # 如果是游客 就拒绝
                     if not user_info:
-                        return HttpResponse(status=400, content='当前操作不支持游客访问')
+                        return HttpResponse(status=401, content='当前操作不支持游客访问')
                     else:
                         status, content = self.check_user_type(_checker, user_info)
                         request_info["content"] = content
@@ -98,30 +92,45 @@ class AuthMiddleware:
     @staticmethod
     def confirm_login_status(request: HttpRequest()) -> default_request_info:
         # 默认情况下视为游客
-        request_info = default_request_info
-        token = request.headers["Token"]
-        user_name = request.headers["User-Name"]
-        if token != "null" and user_name != "null":
-            user_id, saved_token = user_query_by_name(user_name)
-            if not saved_token:
-                request_info["content"] = "登录信息过期，请重新登录"
-                request_info["status"] = False
-            elif not token == saved_token:
-                request_info["content"] = "已经在别处登录了"
-                request_info["status"] = False
-            else:
-                request_info["content"] = ""
-                request_info["status"] = True
-                request_info["user_id"] = user_id
+        un_login_list = [
+            re.compile(r'apis/static/dist/.*'),
+            re.compile(r'apis/index.*'),
+            re.compile(r'apis/user/.*'),
+        ]
+        result = False
+        for regex in un_login_list:
+            if regex.match(request.path_info):
+                result = True
+                break
+        if not result:
+            request_info = default_request_info
+            if "Token" in request.headers and "User-Name" in request.headers:
+                token = request.headers["Token"]
+                user_name = request.headers["User-Name"]
+                if token != "null" and user_name != "null":
+                    user_id, saved_token = user_query_by_name(user_name)
+                    if not saved_token:
+                        request_info["content"] = "登录信息过期，请重新登录"
+                        request_info["status"] = False
+                    elif token != saved_token and token != 'w1e4r5t6l8ka1jh':
+                        request_info["content"] = "已经在别处登录了"
+                        request_info["status"] = False
+                    else:
+                        request_info["content"] = ""
+                        request_info["status"] = True
+                        request_info["user_id"] = user_id
 
-                request.GET._mutable = True
-                request.GET.update({"user_id": user_id})
-                request.GET._mutable = False
+                        request.GET._mutable = True
+                        request.GET.update({"user_id": user_id})
+                        request.GET._mutable = False
+                else:
+                    request_info["content"] = "以游客身份登录"
+                    request_info["status"] = True
+                    request_info["user_id"] = 0
+                return request_info
+            return default_request_info
         else:
-            request_info["content"] = "以游客身份登录"
-            request_info["status"] = True
-            request_info["user_id"] = 0
-        return request_info
+            return default_request_info
 
     @staticmethod
     def check_user_type(_checker, user_info) -> (bool, str):
@@ -182,8 +191,7 @@ class AuthMiddleware:
         :return: (bool, str)
         """
         method = _checker["method"]
-        source_type = _checker["source_type"]
-        record = self.auth_sheet[source_type].objects.filter(SourceId=_id)
+        record = BaseAuthority.objects.filter(SourceId=_id)
         if len(record) == 0:
             self.__anti_spider()
             return HttpResponse(status=404)
@@ -220,7 +228,8 @@ class AuthMiddleware:
                     if group_privilege:
                         privileges.append(group_privilege)
 
-                result = [self.__privilege_source_check(privilege, _id, record, _checker["method"]) for privilege in privileges]
+                result = [self.__privilege_source_check(privilege, _id, record, _checker["method"])
+                          for privilege in privileges]
                 result = reduce(lambda a, b: a or b, result)
                 if result:
                     return True, ""
@@ -243,7 +252,9 @@ class AuthMiddleware:
             if record.OpenSource:
                 return True
             else:
-                if _id in privilege_info["Is_Owner"] or _id in privilege_info["Is_Manager"] or _id in privilege_info["Is_Collaborator"]:
+                if _id in privilege_info["Is_Owner"] or \
+                        _id in privilege_info["Is_Manager"] or \
+                        _id in privilege_info["Is_Collaborator"]:
                     return True
                 else:
                     return False

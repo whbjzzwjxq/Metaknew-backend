@@ -12,13 +12,23 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
-import djcelery
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+STATIC_URL = "templates/static/"
 MEDIA_URL = "media/"
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "templates/static/"),
+    'templates/static/dist',
+]
+
+STATICFILES_FINDERS = (
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+)
+
 # MEDIA_ROOT = os.path.join(BASE_DIR,"media")
 
 # Quick-start development settings - unsuitable for production
@@ -66,7 +76,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.postgres",
     "django.contrib.sites",
-    "djcelery",
     "users",
     "subgraph",
     "document",
@@ -94,7 +103,7 @@ ROOT_URLCONF = "demo.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, 'templates')],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -173,14 +182,4 @@ USE_L10N = True
 
 USE_TZ = True
 
-
-djcelery.setup_loader()
-# 数据库调度
-CELERYBEAT_SCHEDULER = "djcelery.schedulers.DatabaseScheduler"
-# celery setting
-BROKER_URL = "amqp://guest:guest@39.96.10.154:5672//"
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/2.1/howto/static-files/
-
-STATIC_URL = "/static/"

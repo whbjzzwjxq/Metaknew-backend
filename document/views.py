@@ -1,13 +1,10 @@
 # -*-coding=utf-8 -*-
-# APP内定义
-from document.logic_class import BaseComment, BaseNote, BaseDoc
-# django定义与工具包
-import datetime as dt
 from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-from document.logic_class import PersonalDoc
 
+from document.logic_class import BaseDocGraph
+from document.models import node_setting
+from subgraph.logic_class import create_node_format
+import json
 
 # # Create your views here.
 # @csrf_exempt
@@ -106,4 +103,16 @@ from document.logic_class import PersonalDoc
 #         return HttpResponse(response, content_type="application/json")
 #     else:
 #         return HttpResponse("删除过程错误")
+from tools.base_tools import DateTimeEncoder
 
+
+def query_graph(request):
+    _id = request.GET.get('_id')
+    user_id = request.GET.get("user_id")
+    if user_id == 'None' or not user_id:
+        user_id = 1
+    graph = BaseDocGraph(_id=_id, user_id=user_id)
+    graph.query_base()
+    result = {"id": _id, "node": graph.handle_for_frontend()}
+
+    return HttpResponse(json.dumps(result, cls=DateTimeEncoder))

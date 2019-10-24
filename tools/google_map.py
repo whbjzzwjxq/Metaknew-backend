@@ -1,4 +1,4 @@
-from subgraph.models import LocationDoc
+from tools.models import LocationDoc
 from django.core.exceptions import ObjectDoesNotExist
 from tools.redis_process import query_location_queue, remove_location_queue
 from record.models import LocationsRecord

@@ -1,7 +1,6 @@
 from django.db import models
-from django.contrib.postgres.fields import ArrayField, HStoreField
-from tools.models import TopicField
-from tools.models import LevelField
+from django.contrib.postgres.fields import ArrayField, HStoreField, JSONField
+from tools.models import TopicField, LevelField
 
 # Create your models here.
 
@@ -70,15 +69,24 @@ class Privilege(models.Model):
         db_table = "user_authority_count"
 
 
-# 用户私有仓库
+# 用户私有仓库 remake 2019-10-20
 class UserRepository(models.Model):
+    """
+    记录所有用户创建的内容的表
+    """
     UserId = models.IntegerField(primary_key=True)
     # 以下是CommonSource
     CreateDoc = ArrayField(models.BigIntegerField(), default=list)
     CreateNode = ArrayField(models.BigIntegerField(), default=list)
     CreateCourse = ArrayField(models.BigIntegerField(), default=list)
-    UploadFile = ArrayField(models.BigIntegerField(), default=list)
-    Fragment = ArrayField(models.BigIntegerField(), default=list)
+    CreateFile = ArrayField(models.BigIntegerField(), default=list)
+    CreatePath = ArrayField(models.BigIntegerField(), default=list)
+    CreateLink = ArrayField(models.BigIntegerField(), default=list)
+    CreateTopic = ArrayField(models.BigIntegerField(), default=list)
+    # 以下是PrivateSource
+    Fragments = ArrayField(models.BigIntegerField(), default=list)
+    Notes = ArrayField(models.BigIntegerField(), default=list)
+    Comments = ArrayField(models.BigIntegerField(), default=list)
 
     class Meta:
         db_table = "user_info_collection"
@@ -95,8 +103,10 @@ class UserConcern(models.Model):
     Imp = LevelField()
     HardLevel = LevelField()
     Useful = LevelField()
-    Is_Star = models.BooleanField(default=False)
-    Is_Tag = models.BooleanField(default=False)
+    Is_Star = models.BooleanField(default=False)  # 是否收藏
+    Is_Good = models.BooleanField(default=False)  # 是否点赞
+    Is_Shared = models.BooleanField(default=False)  # 是否分享给别人
+    SpendTime = models.IntegerField(db_column="SpendTime", default=0)  # 花费的时间
 
     class Meta:
         indexes = [
@@ -118,63 +128,14 @@ class UserDocProgress(models.Model):
         db_table = "user_info_progress"
 
 
-# ----------------用户权限----------------
-
-# 原则:
-# 1 Common=False的Source 不暴露id和内容
-# 2 Used=False的Source 拦截所有API
-# 3 只有Owner才可以delete
-# 4 ChangeState 是指可以改变状态的用户，拥有除了Delete外的全部权限
-# 5 Collaborator 是指可以完全操作的用户
-# 5 SharedTo 是指可以进行查询级别操作的用户
-
-
-# done 07-22
-# 控制主题
-class BaseAuthority(models.Model):
-    SourceId = models.BigIntegerField(primary_key=True, db_index=True)  # 资源id
-
-    # 状态
-    Used = models.BooleanField(db_column="used", default=True)
-    Common = models.BooleanField(db_column="common", default=True)
-    Shared = models.BooleanField(db_column="shared", default=False)
-    OpenSource = models.BooleanField(db_column="open", default=False)
-    Payment = models.BooleanField(db_column="payment", default=False)
-    Vip = models.BooleanField(db_column="vip", default=False)
-    HighVip = models.BooleanField(db_column="high_vip", default=False)
+class UserDraft(models.Model):
+    RecordId = models.AutoField(primary_key=True)
+    UserId = models.BigIntegerField(db_column="UserId", db_index=True)
+    SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
+    SourceType = models.TextField(db_column="SourceType", db_index=True)
+    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
+    Content = JSONField(default=dict)
+    DontClear = models.BooleanField(default=False)
 
     class Meta:
-        abstract = True
-
-
-class DocAuthority(BaseAuthority):
-    class Meta:
-        db_table = "graph_authority_doc"
-
-
-class NodeAuthority(BaseAuthority):
-    class Meta:
-        db_table = "graph_authority_node"
-
-
-class MediaAuthority(BaseAuthority):
-    class Meta:
-        db_table = "graph_authority_media"
-
-
-class CourseAuthority(BaseAuthority):
-    class Meta:
-        db_table = "graph_authority_course"
-
-# todo 支付管理 level: 3
-# class PaymentManager(models.Model):
-#
-#     OrderId = models.BigIntegerField(db_column="OrderId", primary_key=True)
-#     SourceId = models.IntegerField(db_column="SourceId")
-#     Success = models.BooleanField(db_column="Success")
-#     Time = models.DateTimeField(db_column="Time", auto_now=True)
-#     Price = models.FloatField(db_column="Price", default=0)
-#     Free = models.FloatField(db_column="Free", default=1)
-#
-#     class Meta:
-#         db_table = "authority_payment"
+        db_table = "user_draft"

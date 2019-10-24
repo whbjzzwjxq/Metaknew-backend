@@ -8,6 +8,10 @@ from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import typing
 from tools.base_tools import model_to_dict
+from aliyunsdkcore import client
+from aliyunsdkcore.profile import region_provider
+from aliyunsdksts.request.v20150401 import AssumeRoleRequest
+import datetime
 
 salt = "al76vdj895as12cq"
 
@@ -20,9 +24,11 @@ class BaseUser:
         self.privilege: typing.Optional[Privilege] = None
         self.repository: typing.Optional[UserRepository] = None
         self.concern: typing.Optional[UserConcern] = None
+        self.is_login = False
 
     # 登录成功之后的设置
     def login_success(self):
+        self.is_login = True
         name = self.user.UserName
         _id = self.user.UserId
         token = make_token(name, _id)
@@ -31,10 +37,41 @@ class BaseUser:
         result = {
             "content": "登录成功",
             "token": token,
-            "userName": self.user.UserName
+            "userName": self.user.UserName,
+            "fileToken": self.resource_auth_for_ali_oss()["Credentials"]
         }
         response = HttpResponse(json.dumps(result), content_type="application/json", status=200)
         return response
+
+    def resource_auth_for_ali_oss(self):
+        regionId = 'cn-beijing'
+        endpoint = 'sts-vpc.cn-beijing.aliyuncs.com'
+        authorityKeys = {
+            "guest": {
+                "id": 'LTAI4FwvcibXwt11sCCiDUQB',
+                "secret": '26TNuCRT22WXjUOUnrNH8oQFgakxf1',
+            },
+            "developer": {
+                "id": 'LTAI4Fm4oYhKEjpDmSArRY7q',
+                "secret": "bZRE9nIm7W20YxEXGlkui9Pyq6UAoc"
+            }
+        }
+        if self.is_login:
+            region_provider.add_endpoint('Sts', regionId, endpoint)
+            clt = client.AcsClient(authorityKeys["guest"]["id"], authorityKeys["guest"]["secret"], regionId)
+            request = AssumeRoleRequest.AssumeRoleRequest()
+            role_arn = "acs:ram::1807542795506680:role/webservernormaluser"
+            request.set_RoleArn(role_arn)
+            request.set_RoleSessionName("user" + str(self.user_id))
+            request.set_DurationSeconds(3600)
+            response = json.loads(clt.do_action_with_exception(request).decode())
+
+            # 转为时间戳
+            expire = datetime.datetime.strptime(response["Credentials"]["Expiration"], '%Y-%m-%dT%H:%M:%SZ')
+            response["Credentials"]["Expiration"] = expire.timestamp()
+            return response
+        else:
+            raise AttributeError
 
     def create(self, info, concern, status):
         password = info["password"]
@@ -97,7 +134,7 @@ class BaseUser:
     def bulk_create_source(self, id_type_dict: typing.Dict[int, str]):
         """
         source的定义:Node Media Document
-        :param id_type_dict: 创建的内容的id-source dict
+        :param id_type_dict: 创建的内容 key-value形式: id: Node
         :return:
         """
         self.query_repository()
@@ -105,14 +142,15 @@ class BaseUser:
         if id_type_dict:
             for _id, source_type in id_type_dict.items():
                 self.privilege.Is_Owner.append(_id)
-                if source_type == "Node":
-                    self.repository.CreateNode.append(_id)
-                elif source_type == "Media":
-                    self.repository.UploadFile.append(_id)
-                elif source_type == "Document":
-                    self.repository.CreateDoc.append(_id)
-                elif source_type == "Fragment":
-                    self.repository.Fragment.append(_id)
+                repositoryList = {
+                    "node": self.repository.CreateNode,
+                    "media": self.repository.CreateFile,
+                    "document": self.repository.CreateDoc,
+                    "fragment": self.repository.Fragments,
+                    "link": self.repository.CreateLink
+                }
+                if source_type in repositoryList:
+                    repositoryList[source_type].append(_id)
                 else:
                     raise AttributeError("Unknown Source Type")
             self.repository.save()
