@@ -1,6 +1,5 @@
 import mimetypes
 from datetime import datetime, timezone
-from typing import Optional
 
 import oss2
 
@@ -16,12 +15,13 @@ class BaseMedia(base_tools.BaseModel):
     access_key_secret = authorityKeys["developer"]["access_key_secret"]
     bucket_name = authorityKeys["developer"]["bucket_name"]
     endpoint = authorityKeys["developer"]["endpoint"]
+    auth = oss2.Auth(access_key_id, access_key_secret)
+    oss_manager = oss2.Bucket(auth, endpoint, bucket_name=bucket_name, connect_timeout=10000)
 
     def __init__(self, _id: int, user_id: int, _type="media", collector=base_tools.NeoSet()):
         super().__init__(_id, user_id, _type, collector)
         self.p_label = "unknown"
         self.is_create = False
-        self.oss_manager: Optional[oss2.Bucket] = None
 
     # remake 2019-10-17 2019-10-20
     def create(self, data: dict, remote_file: str, is_user_made):
@@ -77,7 +77,6 @@ class BaseMedia(base_tools.BaseModel):
             if remote_name == self.ctrl.FileName:
                 self.info_update(data)
             else:
-                self.set_oss_manager()
                 if self.oss_manager.object_exists(remote_name):
                     history = {
                         "FileName": self.ctrl.FileName,
@@ -99,19 +98,11 @@ class BaseMedia(base_tools.BaseModel):
         self.authority.save()
         self.collector.tx.commit()
 
-    def set_oss_manager(self):
-        if not self.oss_manager:
-            auth = oss2.Auth(self.access_key_id, self.access_key_secret)
-            self.oss_manager = oss2.Bucket(auth, self.endpoint, bucket_name=self.bucket_name, connect_timeout=10000)
-        else:
-            pass
-
     def check_remote_file(self) -> bool:
         """
         查看远端文件
         :return: bool
         """
-        self.set_oss_manager()
         return self.oss_manager.object_exists(self.ctrl.FileName)
 
     def move_remote_file(self, new_location):

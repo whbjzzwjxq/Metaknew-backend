@@ -360,6 +360,39 @@ class BaseModel:
     def output_table_create(self):
         return self.ctrl, self.info, self.authority, self.warn
 
+    def handle_for_frontend(self):
+        """
+        前端所用格式
+        :return:
+        """
+        unused_props = ["CountCacheTime",
+                        "Is_Used",
+                        "Is_UserMade",
+                        "ImportMethod",
+                        "CreateTime",
+                        "NodeId",
+                        "CreateUser"]
+        self.query_base()
+        ctrl_fields = self.ctrl._meta.get_fields()
+        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
+                            for field in ctrl_fields if field.name not in unused_props}
+        info_fields = self.info._meta.get_fields()
+        output_info_dict = {field.name: getattr(self.info, field.name)
+                            for field in info_fields if field.name not in unused_props}
+        output_info_dict["id"] = self.id
+        output_info_dict["type"] = self.type
+        result = {
+            "Ctrl": output_ctrl_dict,
+            "Info": output_info_dict,
+            "State": {
+                "isSelf": self.ctrl.CreateUser == self.user_id,
+                "isRemote": True
+            },
+
+            # todo 把State去掉
+        }
+        return result
+
 
 class ErrorContent:
     """

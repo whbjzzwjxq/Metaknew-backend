@@ -8,6 +8,7 @@ from django.db.models import Max
 from es_module.logic_class import bulk_add_node_index
 from record.logic_class import error_check
 from record.models import WarnRecord, NodeVersionRecord
+from subgraph.class_media import BaseMedia
 from subgraph.models import NodeCtrl, MediaCtrl
 from tools import base_tools
 from tools.base_tools import neo4j_create_node
@@ -99,7 +100,7 @@ class BaseNode(base_tools.BaseModel):
         self.info = base_tools.node_init(self.p_label)()
         self.info.NodeId = self.id
         self.info.PrimaryLabel = self.p_label
-        if type(data["MainPic"]) == int:
+        if type(data["MainPic"]) == str and data["MainPic"] != " ":
             self.main_pic_setter(data["MainPic"])
         if data["IncludedMedia"]:
             self.media_setter(data["IncludedMedia"])
@@ -150,15 +151,11 @@ class BaseNode(base_tools.BaseModel):
                     "warn_type": "similar_node_id" + json.dumps([node.NodeId for node in similar_node])}
             self.warn.WarnContent.append(warn)
 
-    def main_pic_setter(self, media):
-        try:
-            record = MediaCtrl.objects.get(pk=media)
-            if record.PrimaryLabel == "Image":
-                self.info.MainPic = record.FileName
-            else:
-                warn = {"field": "MainPic", "warn_type": "error_type"}
-                self.warn.WarnContent.append(warn)
-        except ObjectDoesNotExist:
+    def main_pic_setter(self, media_name):
+        media_manager = BaseMedia.oss_manager
+        if media_manager.object_exists(media_name):
+            self.info.MainPic = media_name
+        else:
             warn = {"field": "MainPic", "warn_type": "empty_prop"}
             self.warn.WarnContent.append(warn)
         return self
@@ -196,26 +193,6 @@ class BaseNode(base_tools.BaseModel):
         self.loading_history.save()
         self.warn.save()
         bulk_add_node_index([self])
-
-    def handle_for_frontend(self):
-        """
-        前端所用格式
-        :return:
-        """
-        unused_props = ["CountCacheTime",
-                        "Is_Used",
-                        "ImportMethod",
-                        "CreateTime",
-                        "NodeId",
-                        "CreateUser"]
-        self.query_base()
-        ctrl_fields = self.ctrl._meta.get_fields()
-        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
-                            for field in ctrl_fields if field.name not in unused_props}
-        info_fields = self.info._meta.get_fields()
-        output_info_dict = {field.name: getattr(self.info, field.name)
-                            for field in info_fields if field.name not in unused_props}
-        return {"Ctrl": output_ctrl_dict, "Info": output_info_dict}
 
     def node_index(self):
         ctrl = self.ctrl

@@ -1,5 +1,7 @@
 # -*-coding=utf-8 -*-
 from django.http import HttpResponse
+
+from document.logic_class import BaseDocGraph
 from document.models import node_setting
 from subgraph.logic_class import create_node_format
 import json
@@ -101,45 +103,16 @@ import json
 #         return HttpResponse(response, content_type="application/json")
 #     else:
 #         return HttpResponse("删除过程错误")
+from tools.base_tools import DateTimeEncoder
 
 
-def query_document_graph(request):
+def query_graph(request):
     _id = request.GET.get('_id')
     user_id = request.GET.get("user_id")
-    node_template = {
-        "Ctrl": node_setting(),
-        "Info": create_node_format
-    }
-    result = {
-        "ctrl": {
-            "Base": {
-                "theme": 0,  # 这个需要商定一下
-                "background": "",  # 背景图URL/id
-                "color": "000000",  # 背景颜色
-                "opacity": 0,  # 背景透明度
-                "mode": 0,  # 0 normal 1 time 2 geo 3 imp 4...
-            },
-            "Group": [
-                {
-                    "scale": 1,
-                    "show": True,
-                    "color": "",
-                    "move_together": "",
-                }
-            ],
-            "Order": [
-                {"_id": 0,
-                 "time": 10}
-            ]
-        },
-        "info": {
-          "nodes": [],
-          "links": [],
-          "notes": []
-        },
-    }
-    return HttpResponse(json.dumps(result))
+    if user_id == 'None' or not user_id:
+        user_id = 1
+    graph = BaseDocGraph(_id=_id, user_id=user_id)
+    graph.query_base()
+    result = {"id": _id, "node": graph.handle_for_frontend()}
 
-
-def create_graph(request):
-    pass
+    return HttpResponse(json.dumps(result, cls=DateTimeEncoder))

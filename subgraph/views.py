@@ -6,12 +6,14 @@ from django.shortcuts import render
 
 from document.logic_class import BaseDocGraph
 from es_module.logic_class import bulk_add_text_index
+from subgraph.class_link import BaseLink, SystemMade
 from subgraph.class_media import BaseMedia
 from subgraph.class_node import BaseNode
-from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model
+from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model, type_label_to_model
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from users.logic_class import BaseUser
+from users.models import UserDraft
 
 
 def query_frontend_prop(request):
@@ -34,23 +36,31 @@ def query_field_type(field) -> str:
 
 def create_graph(request):
     collector = NeoSet()
+    data = json.loads(request.body.decode())
     doc_id = id_generator(number=1, method="node", jump=3)[0]
     user_id = request.GET.get("user_id")
-    data = json.loads(request.body.decode())
     graph = data["graph"]
-    user_model = BaseUser(_id=user_id).query_user()
-    doc = BaseDocGraph(_id=doc_id, user_id=user_id, collector=collector)
-    document = doc.create(graph)
-    document.info_change_nodes.append(document.node)
-    nodes = [node for node in document.info_change_nodes if node.type != 'media']
-    medias = [media for media in document.info_change_nodes if media.type == 'media']
-    links = document.info_change_links
-    bulk_save_base_model(nodes, user_model, "node")
-    bulk_save_base_model(medias, user_model, "media")
-    bulk_save_base_model(links, user_model, "link")
-    collector.tx.commit()
-    document.graph.save()
-    return HttpResponse(content="Create Document Success", status=200)
+    is_draft = data["isDraft"]
+    if is_draft:
+        draft = UserDraft(UserId=user_id, SourceId=doc_id, SourceType='document', Content=data)
+        draft.save()
+        return HttpResponse(content="Save Document Draft Success", status=200)
+    else:
+        user_model = BaseUser(_id=user_id).query_user()
+        doc = BaseDocGraph(_id=doc_id, user_id=user_id, collector=collector)
+        document = doc.create(graph)
+        nodes = [node for node in document.info_change_nodes if node.type != 'media']
+        medias = [media for media in document.info_change_nodes if media.type == 'media']
+        links = document.info_change_links
+        doc_to_node_links = document.doc_to_node_links
+        bulk_save_base_model(nodes, user_model, "node")
+        bulk_save_base_model(medias, user_model, "media")
+        bulk_save_base_model(links, user_model, "link")
+        bulk_save_base_model(doc_to_node_links, user_model, "link")
+        collector.tx.commit()
+        document.graph.save()
+        return HttpResponse(json.dumps({'node': document.node_id_old_new_map, 'link': document.link_id_old_new_map}),
+                            status=200)
 
 
 def bulk_create_node(request):
@@ -144,3 +154,42 @@ def query_single_node(request):
         return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
     else:
         return HttpResponse(404)
+
+
+def query_multi_source(request):
+    query_list = json.loads(request.body.decode())
+    user_id = request.GET.get("user_id")
+    _type_to_class = {
+        "node": {
+            'default': BaseNode
+        },
+        "media": {
+            "default": BaseMedia
+        },
+        "link": {
+            "default": BaseLink,
+            "Doc2Node": SystemMade,
+            "SearchTogether": SystemMade,
+            "MentionTogether": SystemMade,
+            "VisitAfter": SystemMade,
+        },
+        "document": {
+            "default": BaseDocGraph,
+            "DocPaper": BaseDocGraph  # todo
+        }
+    }
+    # todo 有时间改成map
+    result = []
+    for query in query_list:
+        _type = query[1]
+        p_label = query[2]
+        model_list = _type_to_class[_type]
+        if p_label in model_list:
+            model = model_list[p_label]
+        else:
+            model = model_list["default"]
+        output = model(_id=query[0], user_id=user_id)
+        output.query_base()
+        result.append(output.handle_for_frontend())
+
+    return HttpResponse(json.dumps(result, cls=DateTimeEncoder))

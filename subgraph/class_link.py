@@ -114,9 +114,6 @@ class BaseLink(base_tools.BaseModel):
         neo4j_props = {"Is_UserMade": self.is_user_made, "CreateTime": datetime.now().strftime('%a, %b %d %H:%M')}
         self.link.update(neo4j_props)
 
-    def handle_for_frontend(self):
-        pass
-
     def text_index(self):
         self.info: KnowLedge
         if len(list(self.info.Text.keys())) > 0:

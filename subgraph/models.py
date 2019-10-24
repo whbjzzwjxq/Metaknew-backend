@@ -19,7 +19,7 @@ def feature_vector():
 # remake 20191017
 class NodeCtrl(models.Model):
     NodeId = models.BigIntegerField(primary_key=True, editable=False)
-    IsUsed = models.BooleanField(default=True)
+    Is_Used = models.BooleanField(default=True)
     # 不传回的控制性内容
     CountCacheTime = models.DateTimeField(db_column="CacheTime", default=now)  # 最后统计的时间
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
@@ -134,7 +134,7 @@ class NodeNormal(NodeInfo):
 
 class MediaCtrl(models.Model):
     MediaId = models.BigIntegerField(primary_key=True)
-    IsUsed = models.BooleanField(default=True)
+    Is_Used = models.BooleanField(default=True)
     Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
     FileName = models.TextField(db_column="Name")  # 储存在阿里云OSS里的Name
     Format = models.TextField(db_column="Format", db_index=True)  # 储存在阿里云OSS里的format
@@ -144,6 +144,8 @@ class MediaCtrl(models.Model):
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
     TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间 主要是给音频和视频用的
+    # 缩略图
+    Thumb = models.TextField(default="")
     # 用户相关
     IsGood = models.BigIntegerField(default=0)
     IsBad = models.BigIntegerField(default=0)
@@ -211,7 +213,7 @@ class Fragment(models.Model):
 # remake 2019-10-17 2019-10-20
 class RelationshipCtrl(models.Model):
     LinkId = models.BigIntegerField(primary_key=True)
-    IsUsed = models.BooleanField(default=True)
+    Is_Used = models.BooleanField(default=True)
     PrimaryLabel = models.TextField(db_index=True)
     Start = models.BigIntegerField(db_column="Start", db_index=True)
     End = models.BigIntegerField(db_column="End", db_index=True)

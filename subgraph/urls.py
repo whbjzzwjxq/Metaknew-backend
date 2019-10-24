@@ -7,5 +7,6 @@ urlpatterns = [
     url("create/media/normal", views.upload_media_by_user),
     url("query/query_needed_props", views.query_frontend_prop),
     url("query/query_single_node", views.query_single_node),
-    url("create/graph/normal", views.create_graph)
+    url("create/graph/normal", views.create_graph),
+    url("query/multi", views.query_multi_source)
 ]

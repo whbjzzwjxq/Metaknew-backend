@@ -1,7 +1,6 @@
 from django.db import models
-from django.contrib.postgres.fields import ArrayField, HStoreField
-from tools.models import TopicField
-from tools.models import LevelField
+from django.contrib.postgres.fields import ArrayField, HStoreField, JSONField
+from tools.models import TopicField, LevelField
 
 # Create your models here.
 
@@ -127,3 +126,16 @@ class UserDocProgress(models.Model):
 
     class Meta:
         db_table = "user_info_progress"
+
+
+class UserDraft(models.Model):
+    RecordId = models.AutoField(primary_key=True)
+    UserId = models.BigIntegerField(db_column="UserId", db_index=True)
+    SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
+    SourceType = models.TextField(db_column="SourceType", db_index=True)
+    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
+    Content = JSONField(default=dict)
+    DontClear = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "user_draft"
