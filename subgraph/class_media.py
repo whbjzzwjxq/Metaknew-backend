@@ -141,8 +141,6 @@ class BaseMedia(base_tools.BaseModel):
         :return:
         """
         unused_props = [
-            "MediaId",
-            "FileName",
             "Format",
             "History",
             "CountCacheTime",
