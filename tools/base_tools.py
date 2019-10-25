@@ -74,11 +74,11 @@ model_dict: Dict[str, Dict[str, info_models]] = {
         "Doc2Node": Doc2Node,
     },
     "media": {
-        "default": Text,
-        "Image": Image,
-        "Text": Text,
-        "Audio": Audio,
-        "Video": Video
+        "default": Image,
+        "image": Image,
+        "text": Text,
+        "audio": Audio,
+        "video": Video
     }
 }
 
@@ -322,6 +322,9 @@ class BaseModel:
                         new_prop = data[field.name]
                     else:
                         new_prop = field.default
+                        # 如果是dict list等构造类 实例化
+                        if isinstance(new_prop, type):
+                            new_prop = new_prop()
                     self.__update_prop(field, new_prop, old_prop)
                     # todo field resolve
                 return self
@@ -384,11 +387,6 @@ class BaseModel:
         result = {
             "Ctrl": output_ctrl_dict,
             "Info": output_info_dict,
-            "State": {
-                "isSelf": self.ctrl.CreateUser == self.user_id,
-                "isRemote": True
-            },
-
             # todo 把State去掉
         }
         return result

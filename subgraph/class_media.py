@@ -61,7 +61,8 @@ class BaseMedia(base_tools.BaseModel):
             CreateUser=self.user_id,
             Format=remote_file.split(".")[1],
             Is_UserMade=is_user_made,
-            CountCacheTime=datetime.now(tz=timezone.utc).replace(microsecond=0)
+            CountCacheTime=datetime.now(tz=timezone.utc).replace(microsecond=0),
+            PrimaryLabel=self.p_label
         )
 
     def update(self, data, remote_name, user_id) -> ErrorContent:
@@ -157,8 +158,7 @@ class BaseMedia(base_tools.BaseModel):
         output_info_dict = {field.name: getattr(self.info, field.name)
                             for field in info_fields if field.name not in unused_props}
         output = {
-            "src": self.ctrl.FileName,
-            "format": self.ctrl.Format,
+            "status": "remote",
             "Ctrl": output_ctrl_dict,
             "Info": output_info_dict,
         }

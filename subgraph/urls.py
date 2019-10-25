@@ -8,5 +8,6 @@ urlpatterns = [
     url("query/query_needed_props", views.query_frontend_prop),
     url("query/query_single_node", views.query_single_node),
     url("create/graph/normal", views.create_graph),
-    url("query/multi", views.query_multi_source)
+    url("query/multi", views.query_multi_source),
+    url("query/media/multi", views.query_multi_media)
 ]

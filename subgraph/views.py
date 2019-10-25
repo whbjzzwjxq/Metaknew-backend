@@ -2,14 +2,13 @@ import json
 import typing
 
 from django.http import HttpResponse
-from django.shortcuts import render
 
 from document.logic_class import BaseDocGraph
 from es_module.logic_class import bulk_add_text_index
 from subgraph.class_link import BaseLink, SystemMade
 from subgraph.class_media import BaseMedia
 from subgraph.class_node import BaseNode
-from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model, type_label_to_model
+from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from users.logic_class import BaseUser
@@ -22,7 +21,7 @@ def query_frontend_prop(request):
     for label in labels:
         props = query_needed_prop(label)
         if not props:
-            props = {field.name: query_field_type(field) for field in get_special_props(p_label=label)}
+            props = {field.name: query_field_type(field) for field in get_special_props(_type='node', p_label=label)}
             if props:
                 set_needed_prop(label, props)
         label_prop_dict.update({label: props})
@@ -64,7 +63,6 @@ def create_graph(request):
 
 
 def bulk_create_node(request):
-    batch_size = 256
     collector = NeoSet()
     data_list = json.loads(request.body)["data"]
     plabel = json.loads(request.body)["pLabel"]
@@ -193,3 +191,15 @@ def query_multi_source(request):
         result.append(output.handle_for_frontend())
 
     return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
+
+
+def query_multi_media(request):
+    """
+    data: [id]
+    :param request:
+    :return:
+    """
+    data = json.loads(request.body.decode())
+    user_id = request.GET.get('user_id')
+    result = [BaseMedia(_id=_id, user_id=user_id).handle_for_frontend() for _id in data]
+    return HttpResponse(json.dumps(result, cls=DateTimeEncoder), status=200)
