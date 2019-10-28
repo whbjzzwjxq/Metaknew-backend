@@ -136,7 +136,7 @@ class UserDraft(models.Model):
     VersionId = models.IntegerField()  # 版本
 
     Name = models.TextField()
-    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
+    UpdateTime = models.DateTimeField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
     Content = JSONField(default=dict)
     DontClear = models.BooleanField(default=False)
 

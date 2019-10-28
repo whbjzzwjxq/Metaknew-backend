@@ -33,6 +33,7 @@ frontend_format = {
 }
 
 
+# todo node link 改写为类 level: 2
 class DocGraphClass:
     re_for_old_id = re.compile('\\$_.*')
 
@@ -49,8 +50,6 @@ class DocGraphClass:
 
         self.info_change_nodes: List[BaseNode] = []  # BaseNode
         self.info_change_links: List[BaseLink] = []  # BaseLink
-        self.add_node_list = []  # 新加入的节点
-        self.remove_node_list = []  # 移除的节点
         self.old_id = ""  # 节点的旧id
         self.node_id_old_new_map = {}
         self.link_id_old_new_map = {}
@@ -77,6 +76,7 @@ class DocGraphClass:
         self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
         self.update_nodes_links_info(data)
         self.container = self.graph
+        self.update_doc_to_node(data)
         self.update_container(data)
         self.update_info()
         return self
@@ -93,6 +93,7 @@ class DocGraphClass:
             # 非草稿 保存现有graph 更新graph
             self.synchronous(self.graph, self.new_history)
             self.container = self.graph
+            self.update_doc_to_node(data)
             self.update_container(data)
             self.update_info()
         return self
@@ -130,16 +131,43 @@ class DocGraphClass:
                 self.info_change_links.append(self.update_link(link))
         self.info_change_links.extend(self.create_links(new_links))
 
-    def update_info(self):
+    def update_doc_to_node(self, data):
         """
-        更新Info部分
+        先不更新container 先比较差异
         :return:
         """
-        info = self.node.info
-        info.Size = len(self.graph.Nodes)
-        info.Complete = 50
-        info.MainNodes = [node["_id"] for node in self.graph.Nodes
-                          if node["Show"]["isMain"] and node["_id"] != self.id]
+        # Doc2graph关系生成
+        add_node_list = []
+        remove_node_list = []
+        graph = data["Graph"]
+        new_node_id_list = [node["Setting"]["_id"] for node in graph['nodes']]
+
+        for node in graph["nodes"]:
+            if self.check_for_exist_in_setting(node["Setting"]["_id"], _type='node') == -1:
+                add_node_list.append(node)
+        for node in self.graph.Nodes:
+            if node["_id"] not in new_node_id_list:
+                remove_node_list.append(node)
+        link_id_list = id_generator(number=len(add_node_list), method='link', jump=2)
+        for (index, node) in enumerate(add_node_list):
+            if node["Setting"]["_id"] != self.id:
+                doc_to_node = SystemMade(_id=link_id_list[index], user_id=self.user_id, collector=self.collector)
+                node_id = node["Setting"]["_id"]
+                doc_to_node.pre_create(
+                    start=self.node.node,
+                    end=self.bound_node(node),
+                    p_label='Doc2Node',
+                    data={"Is_Main": node_id in self.node.info.MainNodes, "DocImp": 50, "Correlation": 50})
+                self.doc_to_node_links.append(doc_to_node)
+
+        # Doc2graph关系取消
+        for (index, node) in enumerate(remove_node_list):
+            doc_to_node = SystemMade.query_by_start_end(start=self.node.id,
+                                                        end=node["_id"],
+                                                        user_id=self.user_id,
+                                                        p_label="Doc2Node",
+                                                        single=True)
+            self.doc_to_node_links.append(doc_to_node.delete())
 
     def update_container(self, data):
         """
@@ -152,27 +180,16 @@ class DocGraphClass:
         self.container.Conf = data["Conf"]
         self.container.Path = data["Path"]
 
-    def update_doc_to_node(self):
-        # Doc2graph关系生成
-        link_id_list = id_generator(number=len(self.add_node_list), method='link', jump=2)
-        for (index, node) in enumerate(self.add_node_list):
-            if node["Setting"]["_id"] != self.id:
-                doc_to_node = SystemMade(_id=link_id_list[index], user_id=self.user_id, collector=self.collector)
-                node_id = node["Setting"]["_id"]
-                doc_to_node.pre_create(
-                    start=self.node.node,
-                    end=self.bound_node(node),
-                    p_label='Doc2Node',
-                    data={"Is_Main": node_id in self.node.info.MainNodes, "DocImp": 50, "Correlation": 50})
-                self.doc_to_node_links.append(doc_to_node)
-        # Doc2graph关系取消
-        for (index, node) in enumerate(self.remove_node_list):
-            doc_to_node = SystemMade.query_by_start_end(start=self.node.id,
-                                                        end=node["Setting"]["_id"],
-                                                        user_id=self.user_id,
-                                                        p_label="Doc2Node",
-                                                        single=True)
-            self.doc_to_node_links.append(doc_to_node.delete())
+    def update_info(self):
+        """
+        更新Info部分
+        :return:
+        """
+        info = self.node.info
+        info.Size = len(self.graph.Nodes)
+        info.Complete = 50
+        info.MainNodes = [node["_id"] for node in self.graph.Nodes
+                          if node["Show"]["isMain"] and node["_id"] != self.id]
 
     @staticmethod
     def synchronous(item_a, item_b):
