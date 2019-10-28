@@ -129,13 +129,19 @@ class UserDocProgress(models.Model):
 
 
 class UserDraft(models.Model):
-    RecordId = models.AutoField(primary_key=True)
     UserId = models.BigIntegerField(db_column="UserId", db_index=True)
+
     SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
     SourceType = models.TextField(db_column="SourceType", db_index=True)
+    VersionId = models.IntegerField()  # 版本
+
+    Name = models.TextField()
     UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
     Content = JSONField(default=dict)
     DontClear = models.BooleanField(default=False)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["SourceId", "VersionId"], name="DraftVersionControl")
+        ]
         db_table = "user_draft"

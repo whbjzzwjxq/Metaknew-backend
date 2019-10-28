@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 import oss2
 
+from es_module.logic_class import bulk_add_text_index
 from subgraph.models import MediaCtrl
 from tools import base_tools
 from tools.aliyun import authorityKeys
@@ -98,6 +99,7 @@ class BaseMedia(base_tools.BaseModel):
         self.ctrl.save()
         self.authority.save()
         self.collector.tx.commit()
+        bulk_add_text_index([self])
 
     def check_remote_file(self) -> bool:
         """
@@ -134,30 +136,3 @@ class BaseMedia(base_tools.BaseModel):
             return media_type
         else:
             return "unknown"
-
-    def handle_for_frontend(self):
-        """
-        前端所用格式
-        :return:
-        """
-        unused_props = [
-            "Format",
-            "History",
-            "CountCacheTime",
-            "TotalTime",
-            "Hot",
-            "CountCacheTime",
-        ]
-        self.query_base()
-        ctrl_fields = self.ctrl._meta.get_fields()
-        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
-                            for field in ctrl_fields if field.name not in unused_props}
-        info_fields = self.info._meta.get_fields()
-        output_info_dict = {field.name: getattr(self.info, field.name)
-                            for field in info_fields if field.name not in unused_props}
-        output = {
-            "status": "remote",
-            "Ctrl": output_ctrl_dict,
-            "Info": output_info_dict,
-        }
-        return output

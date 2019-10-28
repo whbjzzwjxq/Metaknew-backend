@@ -16,7 +16,6 @@ from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
 from record.logic_class import field_check
 from record.models import WarnRecord, NodeVersionRecord
 from subgraph.models import *
-from subgraph.models import BaseAuthority
 
 re_for_info = re.compile(r".*Info")
 re_for_ptr = re.compile(r".*_ptr")
@@ -32,178 +31,6 @@ class NeoSet:
         self.tx = graph.begin()
         self.Nmatcher = NodeMatcher(graph)
         self.Rmatcher = RelationshipMatcher(graph)
-
-
-def type_label_to_model(_type: _types, label: str) -> info_models:
-    """
-    可能有多张表继承的模型
-    :param _type:
-    :param label:
-    :return:
-    """
-    if _type in model_dict:
-        if label in model_dict[_type]:
-            return model_dict[_type][label]
-        else:
-            return model_dict[_type]['default']
-    else:
-        raise TypeError('Error Type')
-
-
-ctrl_dict: Dict[str, Type[Union[NodeCtrl, RelationshipCtrl, MediaCtrl]]] = {
-    "node": NodeCtrl,
-    "link": RelationshipCtrl,
-    "document": NodeCtrl,
-    "media": MediaCtrl
-}
-
-model_dict: Dict[str, Dict[str, info_models]] = {
-    "node": {
-        "default": NodeNormal,
-        "Person": Person,
-        "Project": Project,
-        "ArchProject": ArchProject,
-        "DocGraph": BaseDocGraph,
-    },
-    "link": {
-        "default": KnowLedge,
-        "KnowLedge": KnowLedge,
-        "SearchTogether": FrequencyCount,
-        "MentionTogether": FrequencyCount,
-        "VisitAfter": FrequencyCount,
-        "Doc2Node": Doc2Node,
-    },
-    "media": {
-        "default": Image,
-        "image": Image,
-        "text": Text,
-        "audio": Audio,
-        "video": Video
-    }
-}
-
-
-def bulk_save_base_model(item_list, user_model, _type):
-    info_dict = {}
-    items = [item for item in item_list if item]
-    if items:
-        items_id = {item.id: _type for item in items}
-        user_model.bulk_create_source(items_id)
-        output = np.array([item.output_table_create() for item in items])
-        ctrl = list(output[:, 0])
-        ctrl_dict[_type].objects.bulk_create(ctrl)
-        info_list = list(output[:, 1])
-        for info in info_list:
-            if info.PrimaryLabel not in info_dict:
-                info_dict[info.PrimaryLabel] = []
-            info_dict[info.PrimaryLabel].append(info)
-        for key in info_dict:
-            type_label_to_model(_type, key).objects.bulk_create(info_dict[key])
-        bulk_add_text_index(items)
-        # 保存authority
-        authority = list(output[:, 2])
-        authority = [auth for auth in authority if auth]
-        BaseAuthority.objects.bulk_create(authority)
-        # 保存warn
-        warn = list(output[:, 3])
-        WarnRecord.objects.bulk_create(warn)
-        if _type == 'node':
-            history = list(output[:, 4])
-            NodeVersionRecord.objects.bulk_create(history)
-            bulk_add_node_index(items)
-
-
-def node_init(label: str) -> Type[NodeInfo]:
-    """
-    从主标签返回模型信息 下同
-    :param label: PrimaryLabel
-    :return: NodeInfo
-    """
-    return type_label_to_model('node', label)
-
-
-def link_init(label: str) -> Type[RelationshipInfo]:
-    return type_label_to_model('link', label)
-
-
-def media_init(label: str) -> Type[MediaInfo]:
-    return type_label_to_model('media', label)
-
-
-def get_update_props(_type: _types, p_label: str) -> List[Field]:
-    """
-    :param _type: type node...
-    :param p_label: PrimaryLabel...
-    :return: 数据可以直接写入的属性
-    """
-    remove_list = {
-        "node": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia",
-                 "HasPaper", "HasGraph", "Size", "MainNodes", "Complete"],
-        "link": ["LinkId", "PrimaryLabel", "Star"],
-        "media": ["MediaId", "PrimaryLabel"],
-    }
-    try:
-        # 目标包含的域
-        target = type_label_to_model(_type=_type, label=p_label)._meta.get_fields()
-        result = [field for field in target
-                  if not field.auto_created
-                  and field.name not in remove_list[_type]]
-        return result
-    except AttributeError("没有这种标签: %s" % p_label):
-        return []
-
-
-def get_special_props(_type: _types, p_label: str) -> List[Field]:
-    """
-    :param _type: _type
-    :param p_label: PrimaryLabel
-    :return: 该标签的特殊属性 不包含.*Info
-    """
-    result = get_update_props(_type, p_label)
-    result = [field for field in result if re_for_info.match(field.model.__name__)]
-    return result
-
-
-def neo4j_create_node(_id: int, _type: _types, labels: List[str], plabel: str,
-                      props: Dict, collector: NeoSet(),
-                      is_user_made=True, is_common=True) -> NeoNode:
-    """
-
-    :param _id: _id
-    :param _type: Node | Media | Document | Fragment
-    :param labels: 标签组
-    :param plabel: 主标签
-    :param props: 属性
-    :param is_user_made: 是否是用户创建的
-    :param is_common: 是否是公开的
-    :param collector: 连接池
-    :return: None | Node
-    """
-    node_labels = ["Used"]
-    node_labels.extend(labels)
-    node_labels.append(_type)
-    node_labels.append(plabel),
-    if is_user_made:
-        node_labels.append("UserMade")
-    if is_common:
-        node_labels.append("Common")
-    node = NeoNode(*node_labels, **props)
-    node["_id"] = _id
-    node["_type"] = _type
-    node["_label"] = plabel
-    node.__primarylabel__ = plabel
-    node.__primarykey__ = "_id"
-    node.__primaryvalue__ = _id
-    collector.tx.create(node)
-    return node
-
-
-def dict_dryer(node: dict):
-    dry_prop = ["_id", "type", "PrimaryLabel"]
-    for key in dry_prop:
-        if key in node:
-            node.pop(key)
-    return node
 
 
 class BaseModel:
@@ -303,8 +130,7 @@ class BaseModel:
     @field_check
     def __update_prop(self, field, new_prop, old_prop):
         if new_prop != old_prop:
-            if not self.is_draft:
-                setattr(self.info, field.name, new_prop)
+            setattr(self.info, field.name, new_prop)
 
     def info_update(self, data):
         self.warn = WarnRecord(
@@ -340,6 +166,13 @@ class BaseModel:
         else:
             language = "auto"
             text = ""
+        if self.type == 'link':
+            hot = self.info.Hot
+            star = self.info.Star
+        else:
+            hot = self.ctrl.Hot
+            star = self.ctrl.Star
+
         body = {
             "id": self.id,
             "type": self.type,
@@ -352,8 +185,8 @@ class BaseModel:
                 "en": "",
                 "auto": text
             },
-            "Hot": self.ctrl.Hot,
-            "Star": self.ctrl.Star
+            "Hot": hot,
+            "Star": star
         }
         for lang in body["Text"]:
             if lang in self.info.Text:
@@ -374,7 +207,11 @@ class BaseModel:
                         "ImportMethod",
                         "CreateTime",
                         "NodeId",
-                        "CreateUser"]
+                        "CreateUser",
+                        "Format",
+                        "History",
+                        "MediaId",
+                        ]
         self.query_base()
         ctrl_fields = self.ctrl._meta.get_fields()
         output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
@@ -387,26 +224,206 @@ class BaseModel:
         result = {
             "Ctrl": output_ctrl_dict,
             "Info": output_info_dict,
-            # todo 把State去掉
         }
         return result
 
 
-class ErrorContent:
+def type_label_to_model(_type: _types, label: str) -> info_models:
     """
-    适用于不直接返回HttpResponse的情况
+    可能有多张表继承的模型
+    :param _type:
+    :param label:
+    :return:
+    """
+    if _type in model_dict:
+        if label in model_dict[_type]:
+            return model_dict[_type][label]
+        else:
+            return model_dict[_type]['default']
+    else:
+        raise TypeError('Error Type')
+
+
+ctrl_dict: Dict[str, Type[Union[NodeCtrl, RelationshipCtrl, MediaCtrl]]] = {
+    "node": NodeCtrl,
+    "link": RelationshipCtrl,
+    "document": NodeCtrl,
+    "media": MediaCtrl
+}
+
+model_dict: Dict[str, Dict[str, info_models]] = {
+    "node": {
+        "default": NodeNormal,
+        "Person": Person,
+        "Project": Project,
+        "ArchProject": ArchProject,
+        "DocGraph": BaseDocGraph,
+    },
+    "link": {
+        "default": KnowLedge,
+        "KnowLedge": KnowLedge,
+        "SearchTogether": FrequencyCount,
+        "MentionTogether": FrequencyCount,
+        "VisitAfter": FrequencyCount,
+        "Doc2Node": Doc2Node,
+    },
+    "media": {
+        "default": Image,
+        "image": Image,
+        "text": Text,
+        "audio": Audio,
+        "video": Video
+    },
+    "document": {
+        "default": BaseDocGraph,
+        "DocGraph": BaseDocGraph
+    }
+}
+
+
+def bulk_save_base_model(item_list: List[BaseModel], user_model, _type):
+    def info_list_to_dict(info_list):
+        """
+        整理info_list 找到对应的info_dict
+        :return:
+        """
+        info_dict = {}
+        for info in info_list:
+            if info.PrimaryLabel not in info_dict:
+                info_dict[info.PrimaryLabel] = []
+            info_dict[info.PrimaryLabel].append(info)
+        return info_dict
+
+    items = [item for item in item_list if item]
+    if items:
+        # 创建内容记录
+        items_id = {item.id: _type for item in items if item.is_create}
+        user_model.bulk_create_source(items_id)
+
+        # create部分
+        output_create = np.array([item.output_table_create() for item in items if item.is_create])
+        if len(output_create) > 0:
+            ctrl = list(output_create[:, 0])
+            ctrl_dict[_type].objects.bulk_create(ctrl)
+
+            info_dict = info_list_to_dict(list(output_create[:, 1]))
+            for key in info_dict:
+                type_label_to_model(_type, key).objects.bulk_create(info_dict[key])
+
+            authority = list(output_create[:, 2])
+            authority = [auth for auth in authority if auth]
+            BaseAuthority.objects.bulk_create(authority)
+            # 保存warn
+            warn = list(output_create[:, 3])
+            WarnRecord.objects.bulk_create(warn)
+
+        # update部分
+        output_update = np.array([item.output_table_create() for item in items if not item.is_create])
+        if len(output_update) > 0:
+            ctrl = list(output_update[:, 0])
+            ctrl_dict[_type].objects.bulk_update(ctrl, ['PrimaryLabel', 'Is_Used'])
+            info_dict = info_list_to_dict(list(output_update[:, 1]))
+            for key in info_dict:
+                fields = [field.name for field in get_update_props(_type=_type, p_label=key)]
+                type_label_to_model(_type, key).objects.bulk_update(info_dict[key], fields)
+
+        bulk_add_text_index(items)
+        if _type == 'node':
+            bulk_add_node_index(items)
+
+
+def node_init(label: str) -> Type[NodeInfo]:
+    """
+    从主标签返回模型信息 下同
+    :param label: PrimaryLabel
+    :return: NodeInfo
+    """
+    return type_label_to_model('node', label)
+
+
+def link_init(label: str) -> Type[RelationshipInfo]:
+    return type_label_to_model('link', label)
+
+
+def media_init(label: str) -> Type[MediaInfo]:
+    return type_label_to_model('media', label)
+
+
+def get_update_props(_type: _types, p_label: str) -> List[Field]:
+    """
+    :param _type: type node...
+    :param p_label: PrimaryLabel...
+    :return: 数据可以直接写入的属性
+    """
+    remove_list = {
+        "node": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia"],
+        "link": ["LinkId", "PrimaryLabel", "Star", "Hot"],
+        "media": ["MediaId", "PrimaryLabel"],
+        "document": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia",
+                     "Size", "MainNodes", "Complete"],
+    }
+    try:
+        # 目标包含的域
+        target = type_label_to_model(_type=_type, label=p_label)._meta.get_fields()
+        result = [field for field in target
+                  if not field.auto_created
+                  and field.name not in remove_list[_type]]
+        return result
+    except AttributeError("没有这种标签: %s" % p_label):
+        return []
+
+
+def get_special_props(_type: _types, p_label: str) -> List[Field]:
+    """
+    :param _type: _type
+    :param p_label: PrimaryLabel
+    :return: 该标签的特殊属性 不包含.*Info
+    """
+    result = get_update_props(_type, p_label)
+    result = [field for field in result if re_for_info.match(field.model.__name__)]
+    return result
+
+
+def neo4j_create_node(_id: int, _type: _types, labels: List[str], plabel: str,
+                      props: Dict, collector: NeoSet(),
+                      is_user_made=True, is_common=True) -> NeoNode:
     """
 
-    def __init__(self, status: int, state: bool, reason: str):
-        self.status = status
-        self.state = state
-        self.reason = reason
+    :param _id: _id
+    :param _type: Node | Media | Document | Fragment
+    :param labels: 标签组
+    :param plabel: 主标签
+    :param props: 属性
+    :param is_user_made: 是否是用户创建的
+    :param is_common: 是否是公开的
+    :param collector: 连接池
+    :return: None | Node
+    """
+    node_labels = ["Used"]
+    node_labels.extend(labels)
+    node_labels.append(_type)
+    node_labels.append(plabel),
+    if is_user_made:
+        node_labels.append("UserMade")
+    if is_common:
+        node_labels.append("Common")
+    node = NeoNode(*node_labels, **props)
+    node["_id"] = _id
+    node["_type"] = _type
+    node["_label"] = plabel
+    node.__primarylabel__ = plabel
+    node.__primarykey__ = "_id"
+    node.__primaryvalue__ = _id
+    collector.tx.create(node)
+    return node
 
-    def __repr__(self):
-        return {"state": self.state, "reason": self.reason}
 
-    def __bool__(self):
-        return False
+def dict_dryer(node: dict):
+    dry_prop = ["_id", "type", "PrimaryLabel"]
+    for key in dry_prop:
+        if key in node:
+            node.pop(key)
+    return node
 
 
 def check_is_user_made(user_id):
@@ -449,3 +466,20 @@ class DateTimeEncoder(json.JSONEncoder):
         elif isinstance(obj, date):
             return obj.strftime('%Y-%m-%d')
         return json.JSONEncoder.default(self, obj)
+
+
+class ErrorContent:
+    """
+    适用于不直接返回HttpResponse的情况
+    """
+
+    def __init__(self, status: int, state: bool, reason: str):
+        self.status = status
+        self.state = state
+        self.reason = reason
+
+    def __repr__(self):
+        return {"state": self.state, "reason": self.reason}
+
+    def __bool__(self):
+        return False

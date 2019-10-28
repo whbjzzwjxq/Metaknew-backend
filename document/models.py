@@ -86,7 +86,7 @@ class DocGraph(models.Model):
     DocId = models.BigIntegerField(primary_key=True, editable=False)  # 专题ID
     Nodes = ArrayField(SettingField(), default=node_setting)  # json里包含节点在该专题下的设置
     Links = ArrayField(SettingField(), default=link_setting)  # json里包含关系在该专题下的设置
-    Paths = ArrayField(JSONField(default=dict))
+    Path = ArrayField(JSONField(default=dict))
     Conf = JSONField(default=graph_setting)  # json里包含专题本身的设置
 
     class Meta:
@@ -98,7 +98,7 @@ class DocPaper(models.Model):
     DocId = models.BigIntegerField(primary_key=True, editable=False)
     Nodes = ArrayField(SettingField(), default=card_setting)
     Links = ArrayField(SettingField(), default=link_setting)
-    Paths = ArrayField(JSONField(default=dict))
+    Path = ArrayField(JSONField(default=dict))
     Conf = JSONField(default=paper_setting)  # 设置
 
     class Meta:
@@ -142,22 +142,27 @@ class Note(models.Model):
 
         db_table = "document_note"
 
-# todo 课程 level: 3
-# class Course(DocGraph):
-#     LinksInfo = ArrayField(JSONField(), db_column="LINKS_INFO")  # 学习网连接的信息
-#     NodesInfo = ArrayField(JSONField(), db_column="NODES_INFO")  # 学习网
-#     Total_Time = models.IntegerField(db_column="TOTAL_TIME", default=1000)
-#
-#     class Meta:
-#         db_table = "document_course"
 
-# todo Path level: 3
-# class Path(models.Model):
-#
-#     PathId = models.BigIntegerField(primary_key=True)
-#     CreateUser = models.IntegerField(db_column="USER_ID", db_index=True)  # 用户id
-#     Order = JSONField(default=base_path())
-#
-#     class Meta:
-#
-#         db_table = "document_path"
+class GraphVersionRecord(models.Model):
+    CreateUser = models.BigIntegerField(db_column="User", editable=False, db_index=True)
+    CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
+    SourceId = models.BigIntegerField(db_column="SourceId", editable=False, db_index=True)
+    VersionId = models.SmallIntegerField(db_column="VersionId", default=0)  # 最多20个版本
+    SourceType = models.TextField(editable=False, default="DocGraph")
+
+    Name = models.TextField(db_column="Name", default='Draft')
+    Is_Draft = models.BooleanField(db_column="Draft", default=True)  # 是草稿还是历史版本
+    DontClear = models.BooleanField(default=False)  # 是否不要清除
+    Nodes = ArrayField(SettingField(), default=node_setting)  # json里包含节点在该专题下的设置
+    Links = ArrayField(SettingField(), default=link_setting)  # json里包含关系在该专题下的设置
+    Path = ArrayField(JSONField(default=dict))
+    Conf = JSONField(default=graph_setting)  # json里包含专题本身的设置
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["SourceId", "Is_Draft"])
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["SourceId", "VersionId"], name="GraphVersionControl")
+        ]
+        db_table = "document_graph_record"

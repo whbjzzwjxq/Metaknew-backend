@@ -90,14 +90,18 @@ class EsQuery:
 def bulk_add_node_index(nodes):
     def index_nodes():
         for node in nodes:
-            if node.authority.Common:
-                body = node.node_index()
-                yield {
-                    "_op_type": "create",
-                    "_index": "nodes",
-                    "_id": node.id,
-                    "_source": body
-                }
+            body = node.node_index()
+            if node.is_create:
+                _type = 'create'
+            else:
+                _type = 'update'
+                body = {"doc": body}
+            yield {
+                "_op_type": _type,
+                "_index": "nodes",
+                "_id": node.id,
+                "_source": body
+            }
 
     result = helpers.bulk(es, index_nodes())
     return result
@@ -107,9 +111,14 @@ def bulk_add_text_index(nodes):
     def index_texts():
         for node in nodes:
             body = node.text_index()
+            if node.is_create:
+                _type = 'create'
+            else:
+                _type = 'update'
+                body = {"doc": body}
             if body:
                 yield {
-                    "_op_type": "create",
+                    "_op_type": _type,
                     "_index": "texts",
                     "_id": node.id,
                     "_source": body

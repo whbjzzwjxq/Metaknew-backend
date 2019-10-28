@@ -19,5 +19,6 @@ from django.conf.urls import url
 from document import views
 
 urlpatterns = [
-    url("query/graph", views.query_graph)
+    url("query/graph", views.query_graph),
+    url("create/graph/normal", views.create_graph),
 ]

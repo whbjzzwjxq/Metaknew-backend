@@ -1,21 +1,17 @@
-import datetime
+import re
 from time import time
 from typing import Optional, List
 
-import re
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Avg
-from django.db.models import Max
 
-from document.models import DocGraph, Comment, Note
-from record.logic_class import error_check, field_check, EWRecord
-from record.models import DocumentVersionRecord
+from document.models import DocGraph, Comment, Note, GraphVersionRecord
+from record.logic_class import field_check, EWRecord
 from subgraph.class_link import BaseLink, SystemMade
 from subgraph.class_node import BaseNode
 from tools import base_tools
 from tools.base_tools import model_to_dict
 from tools.id_generator import id_generator
-from tools.redis_process import week
 from users.models import UserConcern
 
 # Field: Field -> TranslateField, LocationField, TypeField 等等 可以给每个Field注入格式检测， 翻译队列等
@@ -37,33 +33,31 @@ frontend_format = {
 }
 
 
-class BaseDocGraph:
-    re_for_new_id = re.compile('\\$_.*')
+class DocGraphClass:
+    re_for_old_id = re.compile('\\$_.*')
 
     def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
         self.user_id = int(user_id)
         self.id = int(_id)
         self.collector = collector
-        self.is_create = False
-        self.is_draft = False
         self.node: Optional[BaseNode] = None
         self.graph: Optional[DocGraph] = None
+        self.container: [DocGraph, GraphVersionRecord] = None
+        self.new_history: Optional[GraphVersionRecord] = None
+        self.history: GraphVersionRecord.objects.filter()
+        self.comments = []
 
-        self.loading_history = DocumentVersionRecord()
-        self.new_history = DocumentVersionRecord()
         self.info_change_nodes: List[BaseNode] = []  # BaseNode
         self.info_change_links: List[BaseLink] = []  # BaseLink
-        self.new_nodes_cache = []  # 需要新建的节点
-        self.new_links_cache = []  # 需要新建的边
         self.add_node_list = []  # 新加入的节点
-        self.old_id = ""
-        self.comments = []
+        self.remove_node_list = []  # 移除的节点
+        self.old_id = ""  # 节点的旧id
         self.node_id_old_new_map = {}
         self.link_id_old_new_map = {}
         self.doc_to_node_links = []  # 缓存容器
 
     def query_base(self):
-        self.node = BaseNode(_id=self.id, user_id=self.user_id, collector=self.collector)
+        self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
         self.node.query_base()
         self.graph = DocGraph.objects.get(DocId=self.id)
         return self
@@ -73,191 +67,147 @@ class BaseDocGraph:
                                                Is_Delete=False)
         return self.comments
 
+    def __query_history(self):
+        self.history = GraphVersionRecord.objects.filter(SourceId=self.id)
+
     # @error_check
-    def create(self, data):
-        self.is_create = True
-        self.is_draft = False
+    def graph_create(self, data):
         self.old_id = data["id"]
         self.graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Conf={})
-        self.__all_update(data)
+        self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
+        self.update_nodes_links_info(data)
+        self.container = self.graph
+        self.update_container(data)
+        self.update_info()
         return self
 
-    def update(self, data, is_draft):
+    def graph_update(self, data, is_draft):
         self.query_base()
-        self.is_create = False
-        self.is_draft = is_draft
-        self.__all_update(data)
+        self.__history_create(is_draft)
+        self.update_nodes_links_info(data)
+        if is_draft:
+            # 草稿的话 更新history
+            self.container = self.new_history
+            self.update_container(data)
+        else:
+            # 非草稿 保存现有graph 更新graph
+            self.synchronous(self.graph, self.new_history)
+            self.container = self.graph
+            self.update_container(data)
+            self.update_info()
         return self
 
-    def __all_update(self, data):
-        self.update_graph(data["Graph"])
-        self.graph.Conf = data["Conf"]
-        self.graph.Paths = data["Path"]
-        self.node.info.Size = len(self.graph.Nodes)
-        self.node.info.Complete = 50
-        for node in self.graph.Nodes:
-            if node["Show"]["isMain"] and type(node["_id"]) == int:
-                self.node.info.MainNodes.append(node["_id"])
-        link_id_list = id_generator(number=len(self.add_node_list), method='link', jump=2)
-        for (index, node) in enumerate(self.add_node_list):
-            doc_to_node = SystemMade(_id=link_id_list[index], user_id=self.user_id, collector=self.collector)
-            node_id = node["Setting"]["_id"]
-            labels = [node["Setting"]["_type"], node["Setting"]["_label"]]
-            doc_to_node.pre_create(
-                start=self.node.node,
-                end=self.bound_node(labels=labels, _id=node_id),
-                p_label='Doc2Node',
-                data={"Is_Main": node_id in self.node.info.MainNodes, "DocImp": 50, "Correlation": 50})
-            self.doc_to_node_links.append(doc_to_node)
-
-    def check_privilege(self):
-        pass
-
-    def __history_create(self, name):
-        if self.is_create:
-            version_id = 1
-        else:
-            self.__query_history()
-            version_id = self.history.aggregate(Max("VersionId"))
-            version_id += 1
-        self.new_history = DocumentVersionRecord(VersionId=version_id,
-                                                 SourceId=self.id,
-                                                 CreateUser=self.user_id,
-                                                 Name=name,
-                                                 GraphContent={
-                                                     "nodes": [],
-                                                     "links": [],
-                                                     "notes": [],
-                                                     "Conf": {}
-                                                 },
-                                                 PaperContent={},
-                                                 Is_Draft=self.is_draft
-                                                 )
-        if self.is_draft:
-            self.new_history.BaseHistory = self.loading_history.VersionId
-        else:
-            if self.is_create:
-                self.new_history.BaseHistory = 0
-            else:
-                self.loading_history.BaseHistory = self.new_history.VersionId
-                self.new_history.BaseHistory = 0
-
-    def __query_history(self):
-        self.history = DocumentVersionRecord.objects.filter(SourceId=self.id)
-
-    def __history_save(self):
-
-        if self.is_draft:
-            self.new_history.save()
-        else:
-            self.loading_history.save()
-
-    def update_graph(self, graph):
+    def update_nodes_links_info(self, data):
+        """
+        处理所有未保存的节点和边
+        :param data:
+        :return:
+        """
         # 所有id使用["Setting"]["_id"] 因为Info信息不一定存在
         # 先处理Info的新建/编辑边
+        new_nodes = []
+        new_links = []
+        graph = data['Graph']
         for node in graph["nodes"]:
-            if not node["isRemote"]:
-                self.new_nodes_cache.append(node)
+            if self.re_for_old_id.match(str(node["Setting"]["_id"])):
+                new_nodes.append(node)
             elif node["isEdit"]:
                 self.info_change_nodes.append(self.update_node(node))
-        self.info_change_nodes.extend(self.create_nodes(self.new_nodes_cache))
+        self.info_change_nodes.extend(self.create_nodes(new_nodes))
 
-        # 再处理graph.Nodes的变化
-        for node in graph["nodes"]:
-            if node["State"]["isDeleted"]:
-                self.remove_node(node)
-            elif node["State"]["isAdd"]:
-                self.add_node(node)
-            else:
-                self.change_node(node)
-
-        # 然后新建/编辑边
         for link in graph["links"]:
-            if not link["isRemote"]:
+            if self.re_for_old_id.match(str(link["Setting"]["_id"])):
                 # 把$_开头的前端id重新绑定
                 start = str(link["Setting"]["_start"]["Setting"]["_id"])
                 end = str(link["Setting"]["_end"]["Setting"]["_id"])
-                if self.re_for_new_id.match(start):
+                if self.re_for_old_id.match(start):
                     link["Setting"]["_start"]["Setting"]["_id"] = self.node_id_old_new_map[start]
-                if self.re_for_new_id.match(end):
+                if self.re_for_old_id.match(end):
                     link["Setting"]["_end"]["Setting"]["_id"] = self.node_id_old_new_map[end]
-                self.new_links_cache.append(link)
+                new_links.append(link)
 
             elif link["isEdit"]:
                 self.info_change_links.append(self.update_link(link))
-        self.info_change_links.extend(self.create_links(self.new_links_cache))
+        self.info_change_links.extend(self.create_links(new_links))
 
-        for link in graph["links"]:
-            if link["State"]["isDeleted"]:
-                self.remove_link(link)
-            elif link["State"]["isAdd"]:
-                self.add_link(link)
-            else:
-                self.change_link(link)
-
-    def add_node(self, node: dict):
+    def update_info(self):
         """
-        向Graph添加节点
-        :param node:
+        更新Info部分
         :return:
         """
-        # self.loading_history.GraphContent["addNodes"].append(node)
-        state = True
-        # 如果是专题而且不允许引用就不引用 防止Hack引用
-        if node["Setting"]["_type"] == "document" and not self.check_reference(node["Setting"]["_id"]):
-            state = False
-        if state:
-            self.graph.Nodes.append(node["Setting"])
-            self.add_node_list.append(node)
-        return state
+        info = self.node.info
+        info.Size = len(self.graph.Nodes)
+        info.Complete = 50
+        info.MainNodes = [node["_id"] for node in self.graph.Nodes
+                          if node["Show"]["isMain"] and node["_id"] != self.id]
 
-    def add_link(self, link):
+    def update_container(self, data):
         """
-        向Graph添加已有关系
-        :param link:
+        更新container history或者graph
+        :param data: 前端数据
         :return:
         """
-        # self.loading_history.GraphContent["addLinks"].append(link)
-        self.graph.Links.append(link["Setting"])
-        return True
+        self.container.Nodes = [node['Setting'] for node in data["Graph"]["nodes"]]
+        self.container.Links = [link['Setting'] for link in data["Graph"]["links"]]
+        self.container.Conf = data["Conf"]
+        self.container.Path = data["Path"]
 
-    def add_doc2node(self, node):
-        pass
-
-    def remove_node(self, node):
-        """
-        移除节点
-        :param node:
-        :return:
-        """
-        index = self.check_for_exist_in_setting(node["Setting"]["_id"], self.graph.Nodes)
-        if index >= 0:
-            node = self.graph.Nodes[index]
-            # self.loading_history.GraphContent["removeNodes"].append(node)
-            self.graph.Nodes.pop(index)
+    def update_doc_to_node(self):
+        # Doc2graph关系生成
+        link_id_list = id_generator(number=len(self.add_node_list), method='link', jump=2)
+        for (index, node) in enumerate(self.add_node_list):
+            if node["Setting"]["_id"] != self.id:
+                doc_to_node = SystemMade(_id=link_id_list[index], user_id=self.user_id, collector=self.collector)
+                node_id = node["Setting"]["_id"]
+                doc_to_node.pre_create(
+                    start=self.node.node,
+                    end=self.bound_node(node),
+                    p_label='Doc2Node',
+                    data={"Is_Main": node_id in self.node.info.MainNodes, "DocImp": 50, "Correlation": 50})
+                self.doc_to_node_links.append(doc_to_node)
+        # Doc2graph关系取消
+        for (index, node) in enumerate(self.remove_node_list):
             doc_to_node = SystemMade.query_by_start_end(start=self.node.id,
                                                         end=node["Setting"]["_id"],
                                                         user_id=self.user_id,
                                                         p_label="Doc2Node",
                                                         single=True)
-            doc_to_node.ctrl.isUsed = False
-            doc_to_node.ctrl.save()
-        else:
-            raise ObjectDoesNotExist
+            self.doc_to_node_links.append(doc_to_node.delete())
 
-    def remove_link(self, link):
+    @staticmethod
+    def synchronous(item_a, item_b):
         """
-        移除关系
-        :param link: 前端link格式
+        把a的数据同步到b
+        :param item_a:
+        :param item_b:
         :return:
         """
-        index = self.check_for_exist_in_setting(link["Info"]["id"], self.graph.Links)
-        if index >= 0:
-            link = self.graph.Links[index]
-            # self.loading_history.GraphContent["removeLinks"].append(link)
-            self.graph.Links.pop(index)
+        fields = ['Nodes', 'Links', 'Path', 'Conf']
+        for field in fields:
+            prop = getattr(item_a, field)
+            setattr(item_b, field, prop)
+
+    def __history_create(self, is_draft):
+        """
+
+        :param is_draft: 是否是草稿
+        :return:
+        """
+        self.__query_history()
+        if not self.history:
+            version_id = 1
         else:
-            raise ObjectDoesNotExist
+            latest_draft = self.history.latest('CreateTime')
+            version_id = latest_draft.VersionId % 20 + 1
+        self.new_history = GraphVersionRecord(VersionId=version_id,
+                                              SourceId=self.id,
+                                              CreateUser=self.user_id,
+                                              Name='History' + str(version_id),
+                                              Is_Draft=is_draft,
+                                              Nodes=[],
+                                              Links=[],
+                                              Path=[],
+                                              Conf={})
 
     def update_node(self, node):
         """
@@ -279,7 +229,7 @@ class BaseDocGraph:
 
     def create_nodes(self, node_list):
         """
-        新建node
+        新建nodeInfo
         :param node_list:
         :return:
         """
@@ -290,17 +240,15 @@ class BaseDocGraph:
             old_id = node["Setting"]["_id"]
             if old_id == self.old_id:
                 new_id = self.id
-                remote_node = BaseNode(_id=new_id, user_id=self.user_id, collector=self.collector)
-                self.node = remote_node
+                remote_node = self.node
             else:
                 new_id = id_list[index]
                 remote_node = BaseNode(_id=new_id, user_id=self.user_id, collector=self.collector)
+            # 同步一下id
             node["Setting"]["_id"] = new_id
-            node["isAdd"] = True
             self.node_id_old_new_map[old_id] = new_id
             remote_node.create(node["Info"])
             result.append(remote_node)
-            # 这里处理一下Graph自身
         return result
 
     def create_links(self, link_list):
@@ -311,12 +259,11 @@ class BaseDocGraph:
             old_id = link["Setting"]["_id"]
             new_id = id_list[index]
             link["Setting"]["_id"] = new_id
-            link["isAdd"] = True
             self.link_id_old_new_map[old_id] = new_id
 
             # 再创建边
-            start = self.link_id_to_node(link, "_start")
-            end = self.link_id_to_node(link, "_end")
+            start = self.bound_node(link["Setting"]['_start'])
+            end = self.bound_node(link["Setting"]['_end'])
             remote_link = BaseLink(_id=new_id, user_id=self.user_id, collector=self.collector)
             remote_link.create(start=start,
                                end=end,
@@ -326,23 +273,18 @@ class BaseDocGraph:
             result.append(remote_link)
         return result
 
-    def link_id_to_node(self, link, location):
+    def bound_node(self, node_setting):
         """
 
-        :param link: link
-        :param location: start||end
+        :param node_setting: nodeSetting 包含_id, _type, _label
         :return: NeoNode
         """
-        setting = link["Setting"]
-        labels = [setting[location]["Setting"]["_label"], setting[location]["Setting"]["_type"]]
-        # 先在远端查找对应节点
-        _id = setting[location]["Setting"]["_id"]
-        return self.bound_node(labels, _id)
-
-    def bound_node(self, labels, _id):
+        setting = node_setting["Setting"]
+        labels = [setting['_type'], setting['_label']]
+        _id = setting['_id']
         node = self.collector.Nmatcher.match(*labels, _id=_id).first()
         if not node:
-            if self.re_for_new_id.match(str(_id)):
+            if self.re_for_old_id.match(str(_id)):
                 _id = self.node_id_old_new_map[_id]
             cache = [node for node in self.info_change_nodes
                      if node.id == _id][0]
@@ -350,35 +292,34 @@ class BaseDocGraph:
         else:
             return node
 
-    def change_node(self, node):
-        index = self.check_for_exist_in_setting(node["Setting"]["_id"], self.graph.Nodes)
-        if index >= 0:
-            self.graph.Nodes[index] = node["Setting"]
-        else:
-            if node["Setting"]["_id"] == self.node.id:
-                self.graph.Nodes.append(node["Setting"])
-
-    def change_link(self, link):
-        index = self.check_for_exist_in_setting(link["Setting"]["_id"], self.graph.Links)
-        if index >= 0:
-            self.graph.Links[index] = link["Setting"]
-
     @staticmethod
     def check_reference(doc_id):
         pass
         return True
 
-    @staticmethod
-    def check_for_exist_in_setting(_id, target):
-        for index, item in enumerate(target):
-            if int(_id) == item["_id"]:
+    # 是否在graph里存在
+    def check_for_exist_in_setting(self, _id, _type):
+        if _type == 'link':
+            container = self.graph.Links
+            id_map = self.link_id_old_new_map
+        else:
+            container = self.graph.Nodes
+            id_map = self.node_id_old_new_map
+        # _id转化为数字
+        try:
+            int_id = int(_id)
+        except ValueError:
+            try:
+                int_id = id_map[_id]
+            except KeyError:
+                return -1
+
+        for index, item in enumerate(container):
+            if int_id == item["_id"]:
                 return index
         return -1
 
     def save(self):
-        if time() - self.node.ctrl.CountCacheTime.timestamp() > week:
-            self.re_count()
-            self.node.ctrl.CountCacheTime = datetime.datetime.now().replace(microsecond=0)
         pass
 
     def re_count(self):
@@ -394,23 +335,13 @@ class BaseDocGraph:
         body["type"] = "document"
         return body
 
-    def get_default_image(self):
-        pass
-
-    def update_media_by_doc_id(self, doc_id, include_media):
-        pass
-        return self
-
-    def remove_media(self, medias):
-        pass
-
     def save_cache(self):
         pass
 
     def clear_cache(self):
         pass
 
-    def handle_for_frontend(self):
+    def handle_for_frontend_as_graph(self):
         result = {
             "Base": self.node.handle_for_frontend(),
             "Graph": {
@@ -419,12 +350,15 @@ class BaseDocGraph:
                 "notes": []
             },  # todo 把notes加上
             "Conf": self.graph.Conf,
-            "Path": self.graph.Paths,
+            "Path": self.graph.Path,
             "State": {
                 "isSelf": self.node.ctrl.CreateUser == self.user_id,
             },
         }
         return result
+
+    def handle_for_frontend(self):
+        return self.node.handle_for_frontend()
 
 
 class BaseComment:
