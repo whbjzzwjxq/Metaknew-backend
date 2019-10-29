@@ -92,9 +92,9 @@ class BaseModel:
         else:
             return True
 
-    def __query_node(self):
+    def query_node(self):
         if self.type != "link":
-            self.node = self.collector.Nmatcher.match(_id=self.id).first()
+            self.node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
             if not self.node:
                 self.lack.append("node")
         else:

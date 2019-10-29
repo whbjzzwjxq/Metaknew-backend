@@ -130,7 +130,6 @@ class UserDocProgress(models.Model):
 
 class UserDraft(models.Model):
     UserId = models.BigIntegerField(db_column="UserId", db_index=True)
-
     SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
     SourceType = models.TextField(db_column="SourceType", db_index=True)
     VersionId = models.IntegerField()  # 版本
@@ -139,6 +138,7 @@ class UserDraft(models.Model):
     UpdateTime = models.DateTimeField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
     Content = JSONField(default=dict)
     DontClear = models.BooleanField(default=False)
+    Deleted = models.BooleanField(default=False)  # 是否被删除
 
     class Meta:
         constraints = [

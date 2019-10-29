@@ -145,7 +145,7 @@ class Note(models.Model):
 
 class GraphVersionRecord(models.Model):
     CreateUser = models.BigIntegerField(db_column="User", editable=False, db_index=True)
-    CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
+    CreateTime = models.DateTimeField(auto_now=True, editable=False)
     SourceId = models.BigIntegerField(db_column="SourceId", editable=False, db_index=True)
     VersionId = models.SmallIntegerField(db_column="VersionId", default=0)  # 最多20个版本
     SourceType = models.TextField(editable=False, default="DocGraph")

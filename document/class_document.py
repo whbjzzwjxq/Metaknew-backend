@@ -3,7 +3,7 @@ from time import time
 from typing import Optional, List
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Avg
+from django.db.models import Avg, Max
 
 from document.models import DocGraph, Comment, Note, GraphVersionRecord
 from record.logic_class import field_check, EWRecord
@@ -33,7 +33,7 @@ frontend_format = {
 }
 
 
-# todo node link 改写为类 level: 2
+# todo node link 改写为类 level: 2 NeoNode还没同步
 class DocGraphClass:
     re_for_old_id = re.compile('\\$_.*')
 
@@ -57,9 +57,13 @@ class DocGraphClass:
 
     def query_base(self):
         self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
-        self.node.query_base()
-        self.graph = DocGraph.objects.get(DocId=self.id)
-        return self
+        result = self.node.query_base()
+        self.node.query_node()
+        if result:
+            self.graph = DocGraph.objects.get(DocId=self.id)
+            return True
+        else:
+            return False
 
     def query_comment(self):
         self.comments = Comment.objects.filter(BaseTarget=self.id,
@@ -82,21 +86,24 @@ class DocGraphClass:
         return self
 
     def graph_update(self, data, is_draft):
-        self.query_base()
-        self.__history_create(is_draft)
-        self.update_nodes_links_info(data)
-        if is_draft:
-            # 草稿的话 更新history
-            self.container = self.new_history
-            self.update_container(data)
+        result = self.query_base()
+        if result:
+            self.__history_create(is_draft)
+            self.update_nodes_links_info(data)
+            if is_draft:
+                # 草稿的话 更新history
+                self.container = self.new_history
+                self.update_container(data)
+            else:
+                # 非草稿 保存现有graph 更新graph
+                self.synchronous(self.graph, self.new_history)
+                self.container = self.graph
+                self.update_doc_to_node(data)
+                self.update_container(data)
+                self.update_info()
+            return self
         else:
-            # 非草稿 保存现有graph 更新graph
-            self.synchronous(self.graph, self.new_history)
-            self.container = self.graph
-            self.update_doc_to_node(data)
-            self.update_container(data)
-            self.update_info()
-        return self
+            return self.graph_create(data)
 
     def update_nodes_links_info(self, data):
         """
@@ -210,21 +217,27 @@ class DocGraphClass:
         :param is_draft: 是否是草稿
         :return:
         """
+        self.new_history = GraphVersionRecord(
+            SourceId=self.id,
+            CreateUser=self.user_id,
+            Is_Draft=is_draft,
+            Nodes=[],
+            Links=[],
+            Path=[],
+            Conf={})
         self.__query_history()
         if not self.history:
             version_id = 1
+            self.new_history.VersionId = version_id
+            self.new_history.Name = 'History' + str(version_id)
         else:
-            latest_draft = self.history.latest('CreateTime')
-            version_id = latest_draft.VersionId % 20 + 1
-        self.new_history = GraphVersionRecord(VersionId=version_id,
-                                              SourceId=self.id,
-                                              CreateUser=self.user_id,
-                                              Name='History' + str(version_id),
-                                              Is_Draft=is_draft,
-                                              Nodes=[],
-                                              Links=[],
-                                              Path=[],
-                                              Conf={})
+            max_draft = self.history.aggregate(Max('VersionId'))
+            if max_draft["VersionId__max"] < 20:
+                version_id = max_draft["VersionId__max"] + 1
+                self.new_history.VersionId = version_id
+                self.new_history.Name = 'History' + str(version_id)
+            else:
+                self.new_history = self.history.earliest('CreateTime')
 
     def update_node(self, node):
         """
