@@ -116,15 +116,13 @@ def update_single_node_by_user(request):
     if re_for_old_id:
         new_id = id_generator(number=1, method='node')[0]
         item = model(_id=new_id, user_id=user_id, _type=info['type'], collector=collector)
-        if info['type'] == 'document':
-            item = item.node
         item.create(data=info)
         item.save()
         return HttpResponse(json.dumps({_id: new_id}), status=200)
     else:
         item = model(_id=_id, user_id=user_id, collector=collector)
         item.query_base()
-        if item.ctrl.CreateUser == user_id:
+        if item.ctrl.CreateUser == int(user_id):
             item.info_update(data=info)
             item.save()
             return HttpResponse(json.dumps({}), status=200)
@@ -146,7 +144,6 @@ def query_single_node(request):
 def query_multi_source(request):
     query_list = json.loads(request.body.decode())
     user_id = request.GET.get("user_id")
-    # todo 有时间改成map
     result = []
     for query in query_list:
         _type = query[1]
@@ -172,6 +169,12 @@ def query_multi_media(request):
 
 
 def type_label_to_class(_type, _label: str):
+    """
+    注意document return的是node内容
+    :param _type:
+    :param _label:
+    :return:
+    """
     _type_to_class = {
         "node": {
             'default': BaseNode
@@ -187,8 +190,8 @@ def type_label_to_class(_type, _label: str):
             "VisitAfter": SystemMade,
         },
         "document": {
-            "default": DocGraphClass,
-            "DocPaper": DocGraphClass  # todo
+            "default": BaseNode,
+            "DocPaper": BaseNode  # todo
         }
     }
     model_list = _type_to_class[_type]

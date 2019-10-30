@@ -41,7 +41,7 @@ class DocGraphClass:
         self.user_id = int(user_id)
         self.id = int(_id)
         self.collector = collector
-        self.node: Optional[BaseNode] = None
+        self.base_node: Optional[BaseNode] = None
         self.graph: Optional[DocGraph] = None
         self.container: [DocGraph, GraphVersionRecord] = None
         self.new_history: Optional[GraphVersionRecord] = None
@@ -56,9 +56,9 @@ class DocGraphClass:
         self.doc_to_node_links = []  # 缓存容器
 
     def query_base(self):
-        self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
-        result = self.node.query_base()
-        self.node.query_node()
+        self.base_node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
+        result = self.base_node.query_base()
+        self.base_node.query_node()
         if result:
             self.graph = DocGraph.objects.get(DocId=self.id)
             return True
@@ -77,7 +77,7 @@ class DocGraphClass:
     def graph_create(self, data):
         self.old_id = data["id"]
         self.graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Conf={})
-        self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
+        self.base_node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
         self.update_nodes_links_info(data)
         self.container = self.graph
         self.update_doc_to_node(data)
@@ -161,15 +161,15 @@ class DocGraphClass:
                 doc_to_node = SystemMade(_id=link_id_list[index], user_id=self.user_id, collector=self.collector)
                 node_id = node["Setting"]["_id"]
                 doc_to_node.pre_create(
-                    start=self.node.node,
+                    start=self.base_node.node,
                     end=self.bound_node(node),
                     p_label='Doc2Node',
-                    data={"Is_Main": node_id in self.node.info.MainNodes, "DocImp": 50, "Correlation": 50})
+                    data={"Is_Main": node_id in self.base_node.info.MainNodes, "DocImp": 50, "Correlation": 50})
                 self.doc_to_node_links.append(doc_to_node)
 
         # Doc2graph关系取消
         for (index, node) in enumerate(remove_node_list):
-            doc_to_node = SystemMade.query_by_start_end(start=self.node.id,
+            doc_to_node = SystemMade.query_by_start_end(start=self.base_node.id,
                                                         end=node["_id"],
                                                         user_id=self.user_id,
                                                         p_label="Doc2Node",
@@ -192,7 +192,7 @@ class DocGraphClass:
         更新Info部分
         :return:
         """
-        info = self.node.info
+        info = self.base_node.info
         info.Size = len(self.graph.Nodes)
         info.Complete = 50
         info.MainNodes = [node["_id"] for node in self.graph.Nodes
@@ -270,7 +270,7 @@ class DocGraphClass:
             old_id = node["Setting"]["_id"]
             if old_id == self.old_id:
                 new_id = self.id
-                remote_node = self.node
+                remote_node = self.base_node
             else:
                 new_id = id_list[index]
                 remote_node = BaseNode(_id=new_id, user_id=self.user_id, collector=self.collector)
@@ -354,14 +354,14 @@ class DocGraphClass:
 
     def re_count(self):
         result = UserConcern.objects.filter(SourceId=self.id)
-        self.node.ctrl.Useful = result.filter(Useful__gte=0).aggregate(Avg("Useful"))
-        self.node.ctrl.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg("HardLevel"))
-        self.node.ctrl.Imp = result.filter(Imp__gte=0).aggregate(Avg("Imp"))
-        self.node.ctrl.CountCacheTime = time()
+        self.base_node.ctrl.Useful = result.filter(Useful__gte=0).aggregate(Avg("Useful"))
+        self.base_node.ctrl.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg("HardLevel"))
+        self.base_node.ctrl.Imp = result.filter(Imp__gte=0).aggregate(Avg("Imp"))
+        self.base_node.ctrl.CountCacheTime = time()
         # todo hot_count level : 1
 
     def node_index(self):
-        body = self.node.node_index()
+        body = self.base_node.node_index()
         body["type"] = "document"
         return body
 
@@ -373,7 +373,7 @@ class DocGraphClass:
 
     def handle_for_frontend_as_graph(self):
         result = {
-            "Base": self.node.handle_for_frontend(),
+            "Base": self.base_node.handle_for_frontend(),
             "Graph": {
                 "nodes": self.graph.Nodes,
                 "links": self.graph.Links,
@@ -382,13 +382,13 @@ class DocGraphClass:
             "Conf": self.graph.Conf,
             "Path": self.graph.Path,
             "State": {
-                "isSelf": self.node.ctrl.CreateUser == self.user_id,
+                "isSelf": self.base_node.ctrl.CreateUser == self.user_id,
             },
         }
         return result
 
     def handle_for_frontend(self):
-        return self.node.handle_for_frontend()
+        return self.base_node.handle_for_frontend()
 
 
 class BaseComment:

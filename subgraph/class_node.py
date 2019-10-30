@@ -20,7 +20,7 @@ class BaseNode(base_tools.BaseModel):
 
         # 以下是模型
         super().__init__(_id, user_id, _type, collector)
-
+        self.type = _type
         self.warn: Optional[WarnRecord] = None
         self.loading_history: Optional[NodeVersionRecord] = None
         self.history = NodeVersionRecord.objects.none()
@@ -189,9 +189,12 @@ class BaseNode(base_tools.BaseModel):
         """
         self.ctrl.save()
         self.info.save()
-        self.authority.save()
-        self.loading_history.save()
-        self.warn.save()
+        if self.authority:
+            self.authority.save()
+        if self.loading_history:
+            self.loading_history.save()
+        if self.warn:
+            self.warn.save()
         bulk_add_node_index([self])
 
     def node_index(self):
