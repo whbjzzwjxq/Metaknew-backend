@@ -115,18 +115,21 @@ def update_single_node_by_user(request):
     model = type_label_to_class(_type=info['type'], _label=info["PrimaryLabel"])
     if re_for_old_id:
         new_id = id_generator(number=1, method='node')[0]
-        item = model(_id=new_id, user_id=user_id, collector=collector)
+        item = model(_id=new_id, user_id=user_id, _type=info['type'], collector=collector)
+        if info['type'] == 'document':
+            item = item.node
         item.create(data=info)
-        result = {_id: new_id}
+        item.save()
+        return HttpResponse(json.dumps({_id: new_id}), status=200)
     else:
         item = model(_id=_id, user_id=user_id, collector=collector)
-        item.info_update(data=info)
-        result = {}
-    if item:
-        item.save()
-        return HttpResponse(json.dumps(result), status=200)
-    else:
-        return HttpResponse(status=item.status, content=item.content)
+        item.query_base()
+        if item.ctrl.CreateUser == user_id:
+            item.info_update(data=info)
+            item.save()
+            return HttpResponse(json.dumps({}), status=200)
+        else:
+            return HttpResponse(status=401)
 
 
 def query_single_node(request):
