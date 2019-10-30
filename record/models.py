@@ -70,26 +70,3 @@ class NodeVersionRecord(models.Model):
             models.UniqueConstraint(fields=["SourceId", "VersionId"], name="NodeVersionControl")
         ]
         db_table = "history_version_record"
-
-
-class DocumentVersionRecord(models.Model):
-    CreateUser = models.BigIntegerField(db_column="User", editable=False)
-    CreateTime = models.DateTimeField(auto_now_add=True, editable=False)
-    SourceId = models.BigIntegerField(db_column="SourceId", editable=False, db_index=True)
-    SourceType = models.TextField(db_column="Type", editable=False, default="Document")
-
-    Name = models.TextField(db_column="Name")
-    VersionId = models.SmallIntegerField(db_column="VersionId")
-    Is_Draft = models.BooleanField(db_column="Draft", db_index=True)
-    BaseHistory = models.BigIntegerField(db_column="BaseHis", db_index=True)
-    GraphContent = JSONField(db_column="GraphContent")
-    PaperContent = JSONField(db_column="PaperContent")
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["SourceId", "Is_Draft"])
-        ]
-        constraints = [
-            models.UniqueConstraint(fields=["SourceId", "VersionId"], name="DocVersionControl")
-        ]
-        db_table = "history_doc_version_record"

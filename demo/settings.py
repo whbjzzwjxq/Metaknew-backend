@@ -21,7 +21,6 @@ STATIC_URL = "templates/static/"
 MEDIA_URL = "media/"
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "templates/static/"),
-    'templates/static/dist',
 ]
 
 STATICFILES_FINDERS = (
@@ -174,12 +173,12 @@ LANGUAGE_CODE = "zh-Hans"  # 数据库可视化页面转化为中文：zh_Hans, 
 # LANGUAGE_CODE = "en-us"
 
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Shanghai"
 
 USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 # Static files (CSS, JavaScript, Images)

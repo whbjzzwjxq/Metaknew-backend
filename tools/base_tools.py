@@ -16,7 +16,6 @@ from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
 from record.logic_class import field_check
 from record.models import WarnRecord, NodeVersionRecord
 from subgraph.models import *
-from subgraph.models import BaseAuthority
 
 re_for_info = re.compile(r".*Info")
 re_for_ptr = re.compile(r".*_ptr")
@@ -32,6 +31,201 @@ class NeoSet:
         self.tx = graph.begin()
         self.Nmatcher = NodeMatcher(graph)
         self.Rmatcher = RelationshipMatcher(graph)
+
+
+class BaseModel:
+    """
+    提供的方法
+    query_ctrl, query_info, query_node, query_authority, auth_create, info_update
+    """
+
+    def __init__(self, _id: int, user_id: int, _type: _types, collector=NeoSet()):
+        default = 'default'
+        self.node: Optional[NeoNode] = None
+        self.info: Optional[type_label_to_model(_type, default)] = None
+        self.ctrl: Optional[ctrl_dict[_type]] = None
+        self.authority: Optional[BaseAuthority] = None
+        self.warn: Optional[WarnRecord] = None
+        # 以下是值
+        self.collector = collector  # neo4j连接池
+        self.id = _id  # _id
+        self.user_id = int(user_id)
+        self.type = _type
+        self.p_label = ""  # 主标签
+        self.is_draft = False  # 是否是草稿
+        self.is_create = False  # 是否是创建状态
+        self.is_user_made = check_is_user_made(user_id)
+        self.lack = []
+
+    # ----------------- query ----------------
+    def query_base(self):
+        """
+        查询info,ctrl,text, authority的内容 也就是前端 索引的基本内容
+        :return:
+        """
+        result = self.__query_ctrl()
+        result &= self.__query_info()
+
+        return result
+
+    def __query_ctrl(self) -> bool:
+        if not self.ctrl:
+            try:
+                self.ctrl = ctrl_dict[self.type].objects.get(pk=self.id)
+                self.p_label = self.ctrl.PrimaryLabel
+                return True
+            except ObjectDoesNotExist:
+                return False
+        else:
+            self.p_label = self.ctrl.PrimaryLabel
+            return True
+
+    def __query_info(self) -> bool:
+        if not self.ctrl:
+            return False
+        elif not self.info:
+            try:
+                self.info = type_label_to_model(self.type, self.p_label).objects.get(pk=self.id)
+                return True
+            except ObjectDoesNotExist:
+                return False
+        else:
+            return True
+
+    def query_node(self):
+        if self.type != "link":
+            self.node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
+            if not self.node:
+                self.lack.append("node")
+        else:
+            raise TypeError('link does not have NeoNode!')
+
+    def __query_authority(self) -> bool:
+        if self.type != "link":
+            if not self.authority:
+                try:
+                    self.authority = BaseAuthority.objects.get(SourceId=self.id, SourceType=self.type)
+                    return True
+                except ObjectDoesNotExist:
+                    self.lack.append("authority")
+                    return False
+            else:
+                return True
+        else:
+            raise TypeError('link does not have Authority!')
+
+    def auth_create(self, data):
+        self.authority = BaseAuthority(
+            SourceId=self.id,
+            SourceType=self.type,
+            Used=True,
+            Common=data["$_IsCommon"],
+            OpenSource=data["$_IsOpen"],
+            Shared=data["$_IsShared"],
+            Payment=False,
+            Vip=False,
+            HighVip=False
+        )
+
+    @field_check
+    def __update_prop(self, field, new_prop, old_prop):
+        if new_prop != old_prop:
+            setattr(self.info, field.name, new_prop)
+
+    def info_update(self, data):
+        self.warn = WarnRecord(
+            SourceId=self.id,
+            SourceLabel=self.p_label,
+            BugType="None",
+            CreateUser=self.user_id
+        )
+        if self.user_id == self.ctrl.CreateUser:
+            if self.info:
+                needed_props = get_update_props(self.type, self.p_label)
+                for field in needed_props:
+                    old_prop = getattr(self.info, field.name)
+                    if field.name in data:
+                        new_prop = data[field.name]
+                    else:
+                        new_prop = field.default
+                        # 如果是dict list等构造类 实例化
+                        if isinstance(new_prop, type):
+                            new_prop = new_prop()
+                    self.__update_prop(field, new_prop, old_prop)
+                    # todo field resolve
+                return self
+            else:
+                return ErrorContent(status=400, state=False, reason="info dos not query")
+        else:
+            return ErrorContent(status=401, state=False, reason="unAuthorization")
+
+    def text_index(self):
+        if len(list(self.info.Text.keys())) > 0:
+            language = list(self.info.Text.keys())[0]
+            text = self.info.Text[language]
+        else:
+            language = "auto"
+            text = ""
+        if self.type == 'link':
+            hot = self.info.Hot
+            star = self.info.Star
+        else:
+            hot = self.ctrl.Hot
+            star = self.ctrl.Star
+
+        body = {
+            "id": self.id,
+            "type": self.type,
+            "PrimaryLabel": self.p_label,
+            "Language": language,
+            "Name": self.info.Name,
+            "Labels": self.info.Labels,
+            "Text": {
+                "zh": "",
+                "en": "",
+                "auto": text
+            },
+            "Hot": hot,
+            "Star": star
+        }
+        for lang in body["Text"]:
+            if lang in self.info.Text:
+                body["Text"][lang] = self.info.Text[lang]
+        return body
+
+    def output_table_create(self):
+        return self.ctrl, self.info, self.authority, self.warn
+
+    def handle_for_frontend(self):
+        """
+        前端所用格式
+        :return:
+        """
+        unused_props = ["CountCacheTime",
+                        "Is_Used",
+                        "Is_UserMade",
+                        "ImportMethod",
+                        "CreateTime",
+                        "NodeId",
+                        "CreateUser",
+                        "Format",
+                        "History",
+                        "MediaId",
+                        ]
+        self.query_base()
+        ctrl_fields = self.ctrl._meta.get_fields()
+        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
+                            for field in ctrl_fields if field.name not in unused_props}
+        info_fields = self.info._meta.get_fields()
+        output_info_dict = {field.name: getattr(self.info, field.name)
+                            for field in info_fields if field.name not in unused_props}
+        output_info_dict["id"] = self.id
+        output_info_dict["type"] = self.type
+        result = {
+            "Ctrl": output_ctrl_dict,
+            "Info": output_info_dict,
+        }
+        return result
 
 
 def type_label_to_model(_type: _types, label: str) -> info_models:
@@ -74,42 +268,67 @@ model_dict: Dict[str, Dict[str, info_models]] = {
         "Doc2Node": Doc2Node,
     },
     "media": {
-        "default": Text,
-        "Image": Image,
-        "Text": Text,
-        "Audio": Audio,
-        "Video": Video
+        "default": Image,
+        "image": Image,
+        "text": Text,
+        "audio": Audio,
+        "video": Video
+    },
+    "document": {
+        "default": BaseDocGraph,
+        "DocGraph": BaseDocGraph
     }
 }
 
 
-def bulk_save_base_model(item_list, user_model, _type):
-    info_dict = {}
-    items = [item for item in item_list if item]
-    if items:
-        items_id = {item.id: _type for item in items}
-        user_model.bulk_create_source(items_id)
-        output = np.array([item.output_table_create() for item in items])
-        ctrl = list(output[:, 0])
-        ctrl_dict[_type].objects.bulk_create(ctrl)
-        info_list = list(output[:, 1])
+def bulk_save_base_model(item_list: List[BaseModel], user_model, _type):
+    def info_list_to_dict(info_list):
+        """
+        整理info_list 找到对应的info_dict
+        :return:
+        """
+        info_dict = {}
         for info in info_list:
             if info.PrimaryLabel not in info_dict:
                 info_dict[info.PrimaryLabel] = []
             info_dict[info.PrimaryLabel].append(info)
-        for key in info_dict:
-            type_label_to_model(_type, key).objects.bulk_create(info_dict[key])
+        return info_dict
+
+    items = [item for item in item_list if item]
+    if items:
+        # 创建内容记录
+        items_id = {item.id: _type for item in items if item.is_create}
+        user_model.bulk_create_source(items_id)
+
+        # create部分
+        output_create = np.array([item.output_table_create() for item in items if item.is_create])
+        if len(output_create) > 0:
+            ctrl = list(output_create[:, 0])
+            ctrl_dict[_type].objects.bulk_create(ctrl)
+
+            info_dict = info_list_to_dict(list(output_create[:, 1]))
+            for key in info_dict:
+                type_label_to_model(_type, key).objects.bulk_create(info_dict[key])
+
+            authority = list(output_create[:, 2])
+            authority = [auth for auth in authority if auth]
+            BaseAuthority.objects.bulk_create(authority)
+            # 保存warn
+            warn = list(output_create[:, 3])
+            WarnRecord.objects.bulk_create(warn)
+
+        # update部分
+        output_update = np.array([item.output_table_create() for item in items if not item.is_create])
+        if len(output_update) > 0:
+            ctrl = list(output_update[:, 0])
+            ctrl_dict[_type].objects.bulk_update(ctrl, ['PrimaryLabel', 'Is_Used'])
+            info_dict = info_list_to_dict(list(output_update[:, 1]))
+            for key in info_dict:
+                fields = [field.name for field in get_update_props(_type=_type, p_label=key)]
+                type_label_to_model(_type, key).objects.bulk_update(info_dict[key], fields)
+
         bulk_add_text_index(items)
-        # 保存authority
-        authority = list(output[:, 2])
-        authority = [auth for auth in authority if auth]
-        BaseAuthority.objects.bulk_create(authority)
-        # 保存warn
-        warn = list(output[:, 3])
-        WarnRecord.objects.bulk_create(warn)
         if _type == 'node':
-            history = list(output[:, 4])
-            NodeVersionRecord.objects.bulk_create(history)
             bulk_add_node_index(items)
 
 
@@ -137,10 +356,11 @@ def get_update_props(_type: _types, p_label: str) -> List[Field]:
     :return: 数据可以直接写入的属性
     """
     remove_list = {
-        "node": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia",
-                 "HasPaper", "HasGraph", "Size", "MainNodes", "Complete"],
-        "link": ["LinkId", "PrimaryLabel", "Star"],
+        "node": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia"],
+        "link": ["LinkId", "PrimaryLabel", "Star", "Hot"],
         "media": ["MediaId", "PrimaryLabel"],
+        "document": ["NodeId", "PrimaryLabel", "MainPic", "IncludedMedia",
+                     "Size", "MainNodes", "Complete"],
     }
     try:
         # 目标包含的域
@@ -206,211 +426,6 @@ def dict_dryer(node: dict):
     return node
 
 
-class BaseModel:
-    """
-    提供的方法
-    query_ctrl, query_info, query_node, query_authority, auth_create, info_update
-    """
-
-    def __init__(self, _id: int, user_id: int, _type: _types, collector=NeoSet()):
-        default = 'default'
-        self.node: Optional[NeoNode] = None
-        self.info: Optional[type_label_to_model(_type, default)] = None
-        self.ctrl: Optional[ctrl_dict[_type]] = None
-        self.authority: Optional[BaseAuthority] = None
-        self.warn: Optional[WarnRecord] = None
-        # 以下是值
-        self.collector = collector  # neo4j连接池
-        self.id = _id  # _id
-        self.user_id = int(user_id)
-        self.type = _type
-        self.p_label = ""  # 主标签
-        self.is_draft = False  # 是否是草稿
-        self.is_create = False  # 是否是创建状态
-        self.is_user_made = check_is_user_made(user_id)
-        self.lack = []
-
-    # ----------------- query ----------------
-    def query_base(self):
-        """
-        查询info,ctrl,text, authority的内容 也就是前端 索引的基本内容
-        :return:
-        """
-        result = self.__query_ctrl()
-        result &= self.__query_info()
-
-        return result
-
-    def __query_ctrl(self) -> bool:
-        if not self.ctrl:
-            try:
-                self.ctrl = ctrl_dict[self.type].objects.get(pk=self.id)
-                self.p_label = self.ctrl.PrimaryLabel
-                return True
-            except ObjectDoesNotExist:
-                return False
-        else:
-            self.p_label = self.ctrl.PrimaryLabel
-            return True
-
-    def __query_info(self) -> bool:
-        if not self.ctrl:
-            return False
-        elif not self.info:
-            try:
-                self.info = type_label_to_model(self.type, self.p_label).objects.get(pk=self.id)
-                return True
-            except ObjectDoesNotExist:
-                return False
-        else:
-            return True
-
-    def __query_node(self):
-        if self.type != "link":
-            self.node = self.collector.Nmatcher.match(_id=self.id).first()
-            if not self.node:
-                self.lack.append("node")
-        else:
-            raise TypeError('link does not have NeoNode!')
-
-    def __query_authority(self) -> bool:
-        if self.type != "link":
-            if not self.authority:
-                try:
-                    self.authority = BaseAuthority.objects.get(SourceId=self.id, SourceType=self.type)
-                    return True
-                except ObjectDoesNotExist:
-                    self.lack.append("authority")
-                    return False
-            else:
-                return True
-        else:
-            raise TypeError('link does not have Authority!')
-
-    def auth_create(self, data):
-        self.authority = BaseAuthority(
-            SourceId=self.id,
-            SourceType=self.type,
-            Used=True,
-            Common=data["$_IsCommon"],
-            OpenSource=data["$_IsOpen"],
-            Shared=data["$_IsShared"],
-            Payment=False,
-            Vip=False,
-            HighVip=False
-        )
-
-    @field_check
-    def __update_prop(self, field, new_prop, old_prop):
-        if new_prop != old_prop:
-            if not self.is_draft:
-                setattr(self.info, field.name, new_prop)
-
-    def info_update(self, data):
-        self.warn = WarnRecord(
-            SourceId=self.id,
-            SourceLabel=self.p_label,
-            BugType="None",
-            CreateUser=self.user_id
-        )
-        if self.user_id == self.ctrl.CreateUser:
-            if self.info:
-                needed_props = get_update_props(self.type, self.p_label)
-                for field in needed_props:
-                    old_prop = getattr(self.info, field.name)
-                    if field.name in data:
-                        new_prop = data[field.name]
-                    else:
-                        new_prop = field.default
-                    self.__update_prop(field, new_prop, old_prop)
-                    # todo field resolve
-                return self
-            else:
-                return ErrorContent(status=400, state=False, reason="info dos not query")
-        else:
-            return ErrorContent(status=401, state=False, reason="unAuthorization")
-
-    def text_index(self):
-        if len(list(self.info.Text.keys())) > 0:
-            language = list(self.info.Text.keys())[0]
-            text = self.info.Text[language]
-        else:
-            language = "auto"
-            text = ""
-        body = {
-            "id": self.id,
-            "type": self.type,
-            "PrimaryLabel": self.p_label,
-            "Language": language,
-            "Name": self.info.Name,
-            "Labels": self.info.Labels,
-            "Text": {
-                "zh": "",
-                "en": "",
-                "auto": text
-            },
-            "Hot": self.ctrl.Hot,
-            "Star": self.ctrl.Star
-        }
-        for lang in body["Text"]:
-            if lang in self.info.Text:
-                body["Text"][lang] = self.info.Text[lang]
-        return body
-
-    def output_table_create(self):
-        return self.ctrl, self.info, self.authority, self.warn
-
-    def handle_for_frontend(self):
-        """
-        前端所用格式
-        :return:
-        """
-        unused_props = ["CountCacheTime",
-                        "Is_Used",
-                        "Is_UserMade",
-                        "ImportMethod",
-                        "CreateTime",
-                        "NodeId",
-                        "CreateUser"]
-        self.query_base()
-        ctrl_fields = self.ctrl._meta.get_fields()
-        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
-                            for field in ctrl_fields if field.name not in unused_props}
-        info_fields = self.info._meta.get_fields()
-        output_info_dict = {field.name: getattr(self.info, field.name)
-                            for field in info_fields if field.name not in unused_props}
-        output_info_dict["id"] = self.id
-        output_info_dict["type"] = self.type
-        result = {
-            "Ctrl": output_ctrl_dict,
-            "Info": output_info_dict,
-            "State": {
-                "isSelf": self.ctrl.CreateUser == self.user_id,
-                "isRemote": True
-            },
-
-            # todo 把State去掉
-        }
-        return result
-
-
-class ErrorContent:
-    """
-    适用于不直接返回HttpResponse的情况
-    """
-
-    def __init__(self, status: int, state: bool, reason: str):
-        self.status = status
-        self.state = state
-        self.reason = reason
-
-    def __repr__(self):
-        return {"state": self.state, "reason": self.reason}
-
-    def __bool__(self):
-        return False
-
-
 def check_is_user_made(user_id):
     if user_id != 1:
         return True
@@ -451,3 +466,20 @@ class DateTimeEncoder(json.JSONEncoder):
         elif isinstance(obj, date):
             return obj.strftime('%Y-%m-%d')
         return json.JSONEncoder.default(self, obj)
+
+
+class ErrorContent:
+    """
+    适用于不直接返回HttpResponse的情况
+    """
+
+    def __init__(self, status: int, state: bool, reason: str):
+        self.status = status
+        self.state = state
+        self.reason = reason
+
+    def __repr__(self):
+        return {"state": self.state, "reason": self.reason}
+
+    def __bool__(self):
+        return False

@@ -103,11 +103,3 @@ class EWRecord:
     def bulk_save_warn_record(records):
         result = WarnRecord.objects.bulk_create(records)
         return result
-
-
-class History:
-
-    @staticmethod
-    def bulk_save_node_history(records):
-        result = NodeVersionRecord.objects.bulk_create(records)
-        return result

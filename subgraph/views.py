@@ -1,19 +1,18 @@
 import json
+import re
 import typing
 
 from django.http import HttpResponse
-from django.shortcuts import render
 
-from document.logic_class import BaseDocGraph
+from document.class_document import DocGraphClass
 from es_module.logic_class import bulk_add_text_index
 from subgraph.class_link import BaseLink, SystemMade
 from subgraph.class_media import BaseMedia
 from subgraph.class_node import BaseNode
-from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model, type_label_to_model
+from tools.base_tools import NeoSet, get_special_props, DateTimeEncoder, bulk_save_base_model
 from tools.id_generator import id_generator
 from tools.redis_process import query_needed_prop, set_needed_prop, query_available_plabel
 from users.logic_class import BaseUser
-from users.models import UserDraft
 
 
 def query_frontend_prop(request):
@@ -22,7 +21,7 @@ def query_frontend_prop(request):
     for label in labels:
         props = query_needed_prop(label)
         if not props:
-            props = {field.name: query_field_type(field) for field in get_special_props(p_label=label)}
+            props = {field.name: query_field_type(field) for field in get_special_props(_type='node', p_label=label)}
             if props:
                 set_needed_prop(label, props)
         label_prop_dict.update({label: props})
@@ -34,37 +33,7 @@ def query_field_type(field) -> str:
     return field_type
 
 
-def create_graph(request):
-    collector = NeoSet()
-    data = json.loads(request.body.decode())
-    doc_id = id_generator(number=1, method="node", jump=3)[0]
-    user_id = request.GET.get("user_id")
-    graph = data["graph"]
-    is_draft = data["isDraft"]
-    if is_draft:
-        draft = UserDraft(UserId=user_id, SourceId=doc_id, SourceType='document', Content=data)
-        draft.save()
-        return HttpResponse(content="Save Document Draft Success", status=200)
-    else:
-        user_model = BaseUser(_id=user_id).query_user()
-        doc = BaseDocGraph(_id=doc_id, user_id=user_id, collector=collector)
-        document = doc.create(graph)
-        nodes = [node for node in document.info_change_nodes if node.type != 'media']
-        medias = [media for media in document.info_change_nodes if media.type == 'media']
-        links = document.info_change_links
-        doc_to_node_links = document.doc_to_node_links
-        bulk_save_base_model(nodes, user_model, "node")
-        bulk_save_base_model(medias, user_model, "media")
-        bulk_save_base_model(links, user_model, "link")
-        bulk_save_base_model(doc_to_node_links, user_model, "link")
-        collector.tx.commit()
-        document.graph.save()
-        return HttpResponse(json.dumps({'node': document.node_id_old_new_map, 'link': document.link_id_old_new_map}),
-                            status=200)
-
-
 def bulk_create_node(request):
-    batch_size = 256
     collector = NeoSet()
     data_list = json.loads(request.body)["data"]
     plabel = json.loads(request.body)["pLabel"]
@@ -131,7 +100,7 @@ def upload_media_by_user(request):
         return HttpResponse(status=500)
 
 
-def update_media_by_user(request):
+def update_single_node_by_user(request):
     """
     和upload_media_by_user类似
     :param request:
@@ -139,10 +108,28 @@ def update_media_by_user(request):
     """
     collector = NeoSet()
     user_id = request.GET.get("user_id")
-    user_model = BaseUser(_id=user_id)
     file_data = json.loads(request.body.decode())
-    _id = file_data["Info"]["id"]
-    media = BaseMedia(_id=_id, user_id=user_id, collector=collector).query_base()
+    info = file_data["Info"]
+    _id = info["id"]
+    re_for_old_id = re.match(r'\$_[0,9]*', str(_id))
+    model = type_label_to_class(_type=info['type'], _label=info["PrimaryLabel"])
+    if re_for_old_id:
+        new_id = id_generator(number=1, method='node')[0]
+        item = model(_id=new_id, user_id=user_id, _type=info['type'], collector=collector)
+        if info['type'] == 'document':
+            item = item.node
+        item.create(data=info)
+        item.save()
+        return HttpResponse(json.dumps({_id: new_id}), status=200)
+    else:
+        item = model(_id=_id, user_id=user_id, collector=collector)
+        item.query_base()
+        if item.ctrl.CreateUser == user_id:
+            item.info_update(data=info)
+            item.save()
+            return HttpResponse(json.dumps({}), status=200)
+        else:
+            return HttpResponse(status=401)
 
 
 def query_single_node(request):
@@ -159,6 +146,32 @@ def query_single_node(request):
 def query_multi_source(request):
     query_list = json.loads(request.body.decode())
     user_id = request.GET.get("user_id")
+    # todo 有时间改成map
+    result = []
+    for query in query_list:
+        _type = query[1]
+        p_label = query[2]
+        model = type_label_to_class(_type, p_label)
+        output = model(_id=query[0], user_id=user_id)
+        output.query_base()
+        result.append(output.handle_for_frontend())
+
+    return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
+
+
+def query_multi_media(request):
+    """
+    data: [id]
+    :param request:
+    :return:
+    """
+    data = json.loads(request.body.decode())
+    user_id = request.GET.get('user_id')
+    result = [BaseMedia(_id=_id, user_id=user_id).handle_for_frontend() for _id in data]
+    return HttpResponse(json.dumps(result, cls=DateTimeEncoder), status=200)
+
+
+def type_label_to_class(_type, _label: str):
     _type_to_class = {
         "node": {
             'default': BaseNode
@@ -174,22 +187,13 @@ def query_multi_source(request):
             "VisitAfter": SystemMade,
         },
         "document": {
-            "default": BaseDocGraph,
-            "DocPaper": BaseDocGraph  # todo
+            "default": DocGraphClass,
+            "DocPaper": DocGraphClass  # todo
         }
     }
-    # todo 有时间改成map
-    result = []
-    for query in query_list:
-        _type = query[1]
-        p_label = query[2]
-        model_list = _type_to_class[_type]
-        if p_label in model_list:
-            model = model_list[p_label]
-        else:
-            model = model_list["default"]
-        output = model(_id=query[0], user_id=user_id)
-        output.query_base()
-        result.append(output.handle_for_frontend())
-
-    return HttpResponse(json.dumps(result, cls=DateTimeEncoder))
+    model_list = _type_to_class[_type]
+    if _label in model_list:
+        model = model_list[_label]
+    else:
+        model = model_list["default"]
+    return model

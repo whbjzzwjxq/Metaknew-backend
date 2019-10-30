@@ -4,11 +4,6 @@ from users.logic_class import BaseGroup
 from functools import reduce
 from subgraph.models import BaseAuthority
 import re
-default_request_info = {
-    "status": True,
-    "content": "",
-    "user_id": 0
-}
 
 
 # done 09-13
@@ -90,12 +85,20 @@ class AuthMiddleware:
         return {}
 
     @staticmethod
-    def confirm_login_status(request: HttpRequest()) -> default_request_info:
+    def confirm_login_status(request: HttpRequest()):
+        default_request_info = {
+            "status": True,
+            "content": "",
+            "user_id": 0
+        }
+        request.GET._mutable = True
+        request.GET.update({"user_id": 0})
+        request.GET._mutable = False
         # 默认情况下视为游客
         un_login_list = [
-            re.compile(r'apis/static/dist/.*'),
-            re.compile(r'apis/index.*'),
-            re.compile(r'apis/user/.*'),
+            re.compile(r'/apis/static/dist/.*'),
+            re.compile(r'/apis/index.*'),
+            re.compile(r'/apis/user/.*'),
         ]
         result = False
         for regex in un_login_list:

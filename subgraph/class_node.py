@@ -34,7 +34,7 @@ class BaseNode(base_tools.BaseModel):
         """
         success = self.query_base()
         if success:
-            self.__query_node()
+            self.query_node()
             self.query_history()
         return self
 

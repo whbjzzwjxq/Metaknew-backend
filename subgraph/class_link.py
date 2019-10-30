@@ -1,18 +1,18 @@
 from datetime import datetime
 from typing import Optional
 
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from py2neo import walk, Relationship
 from py2neo.data import Node as NeoNode
 
-from record.logic_class import ObjectAlreadyExist
+from es_module.logic_class import bulk_add_text_index
 from subgraph.class_node import BaseNode
-from tools import base_tools
-from subgraph.models import RelationshipCtrl, KnowLedge
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from subgraph.models import RelationshipCtrl
+from tools.base_tools import BaseModel, NeoSet, ctrl_dict, ErrorContent, link_init, get_update_props
 
 
-class BaseLink(base_tools.BaseModel):
-    def __init__(self, _id: int, user_id: int, _type="link", collector=base_tools.NeoSet()):
+class BaseLink(BaseModel):
+    def __init__(self, _id: int, user_id: int, _type="link", collector=NeoSet()):
         """
 
         :param user_id:用户/设备id
@@ -27,10 +27,6 @@ class BaseLink(base_tools.BaseModel):
         self.end: Optional[BaseNode] = None
         self.link: Optional[Relationship] = None
 
-    def query_by_id(self):
-        self.__query_ctrl()
-        pass
-
     @staticmethod
     def query_by_start_end(start: int, end: int, single: bool, user_id: int, p_label=None, _id=0):
         """
@@ -44,7 +40,7 @@ class BaseLink(base_tools.BaseModel):
         :return: list of link
         """
         try:
-            ctrl_set = base_tools.ctrl_dict["link"].objects.filter(Start=start, End=end)
+            ctrl_set = ctrl_dict["link"].objects.filter(Start=start, End=end)
             if single:
                 if p_label:
                     ctrl_set = ctrl_set.filter(PrimaryLabel=p_label)
@@ -56,7 +52,15 @@ class BaseLink(base_tools.BaseModel):
                 return ctrl_set
 
         except ObjectDoesNotExist or MultipleObjectsReturned:
-            return base_tools.ErrorContent(status=400, state=False, reason='关系不唯一')
+            return ErrorContent(status=400, state=False, reason='关系不唯一')
+
+    def query_link(self):
+        if not self.ctrl:
+            self.query_base()
+        self.start = self.collector.Nmatcher.match(self.ctrl.StartPLabel, self.ctrl.StartType, _id=self.ctrl.Start)
+        self.end = self.collector.Nmatcher.match(self.ctrl.EndPLabel, self.ctrl.EndType, _id=self.ctrl.End)
+        self.link = self.collector.Rmatcher.match(nodes=(self.start, self.end), r_type=self.p_label, _id=self.id)
+        return self
 
     def do_walk(self):
         self.walk = walk(self.link)
@@ -73,13 +77,14 @@ class BaseLink(base_tools.BaseModel):
         :param p_label: p_label
         :return:
         """
+        self.is_create = True
         self.bound_node(start, end, p_label, is_user_made)
         self.p_label = p_label
         # ctrl
         self.__ctrl_create()
         self.auth_create(data=data)
         # info
-        self.info = base_tools.link_init(p_label)()
+        self.info = link_init(p_label)()
         self.info.PrimaryLabel = p_label
         self.info.LinkId = self.id
         self.info_update(data)
@@ -114,33 +119,11 @@ class BaseLink(base_tools.BaseModel):
         neo4j_props = {"Is_UserMade": self.is_user_made, "CreateTime": datetime.now().strftime('%a, %b %d %H:%M')}
         self.link.update(neo4j_props)
 
-    def text_index(self):
-        self.info: KnowLedge
-        if len(list(self.info.Text.keys())) > 0:
-            language = list(self.info.Text.keys())[0]
-            text = self.info.Text[language]
-        else:
-            language = "auto"
-            text = ""
-        body = {
-            "id": self.id,
-            "type": self.type,
-            "PrimaryLabel": self.p_label,
-            "Language": language,
-            "Name": self.info.Name,
-            "Labels": self.info.Labels,
-            "Text": {
-                "zh": "",
-                "en": "",
-                "auto": text
-            },
-            "Hot": self.info.Hot,
-            "Star": self.info.Star
-        }
-        for lang in body["Text"]:
-            if lang in self.info.Text:
-                body["Text"][lang] = self.info.Text[lang]
-        return body
+    def save(self):
+        self.info.save()
+        self.ctrl.save()
+        self.collector.tx.commit()
+        bulk_add_text_index([self])
 
 
 class SystemMade(BaseLink):
@@ -154,14 +137,15 @@ class SystemMade(BaseLink):
         return self
 
     def check_exist(self, start, end, p_label):
-        return self.query_by_start_end(start["_id"], end["_id"], single=True, user_id=self.user_id, p_label=p_label, _id=self.id)
+        return self.query_by_start_end(start["_id"], end["_id"], single=True, user_id=self.user_id, p_label=p_label,
+                                       _id=self.id)
 
     def __link_update(self, data):
         neo4j_props = {
             "Is_UserMade": self.is_user_made,
             "CreateTime": datetime.now().strftime('%a, %b %d %H:%M'),
         }
-        fields = base_tools.get_update_props("link", self.p_label)
+        fields = get_update_props("link", self.p_label)
         for field in fields:
             if field.name in data:
                 neo4j_props[field.name] = data[field.name]
@@ -173,3 +157,14 @@ class SystemMade(BaseLink):
 
     def auth_create(self, data):
         pass
+
+    def save(self):
+        self.info.save()
+        self.ctrl.save()
+        self.collector.tx.commit()
+
+    def delete(self):
+        self.query_link()
+        self.ctrl.isUsed = False
+        self.link['isUsed'] = False
+        return self

@@ -144,6 +144,7 @@ class MediaCtrl(models.Model):
     UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
     TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间 主要是给音频和视频用的
+    PrimaryLabel = models.TextField(db_index=True, default='')
     # 缩略图
     Thumb = models.TextField(default="")
     # 用户相关
