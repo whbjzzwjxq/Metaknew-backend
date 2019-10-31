@@ -24,5 +24,6 @@ urlpatterns = [
     url("login_message", views.login_message),
     url("login_cookie", views.login_cookie),
     url("register", views.register),
-    url("query_other_token", views.query_user_token)
+    url("query_other_token", views.query_user_token),
+    url('test', views.test)
 ]
