@@ -88,6 +88,11 @@ class EsQuery:
 
 
 def bulk_add_node_index(nodes):
+    """
+    调用了is_create
+    :param nodes:
+    :return:
+    """
     def index_nodes():
         for node in nodes:
             body = node.node_index()
@@ -108,6 +113,11 @@ def bulk_add_node_index(nodes):
 
 
 def bulk_add_text_index(nodes):
+    """
+    调用了is_create
+    :param nodes:
+    :return:
+    """
     def index_texts():
         for node in nodes:
             body = node.text_index()

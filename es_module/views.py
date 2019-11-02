@@ -4,7 +4,7 @@ from django.shortcuts import HttpResponse
 
 from es_module.logic_class import bulk_add_node_index, es, EsQuery
 from subgraph.class_node import BaseNode
-from subgraph.models import BaseAuthority
+# from subgraph.models import BaseAuthority
 
 hits_format = {"took": 1,
                "timed_out": False,
@@ -58,15 +58,15 @@ def language_support(lang):
     return field
 
 
-def reindex_nodes(request):
-    def query_common_node(auth):
-        _id = auth.SourceId
-        base_node = BaseNode(_id=_id, user_id=user_id)
-        base_node.authority = auth
-        base_node.query_base()
-        return base_node
-    user_id = request.GET.get("user_id")
-    authorities = BaseAuthority.objects.filter(Common=True, Used=True, SourceType='node')
-    base_nodes = [query_common_node(auth)for auth in authorities]
-    bulk_add_node_index(base_nodes)
-    return HttpResponse(status=200)
+# def reindex_nodes(request):
+#     def query_common_node(auth):
+#         _id = auth.SourceId
+#         base_node = BaseNode(_id=_id, user_id=user_id)
+#         base_node.authority = auth
+#         base_node.query_base()
+#         return base_node
+#     user_id = request.GET.get("user_id")
+#     authorities = BaseAuthority.objects.filter(Common=True, Used=True, SourceType='node')
+#     base_nodes = [query_common_node(auth)for auth in authorities]
+#     bulk_add_node_index(base_nodes)
+#     return HttpResponse(status=200)

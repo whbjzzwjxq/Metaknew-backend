@@ -4,7 +4,6 @@ import typing
 
 from django.http import HttpResponse
 
-from document.class_document import DocGraphClass
 from es_module.logic_class import bulk_add_text_index
 from subgraph.class_link import BaseLink, SystemMade
 from subgraph.class_media import BaseMedia
@@ -49,7 +48,7 @@ def bulk_create_node(request):
         # 创建node object
         nodes = [BaseNode(_id=_id, collector=collector, user_id=user_id) for _id in id_list]
         # 注入数据
-        nodes = [node.create(data=data) for node, data in zip(nodes, data_list)]
+        nodes = [node.base_node_create(data=data) for node, data in zip(nodes, data_list)]
         # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None
         nodes: typing.List[BaseNode] = [node for node in nodes if node]
         bulk_save_base_model(nodes, user_model, "node")
@@ -84,9 +83,11 @@ def upload_media_by_user(request):
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id)
     file_data = json.loads(request.body.decode())
+    file_data["Info"]["remote_file"] = file_data["name"]
     _id = id_generator(number=1, method='node', jump=2)[0]
     media = BaseMedia(_id=_id, user_id=user_id, collector=collector)
-    media = media.create(data=file_data["Info"], remote_file=file_data["name"], is_user_made=True)
+    media = media.base_media_create(data=file_data["Info"])
+
     new_location = 'userResource/' + str(media.id) + "." + media.ctrl.Format
     result = media.move_remote_file(new_location)
     if result.status == 200:
@@ -116,7 +117,7 @@ def update_single_node_by_user(request):
     if re_for_old_id:
         new_id = id_generator(number=1, method='node')[0]
         item = model(_id=new_id, user_id=user_id, _type=info['type'], collector=collector)
-        item.create(data=info)
+        item.base_node_create(data=info)
         item.save()
         return HttpResponse(json.dumps({_id: new_id}), status=200)
     else:
