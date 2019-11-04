@@ -239,7 +239,9 @@ class BaseModel:
             "PrimaryLabel": self.p_label,
             "Language": language,
             "Name": self.info.Name,
-            "Labels": self.info.Labels,
+            "Tags": {
+                "Labels": self.info.Labels,
+            },
             "Text": {
                 "zh": "",
                 "en": "",

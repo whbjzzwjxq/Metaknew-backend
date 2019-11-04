@@ -115,6 +115,28 @@ class BaseNode(BaseModel):
         if data["IncludedMedia"]:
             self.media_setter(data["IncludedMedia"])
         self.name_checker(name=data['Name'])
+        self.name_lang_rewrite(data)
+
+    @staticmethod
+    def name_lang_rewrite(data):
+        """
+        重写一下语言配置 现在有点混乱
+        :param data:
+        :return:
+        """
+        trans = data['Translate']
+        name = data['Name']
+        lang = data['Language']
+        if not lang or lang == 'auto':
+            compute_lang = base_tools.language_detect(name)
+            data['Language'] = compute_lang
+            if compute_lang not in trans and compute_lang != 'auto':
+                trans[compute_lang] = name
+        else:
+            if lang in trans:
+                pass
+            else:
+                trans[lang] = name
 
     def name_checker(self, name):
         """
@@ -210,21 +232,23 @@ class BaseNode(BaseModel):
     def node_index(self):
         ctrl = self.ctrl
         info = self.info
+        if not info.Language:
+            lang = 'auto'
+        else:
+            lang = info.Language
         body = {
             "id": self.id,
             "type": self.type,
+            "PrimaryLabel": ctrl.PrimaryLabel,
+            "Language": lang,
             "CreateUser": ctrl.CreateUser,
             "UpdateTime": ctrl.UpdateTime,
-            "Language": info.Language,
             "MainPic": info.MainPic,
-            "Name": {
-                "zh": "",
-                "en": "",
-                "auto": info.Name
-            },
+            "Alias": info.Alias,
+            "Name_zh": "",
+            "Name_en": "",
+            "Name": info.Name,
             "Tags": {
-                "PrimaryLabel": info.PrimaryLabel,
-                "Alias": info.Alias,
                 "Labels": info.Labels,
                 "Topic": info.Topic
             },
@@ -235,10 +259,13 @@ class BaseNode(BaseModel):
                 "Star": ctrl.Star,
                 "Hot": ctrl.Hot,
                 "TotalTime": ctrl.TotalTime
-            }
+            },
+            "Is_Used": ctrl.Is_Used,
+            "Is_Common": ctrl.Is_Common,
+            "Is_OpenSource": ctrl.Is_OpenSource
         }
-        for lang in body["Name"]:
+        for lang in ['zh', 'en']:
             if lang in info.Translate:
-                body["Name"][lang] = info.Translate[lang]
+                body["Name %s" % lang] = info.Translate[lang]
 
         return body

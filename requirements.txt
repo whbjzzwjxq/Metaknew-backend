@@ -1,3 +1,4 @@
+langdetect
 oss2
 Pillow
 googlemaps

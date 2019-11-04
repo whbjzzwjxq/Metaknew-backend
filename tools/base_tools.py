@@ -14,7 +14,7 @@ from py2neo.data import Node as NeoNode
 from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
 from record.models import WarnRecord, VersionRecord
 from subgraph.models import *
-
+import langdetect
 re_for_info = re.compile(r".*Info")
 re_for_ptr = re.compile(r".*_ptr")
 graph = Graph("bolt://39.96.10.154:7687", username="neo4j", password="12345678")
@@ -240,6 +240,17 @@ def check_is_user_made(user_id):
         return True
     else:
         return False
+
+
+def language_detect(text):
+    lang = langdetect.detect(text)
+    if lang == 'zh_cn' or lang == 'zh_tw':
+        lang = 'zh'
+    elif lang == 'en':
+        lang = 'en'
+    else:
+        lang = 'auto'
+    return lang
 
 
 def merge_list(lists):
