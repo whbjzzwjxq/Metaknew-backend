@@ -1,8 +1,18 @@
 from elasticsearch import Elasticsearch, helpers
-
-from tools.base_tools import language_detect
+import langdetect
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
+
+
+def language_detect(text):
+    lang = langdetect.detect(text)
+    if lang == 'zh_cn' or lang == 'zh_tw':
+        lang = 'zh'
+    elif lang == 'en':
+        lang = 'en'
+    else:
+        lang = 'auto'
+    return lang
 
 
 #  todo 加入评分 level: 3
@@ -65,17 +75,17 @@ class EsQuery:
     @staticmethod
     def name_match_body(keyword, language):
         if language == 'auto':
-            fields = ["Name.auto", "Name.auto.total",
+            fields = ["Name_auto", "Name_auto.total",
                       "Alias"]
         else:
-            fields = ["Name.auto", "Name.auto.total",
-                      'Name %s' % language, 'Name %s.total' % language,
+            fields = ["Name_auto", "Name_auto.total",
+                      'Name_%s' % language, 'Name_%s.total' % language,
                       "Alias"]
         body = {
             "multi_match": {
                 "query": keyword,
                 "fields": fields,
-                "best_fields": "Name.auto",
+                "type": "best_fields",
                 "tie_breaker": 0.7
             }
         }
@@ -137,6 +147,7 @@ def bulk_add_node_index(nodes):
     :param nodes:
     :return:
     """
+
     def index_nodes():
         for node in nodes:
             body = node.node_index()
@@ -162,6 +173,7 @@ def bulk_add_text_index(nodes):
     :param nodes:
     :return:
     """
+
     def index_texts():
         for node in nodes:
             body = node.text_index()

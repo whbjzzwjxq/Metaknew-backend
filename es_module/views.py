@@ -63,10 +63,20 @@ def reindex_nodes(request):
         _id = ctrl.ItemId
         base_node = BaseNode(_id=_id, user_id=user_id)
         base_node.ctrl = ctrl
-        base_node.query_base()
-        return base_node
+        base_node.is_create = True
+        try:
+            base_node.query_base()
+            return base_node
+        except Exception:
+            return None
+
     user_id = request.GET.get("user_id")
     ctrl_list = NodeCtrl.objects.filter(Is_Common=True, Is_Used=True, ItemType='node')
     base_nodes = [query_common_node(ctrl)for ctrl in ctrl_list]
-    bulk_add_node_index(base_nodes)
+    base_nodes = [node for node in base_nodes if node]
+    batch_size = 256
+    batch = int(len(base_nodes) / batch_size) + 1
+    for i in range(0, batch):
+        nodes = base_nodes[i * batch_size: (i+1) * batch_size - 1]
+        bulk_add_node_index(nodes)
     return HttpResponse(status=200)

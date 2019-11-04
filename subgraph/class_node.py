@@ -247,7 +247,7 @@ class BaseNode(BaseModel):
             "Alias": info.Alias,
             "Name_zh": "",
             "Name_en": "",
-            "Name": info.Name,
+            "Name_auto": info.Name,
             "Tags": {
                 "Labels": info.Labels,
                 "Topic": info.Topic
@@ -266,6 +266,6 @@ class BaseNode(BaseModel):
         }
         for lang in ['zh', 'en']:
             if lang in info.Translate:
-                body["Name %s" % lang] = info.Translate[lang]
+                body["Name_%s" % lang] = info.Translate[lang]
 
         return body
