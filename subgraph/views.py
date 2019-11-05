@@ -3,6 +3,7 @@ import re
 import typing
 
 from django.http import HttpResponse
+from django.core.exceptions import ObjectDoesNotExist
 
 from es_module.logic_class import bulk_add_text_index
 from subgraph.class_link import BaseLink, SystemMade
@@ -167,6 +168,29 @@ def query_multi_media(request):
     user_id = request.GET.get('user_id')
     result = [BaseMedia(_id=_id, user_id=user_id).handle_for_frontend() for _id in data]
     return HttpResponse(json.dumps(result, cls=DateTimeEncoder), status=200)
+
+
+def update_media_to_node(request):
+    data = json.loads(request.body.decode())
+    user_id = request.GET.get('user_id')
+    node = data['node']
+    media = data['media']
+
+    remote_node = BaseNode(_id=node['_id'], user_id=user_id)
+    result = remote_node.query_base()
+    if not result:
+        if result.dev:
+            return HttpResponse(status=400)
+        else:
+            return HttpResponse(status=400, content=json.dumps(result.content))
+    else:
+        remote_media = BaseMedia(_id=media['_id'], user_id=user_id)
+        media_result = remote_media.query_ctrl()
+        if media_result:
+            remote_node.info.IncludedMedia.append(remote_media.ctrl.ItemId)
+            return HttpResponse(status=200)
+        else:
+            return HttpResponse(status=404, content='远端文件未找到， 稍后再试')
 
 
 def type_label_to_class(_type, _label: str):

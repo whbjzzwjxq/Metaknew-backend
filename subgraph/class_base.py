@@ -7,6 +7,7 @@ from py2neo import Node as NeoNode
 from record.logic_class import field_check, UnAuthorizationError, RewriteMethodError
 from record.models import WarnRecord, VersionRecord
 from tools.base_tools import NeoSet, type_label_to_info_model, ctrl_dict, check_is_user_made, get_update_props
+from functools import wraps
 
 str_types = Union['node', 'link', 'course', 'media']
 
@@ -35,8 +36,17 @@ class BaseModel:
 
         self.is_create = False  # 是否是创建状态
         self.is_user_made = check_is_user_made(user_id)
+        self.current_func = ''
 
-    def error_output(self, error: Type[BaseException], reason):
+    def error_output(self, error: Type[BaseException], reason, dev=False, strict=True):
+        """
+        捕获错误
+        :param error: 错误object
+        :param reason: 推测原因
+        :param dev: 这个原因是否是开发模式 dev=False会传回前端
+        :param strict: 这个错误是否是严格的 如果是会raise
+        :return:
+        """
         output = {
             'type': self.type,
             'name': error.__name__,
@@ -44,7 +54,10 @@ class BaseModel:
             'user': self.user_id,
             'reason': reason
         }
-        raise error(output)
+        if not strict:
+            return Error(content=output, _func_name=self.current_func, status=status, dev=dev)
+        else:
+            raise error(output)
 
     # ----------------- create ----------------
 
@@ -57,7 +70,7 @@ class BaseModel:
                     new_version_id = new_version['VersionId__max'] + 1
                 else:
                     new_version_id = 1
-                    self.error_output(ObjectDoesNotExist, '历史文件不存在')
+                    self.error_output(ObjectDoesNotExist, '历史文件不存在', strict=True)
             else:
                 new_version_id = 1
 
@@ -83,10 +96,12 @@ class BaseModel:
         :return:
         """
         result = self.query_ctrl()
-        result &= self.query_info()
-        return result
+        if result:
+            return self.query_info()
+        else:
+            return result
 
-    def query_ctrl(self) -> bool:
+    def query_ctrl(self):
         if not self.ctrl:
             try:
                 self.ctrl = ctrl_dict[self.type].objects.get(pk=self.id)
@@ -94,12 +109,12 @@ class BaseModel:
                     self.p_label = self.ctrl.PrimaryLabel
                 return True
             except ObjectDoesNotExist:
-                self.error_output(ObjectDoesNotExist, 'Ctrl不存在')
+                return self.error_output(ObjectDoesNotExist, 'Ctrl不存在', strict=True)
         else:
             self.p_label = self.ctrl.PrimaryLabel
             return True
 
-    def query_info(self) -> bool:
+    def query_info(self):
         if not self.ctrl:
             result = self.query_ctrl()
             if result:
@@ -109,7 +124,7 @@ class BaseModel:
                 self.info = type_label_to_info_model(self.type, self.p_label).objects.get(pk=self.id)
                 return True
             except ObjectDoesNotExist:
-                self.error_output(ObjectDoesNotExist, 'Info不存在,可能是标签有误')
+                return self.error_output(ObjectDoesNotExist, 'Info不存在,可能是标签有误', strict=True)
         else:
             return True
 
@@ -117,7 +132,7 @@ class BaseModel:
         if self.type != 'link':
             self.history_list = VersionRecord.objects.filter(SourceType=self.type, SourceId=self.id)
         else:
-            self.error_output(TypeError, 'link没有历史记录')
+            self.error_output(TypeError, 'link没有历史记录', strict=True)
 
     def query_warn(self):
         remote_warn = WarnRecord.objects.filter(SourceType=self.type, SourceId=self.id)
@@ -173,7 +188,7 @@ class BaseModel:
             try:
                 self.history.Content.update({prop: value})
             except KeyError or AttributeError as e:
-                self.error_output(e, '更新历史文件出错')
+                self.error_output(e, '更新历史文件出错', dev=False)
 
     def info_update(self, data):
         """
@@ -207,17 +222,17 @@ class BaseModel:
                 # todo field resolve
                 self.graph_update(data)
         else:
-            self.error_output(UnAuthorizationError, '没有编辑权限')
+            self.error_output(UnAuthorizationError, '没有编辑权限', dev=False)
 
     def info_special_update(self, data):
-        self.error_output(RewriteMethodError, '方法需要重写')
+        self.error_output(RewriteMethodError, '方法需要重写', dev=False)
 
     def graph_update(self, data):
         """
         更新图数据库里的内容
         :return:
         """
-        self.error_output(RewriteMethodError, '方法需要重写')
+        self.error_output(RewriteMethodError, reason='方法需要重写', dev=False)
 
     def text_index(self):
         if len(list(self.info.Text.keys())) > 0:
@@ -297,3 +312,29 @@ class BaseModel:
             "Info": output_info_dict,
         }
         return result
+
+
+class Error:
+    def __init__(self, content, _func_name, status, dev=False):
+        self.content = content
+        self._func = _func_name
+        self.dev = dev
+        self.status = status
+
+    def __bool__(self):
+        return False
+
+
+def error_handler(_func):
+    """
+    类方法运行时记录方法名
+    :param _func:
+    :return:
+    """
+
+    @wraps(_func)
+    def handler(self, *args, **kwargs):
+        self.current_func = _func.__name__
+        return _func(self, *args, **kwargs)
+
+    return handler

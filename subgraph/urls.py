@@ -7,6 +7,7 @@ urlpatterns = [
     url("create/node/bulk_create", views.bulk_create_node),
     url("create/media/normal", views.upload_media_by_user),
     url("update/node/normal", views.update_single_node_by_user),
+    url("update/node/media", views.update_media_to_node),
     url("query/query_needed_props", views.query_frontend_prop),
     url("query/query_single_node", views.query_single_node),
     url("query/multi", views.query_multi_source),
