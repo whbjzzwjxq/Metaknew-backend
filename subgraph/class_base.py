@@ -37,6 +37,7 @@ class BaseModel:
         self.is_create = False  # 是否是创建状态
         self.is_user_made = check_is_user_made(user_id)
         self.current_func = ''
+        self.warn_update = False  # 局部更新的时候警告记录
 
     def error_output(self, error: Type[BaseException], reason, dev=False, strict=True):
         """
@@ -55,33 +56,36 @@ class BaseModel:
             'reason': reason
         }
         if not strict:
-            return Error(content=output, _func_name=self.current_func, status=status, dev=dev)
+            return Error(content=output, _func_name=self.current_func, dev=dev)
         else:
             raise error(output)
 
     # ----------------- create ----------------
 
     def history_create(self):
-        if self.type != 'link' and not self.is_create:
-            self.query_history()
-            if self.history_list:
-                new_version = self.history_list.aggregate(Max('VersionId'))
-                if new_version['VersionId__max']:
-                    new_version_id = new_version['VersionId__max'] + 1
+        if not self.history:
+            if self.type != 'link' and not self.is_create:
+                self.query_history()
+                if self.history_list:
+                    new_version = self.history_list.aggregate(Max('VersionId'))
+                    if new_version['VersionId__max']:
+                        new_version_id = new_version['VersionId__max'] + 1
+                    else:
+                        new_version_id = 1
+                        self.error_output(ObjectDoesNotExist, '历史文件不存在', strict=True)
                 else:
                     new_version_id = 1
-                    self.error_output(ObjectDoesNotExist, '历史文件不存在', strict=True)
-            else:
-                new_version_id = 1
 
-            self.history = VersionRecord(
-                CreateUser=self.user_id,
-                SourceId=self.id,
-                SourceType=self.type,
-                SourceLabel=self.p_label,
-                VersionId=new_version_id,
-                Content={}
-            )
+                self.history = VersionRecord(
+                    CreateUser=self.user_id,
+                    SourceId=self.id,
+                    SourceType=self.type,
+                    SourceLabel=self.p_label,
+                    VersionId=new_version_id,
+                    Content={}
+                )
+            else:
+                pass
         else:
             pass
 
@@ -138,8 +142,6 @@ class BaseModel:
         remote_warn = WarnRecord.objects.filter(SourceType=self.type, SourceId=self.id)
         if remote_warn:
             self.warn = remote_warn.first()
-            # 重新更新
-            self.warn.WarnContent = []
         else:
             self.warn = WarnRecord(
                 SourceId=self.id,
@@ -171,6 +173,8 @@ class BaseModel:
             self.info = type_label_to_info_model(self.type, self.p_label)()
             self.info.PrimaryLabel = self.p_label
             self.info.ItemId = self.id
+            if self.type == 'node' or self.type == 'document':
+                self.info.IncludedMedia = []
             return self
 
     # ----------------- update ----------------
@@ -199,6 +203,8 @@ class BaseModel:
         # todo authority
         if self.user_id == self.ctrl.CreateUser:
             self.query_warn()
+            # 重新更新warn
+            self.warn.WarnContent = []
             self.history_create()
             self.query_info()
 
@@ -288,7 +294,6 @@ class BaseModel:
                         "CreateTime",
                         "ItemId",
                         "ItemType",
-                        "CreateUser",
                         "Format",
                         "History",
                         "MediaId",
@@ -306,7 +311,7 @@ class BaseModel:
 
         output_ctrl_dict["$_Is_Common"] = self.ctrl.Is_Common
         output_ctrl_dict["$_Is_OpenSource"] = self.ctrl.Is_OpenSource
-        output_ctrl_dict["$_IsShared"] = self.ctrl.Is_Shared
+        output_ctrl_dict["$_Is_Shared"] = self.ctrl.Is_Shared
         result = {
             "Ctrl": output_ctrl_dict,
             "Info": output_info_dict,
@@ -315,11 +320,10 @@ class BaseModel:
 
 
 class Error:
-    def __init__(self, content, _func_name, status, dev=False):
+    def __init__(self, content, _func_name, dev=False):
         self.content = content
         self._func = _func_name
         self.dev = dev
-        self.status = status
 
     def __bool__(self):
         return False

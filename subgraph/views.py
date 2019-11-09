@@ -1,6 +1,6 @@
 import json
 import re
-import typing
+from typing import List, Type
 
 from django.http import HttpResponse
 from django.core.exceptions import ObjectDoesNotExist
@@ -34,6 +34,11 @@ def query_field_type(field) -> str:
 
 
 def bulk_create_node(request):
+    """
+    用于excel创建节点
+    :param request:
+    :return:
+    """
     collector = NeoSet()
     data_list = json.loads(request.body)["data"]
     plabel = json.loads(request.body)["pLabel"]
@@ -51,7 +56,7 @@ def bulk_create_node(request):
         # 注入数据
         nodes = [node.base_node_create(data=data) for node, data in zip(nodes, data_list)]
         # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None
-        nodes: typing.List[BaseNode] = [node for node in nodes if node]
+        nodes: List[BaseNode] = [node for node in nodes if node]
         bulk_save_base_model(nodes, user_model, "node")
         collector.tx.commit()
 
@@ -171,10 +176,15 @@ def query_multi_media(request):
 
 
 def update_media_to_node(request):
+    """
+    update和remove都可以使用
+    :param request:
+    :return:
+    """
     data = json.loads(request.body.decode())
     user_id = request.GET.get('user_id')
     node = data['node']
-    media = data['media']
+    media: List[Type[str, int]] = data['media']
 
     remote_node = BaseNode(_id=node['_id'], user_id=user_id)
     result = remote_node.query_base()
@@ -184,13 +194,18 @@ def update_media_to_node(request):
         else:
             return HttpResponse(status=400, content=json.dumps(result.content))
     else:
-        remote_media = BaseMedia(_id=media['_id'], user_id=user_id)
-        media_result = remote_media.query_ctrl()
-        if media_result:
-            remote_node.info.IncludedMedia.append(remote_media.ctrl.ItemId)
-            return HttpResponse(status=200)
+        result = remote_node.media_setter(media)
+        if result:
+            if remote_node.warn_update:
+                remote_node.warn.save()
+                content = result
+            else:
+                content = []
+            remote_node.history.save()
+            remote_node.info.save()
+            return HttpResponse(status=200, content=json.dumps(content))
         else:
-            return HttpResponse(status=404, content='远端文件未找到， 稍后再试')
+            return HttpResponse(status=400, content=result.content)
 
 
 def type_label_to_class(_type, _label: str):

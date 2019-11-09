@@ -106,26 +106,13 @@ class UserConcern(models.Model):
     Is_Star = models.BooleanField(default=False)  # 是否收藏
     Is_Good = models.BooleanField(default=False)  # 是否点赞
     Is_Shared = models.BooleanField(default=False)  # 是否分享给别人
-    SpendTime = models.IntegerField(db_column="SpendTime", default=0)  # 花费的时间
+    Is_Bad = models.BooleanField(default=False)  # 是否点踩
 
     class Meta:
         indexes = [
             models.Index(fields=["SourceId", "SourceType"])
         ]
         db_table = "user_info_concern"
-
-
-# todo 用户进度记录 level: 2
-class UserDocProgress(models.Model):
-    UserId = models.BigIntegerField(db_column="UserId", db_index=True)
-    # 用户查看的专题
-    SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
-    SourceType = models.TextField(db_column="SourceType", db_index=True)
-    SpendTime = models.IntegerField(db_column="SpendTime")
-    LastPart = models.BigIntegerField(db_column="LastPart")  # 上次最后停在哪个位置
-
-    class Meta:
-        db_table = "user_info_progress"
 
 
 class UserDraft(models.Model):

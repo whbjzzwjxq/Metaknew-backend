@@ -152,27 +152,59 @@ class BaseNode(BaseModel):
     def main_pic_setter(self, media_name):
         """
         设置主图片
-        :param media_name:
+        :param media_name: media的储存路径
         :return:
         """
         media_manager = BaseMedia.oss_manager
+        self.query_warn()
+        if not self.is_create:
+            self.history_create()
+            self.history.Content['MainPic'] = self.info.MainPic
         if media_manager.object_exists(media_name):
             self.info.MainPic = media_name
+            return True
         else:
             warn = {"field": "MainPic", "warn_type": "empty_prop"}
             self.warn.WarnContent.append(warn)
-        return self
+            self.warn_update = True
+            return False
 
     def media_setter(self, media_list):
-        for media_id in media_list:
-            try:
-                record = MediaCtrl.objects.get(pk=media_id)
-                if record:
-                    self.info.IncludedMedia.append(media_id)
-            except ObjectDoesNotExist:
-                warn = {"field": "IncludeMedia", "warn_type": "media_not_exist" + media_id}
-                self.warn.WarnContent.append(warn)
-        return self
+        """
+        设置包含的媒体
+        :param media_list: list of media_id
+        :return: self
+        """
+        # todo 改写为add_media 所有人 和 media_setter 编辑权限
+        if self.user_id == self.ctrl.CreateUser:
+            available_media = []
+            warn = []
+            self.query_warn()
+            if not self.is_create:
+                self.history_create()
+                self.history.Content['IncludedMedia'] = self.info.IncludedMedia
+            for media_id in media_list:
+                _id = int(media_id)
+                if _id in self.info.IncludedMedia:
+                    available_media.append(_id)
+                else:
+                    try:
+                        record = MediaCtrl.objects.get(pk=_id)
+                        if record:
+                            available_media.append(_id)
+                    except ObjectDoesNotExist:
+                        warn.append(_id)
+            self.info.IncludedMedia = available_media
+
+            if warn:
+                add_warn = {"field": "IncludedMedia", "warn_type": "media_no_exist: " + str(warn)}
+                self.warn.WarnContent.append(add_warn)
+                self.warn_update = True
+                return warn
+            else:
+                return True
+        else:
+            return self.error_output(UnAuthorizationError, '没有编辑权限', strict=False)
 
     def graph_update(self, data):
         if not self.node:

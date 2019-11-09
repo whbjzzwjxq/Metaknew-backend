@@ -38,6 +38,7 @@ class BaseUser:
             "content": "登录成功",
             "token": token,
             "userName": self.user.UserName,
+            "userId": self.user.UserId,
             "fileToken": self.resource_auth_for_ali_oss()["Credentials"]
         }
         response = HttpResponse(json.dumps(result), content_type="application/json", status=200)
