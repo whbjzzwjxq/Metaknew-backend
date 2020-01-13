@@ -1,10 +1,7 @@
-from record.models import WarnRecord, ErrorRecord, SourceAddRecord, NodeVersionRecord
-
-warn_type = []
+from record.models import WarnRecord, SourceAddRecord
 
 
 class IdGenerationError(BaseException):
-    # todo id 生成异常 level: 2
     pass
 
 
@@ -12,22 +9,12 @@ class ObjectAlreadyExist(BaseException):
     pass
 
 
-def error_check(_func):
-    def wrapped(self, data):
-        try:
-            result = _func(self, data)
-            return result
-        except Exception as e:
-            name = type(e).__name__
-            EWRecord.add_error_record(user=self.user_id,
-                                      source_id=self.id,
-                                      source_label=self.p_label,
-                                      data=data,
-                                      bug_type=name)
-            return None
-            # todo 消息队列 level: 1
+class UnAuthorizationError(BaseException):
+    pass
 
-    return wrapped
+
+class RewriteMethodError(BaseException):
+    pass
 
 
 def field_check(_func):
@@ -76,18 +63,6 @@ class EWRecord:
     def query_by_props(self, key, value):
         self.record = self.record.filter({key: value})
         return self
-
-    @staticmethod
-    def add_error_record(user, source_id, source_label, data, bug_type):
-        record = ErrorRecord(
-            SourceId=source_id,
-            SourceLabel=source_label,
-            CreateUser=user,
-            OriginData=data,
-            BugType=bug_type)
-        record.save()
-        # todo 消息队列 level: 1
-        return record
 
     @staticmethod
     def add_warn_record(user, source_id, source_label, content):

@@ -36,7 +36,7 @@ def script_latin(request):
     file = open(path, "r", encoding="utf-8").read()
     lines = json.loads(file)
     nodes = [handle_data(line, user=user) for line in lines]
-    results = [BaseNode(collector=collector).create(node=node) for node in nodes]
+    results = [BaseNode(collector=collector).base_node_create(node=node) for node in nodes]
     collector.tx.commit()
     locations = get_locations()
     return HttpResponse("Success")

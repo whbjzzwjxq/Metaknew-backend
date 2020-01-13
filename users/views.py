@@ -233,3 +233,7 @@ def ali_dayu_api(actionName, signName, templateCode):
     alirequest.add_query_param("TemplateCode", templateCode)
 
     return alirequest
+
+
+def test(request):
+    return HttpResponse('test', status=200)

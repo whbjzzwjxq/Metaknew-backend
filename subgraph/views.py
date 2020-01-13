@@ -1,10 +1,10 @@
 import json
 import re
-import typing
+from typing import List, Type
 
 from django.http import HttpResponse
+from django.core.exceptions import ObjectDoesNotExist
 
-from document.class_document import DocGraphClass
 from es_module.logic_class import bulk_add_text_index
 from subgraph.class_link import BaseLink, SystemMade
 from subgraph.class_media import BaseMedia
@@ -34,6 +34,11 @@ def query_field_type(field) -> str:
 
 
 def bulk_create_node(request):
+    """
+    用于excel创建节点
+    :param request:
+    :return:
+    """
     collector = NeoSet()
     data_list = json.loads(request.body)["data"]
     plabel = json.loads(request.body)["pLabel"]
@@ -49,9 +54,9 @@ def bulk_create_node(request):
         # 创建node object
         nodes = [BaseNode(_id=_id, collector=collector, user_id=user_id) for _id in id_list]
         # 注入数据
-        nodes = [node.create(data=data) for node, data in zip(nodes, data_list)]
+        nodes = [node.base_node_create(data=data) for node, data in zip(nodes, data_list)]
         # 去除掉生成错误的节点 可以看create的装饰器 发生错误返回None
-        nodes: typing.List[BaseNode] = [node for node in nodes if node]
+        nodes: List[BaseNode] = [node for node in nodes if node]
         bulk_save_base_model(nodes, user_model, "node")
         collector.tx.commit()
 
@@ -72,9 +77,9 @@ def upload_media_by_user(request):
             'Name': '1.jpg',
             'Text': {},
             'Labels': [],
-            '$_IsCommon': True,
-            '$_IsShared': True,
-            '$_OpenSource': False
+            '$IsCommon': True,
+            '$IsShared': True,
+            '$OpenSource': False
         }
     }
     :param request:
@@ -84,9 +89,11 @@ def upload_media_by_user(request):
     user_id = request.GET.get("user_id")
     user_model = BaseUser(_id=user_id)
     file_data = json.loads(request.body.decode())
+    file_data["Info"]["remote_file"] = file_data["name"]
     _id = id_generator(number=1, method='node', jump=2)[0]
     media = BaseMedia(_id=_id, user_id=user_id, collector=collector)
-    media = media.create(data=file_data["Info"], remote_file=file_data["name"], is_user_made=True)
+    media = media.base_media_create(data=file_data["Info"])
+
     new_location = 'userResource/' + str(media.id) + "." + media.ctrl.Format
     result = media.move_remote_file(new_location)
     if result.status == 200:
@@ -116,15 +123,13 @@ def update_single_node_by_user(request):
     if re_for_old_id:
         new_id = id_generator(number=1, method='node')[0]
         item = model(_id=new_id, user_id=user_id, _type=info['type'], collector=collector)
-        if info['type'] == 'document':
-            item = item.node
-        item.create(data=info)
+        item.base_node_create(data=info)
         item.save()
         return HttpResponse(json.dumps({_id: new_id}), status=200)
     else:
         item = model(_id=_id, user_id=user_id, collector=collector)
         item.query_base()
-        if item.ctrl.CreateUser == user_id:
+        if item.ctrl.CreateUser == int(user_id):
             item.info_update(data=info)
             item.save()
             return HttpResponse(json.dumps({}), status=200)
@@ -146,12 +151,14 @@ def query_single_node(request):
 def query_multi_source(request):
     query_list = json.loads(request.body.decode())
     user_id = request.GET.get("user_id")
-    # todo 有时间改成map
     result = []
     for query in query_list:
         _type = query[1]
         p_label = query[2]
-        model = type_label_to_class(_type, p_label)
+        if _type == 'node' or _type == 'link':
+            model = type_label_to_class(_type, p_label)
+        else:
+            model = type_label_to_class(_type, 'unknown')
         output = model(_id=query[0], user_id=user_id)
         output.query_base()
         result.append(output.handle_for_frontend())
@@ -171,7 +178,46 @@ def query_multi_media(request):
     return HttpResponse(json.dumps(result, cls=DateTimeEncoder), status=200)
 
 
+def update_media_to_node(request):
+    """
+    update和remove都可以使用
+    :param request:
+    :return:
+    """
+    data = json.loads(request.body.decode())
+    user_id = request.GET.get('user_id')
+    node = data['node']
+    media: List[Type[str, int]] = data['media']
+
+    remote_node = BaseNode(_id=node['_id'], user_id=user_id)
+    result = remote_node.query_base()
+    if not result:
+        if result.dev:
+            return HttpResponse(status=400)
+        else:
+            return HttpResponse(status=400, content=json.dumps(result.content))
+    else:
+        result = remote_node.media_setter(media)
+        if result:
+            if remote_node.warn_update:
+                remote_node.warn.save()
+                content = result
+            else:
+                content = []
+            remote_node.history.save()
+            remote_node.info.save()
+            return HttpResponse(status=200, content=json.dumps(content))
+        else:
+            return HttpResponse(status=400, content=result.content)
+
+
 def type_label_to_class(_type, _label: str):
+    """
+    注意document return的是node内容
+    :param _type:
+    :param _label:
+    :return:
+    """
     _type_to_class = {
         "node": {
             'default': BaseNode
@@ -187,8 +233,8 @@ def type_label_to_class(_type, _label: str):
             "VisitAfter": SystemMade,
         },
         "document": {
-            "default": DocGraphClass,
-            "DocPaper": DocGraphClass  # todo
+            "default": BaseNode,
+            "DocPaper": BaseNode  # todo
         }
     }
     model_list = _type_to_class[_type]

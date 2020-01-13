@@ -1,17 +1,18 @@
 import mimetypes
-from datetime import datetime, timezone
 
 import oss2
+from django.core.exceptions import ObjectDoesNotExist
+from py2neo.data import Node as NeoNode
 
 from es_module.logic_class import bulk_add_text_index
-from subgraph.models import MediaCtrl
+from record.logic_class import UnAuthorizationError
+from subgraph.class_base import BaseModel
 from tools import base_tools
 from tools.aliyun import authorityKeys
-from tools.base_tools import ErrorContent, neo4j_create_node
 from tools.redis_process import mime_type_query, mime_type_set
 
 
-class BaseMedia(base_tools.BaseModel):
+class BaseMedia(BaseModel):
     access_key_id = authorityKeys["developer"]["access_key_id"]
     access_key_secret = authorityKeys["developer"]["access_key_secret"]
     bucket_name = authorityKeys["developer"]["bucket_name"]
@@ -21,83 +22,113 @@ class BaseMedia(base_tools.BaseModel):
 
     def __init__(self, _id: int, user_id: int, _type="media", collector=base_tools.NeoSet()):
         super().__init__(_id, user_id, _type, collector)
-        self.p_label = "unknown"
-        self.is_create = False
 
-    # remake 2019-10-17 2019-10-20
-    def create(self, data: dict, remote_file: str, is_user_made):
+    def query_node(self):
+        if self.type != "link":
+            self.node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
+            if not self.node:
+                self.error_output(ObjectDoesNotExist, 'NeoNode不存在，可能是没有保存')
+        else:
+            self.error_output(TypeError, '异常调用')
+
+    # ---------------- create ----------------
+    # remake 2019-11-1
+    def create(self, data):
+        """
+        别名
+        :param data:
+        :return:
+        """
+        return self.base_media_create(data)
+
+    def base_media_create(self, data: dict):
+        remote_file = data['remote_file']
         self.is_create = True
         self.p_label = data["PrimaryLabel"]
-        self.ctrl_create(remote_file, is_user_made)
-        self.info_create(data)
-        if data["Text"]:
-            self.info.Text = data["Text"]
-        else:
-            self.info.Text = {"auto": ""}
-
-        self.node = neo4j_create_node(
-            labels=data["Labels"],
-            _id=self.id,
-            _type=self.type,
-            plabel=self.p_label,
-            props={"Name": data["Name"]},
-            collector=self.collector
-        )
-        self.collector.tx.create(self.node)
-        self.auth_create(data=data)
-        return self
-
-    def info_create(self, data):
-        self.info = base_tools.media_init(self.p_label)()
-        self.info.PrimaryLabel = self.p_label
-        self.info.MediaId = self.id
+        self._ctrl_create()
+        self._info_create()
+        self.__node_create()
         self.info_update(data)
+        self.ctrl_update_by_user(data, remote_file)
         return self
 
-    def ctrl_create(self, remote_file, is_user_made):
-        # 注意这里还是写了文件位置的 之后可以移动文件位置
-        self.ctrl = MediaCtrl(
-            MediaId=self.id,
-            FileName=remote_file,
-            CreateUser=self.user_id,
-            Format=remote_file.split(".")[1],
-            Is_UserMade=is_user_made,
-            CountCacheTime=datetime.now(tz=timezone.utc).replace(microsecond=0),
-            PrimaryLabel=self.p_label
-        )
+    def __node_create(self):
+        node = NeoNode(self.p_label)
+        node["_id"] = self.id
+        node["_type"] = self.type
+        node["_label"] = self.p_label
+        node.__primarylabel__ = self.p_label
+        node.__primarykey__ = "_id"
+        node.__primaryvalue__ = self.id
+        self.node = node
+        self.collector.tx.create(self.node)
 
-    def update(self, data, remote_name, user_id) -> ErrorContent:
-        """
+    # ---------------- update ----------------
 
-        :param data: 前端的Info
-        :param remote_name: 远端的文件名 主要是修改文件之后文件名会变化
-        :param user_id: 请求者id
-        :return: ErrorContent
+    def ctrl_update_by_user(self, data, remote_file):
         """
-        # todo 更加详细的权限管理
-        if self.ctrl.CreateUser == user_id:
-            if remote_name == self.ctrl.FileName:
-                self.info_update(data)
-            else:
-                if self.oss_manager.object_exists(remote_name):
-                    history = {
-                        "FileName": self.ctrl.FileName,
-                        "UpdateTime": datetime.now(),
-                        "Info": data
-                    }
-                    self.ctrl.History.append(history)
-                    self.ctrl.FileName = remote_name
-                    self.ctrl.Format = remote_name.split(".")[1]
-                    self.info_update(data)
+        用户能改变权限和文件位置 放在history初始化之后进行
+        :param data:
+        :param remote_file:
+        :return:
+        """
+        auth_ctrl_props = ['Is_Common', 'Is_Used', 'Is_Shared', 'Is_OpenSource']
+        if self.ctrl.CreateUser == self.user_id:
+            for prop in auth_ctrl_props:
+                if '$_' + prop in data:
+                    setattr(self.ctrl, prop, data['$_' + prop])
                 else:
-                    return ErrorContent(status=400, state=False, reason='NewFile Dos not Exist')
+                    pass
+            if self.ctrl.FileName != remote_file:
+                if self.oss_manager.object_exists(remote_file):
+                    self._history_update('FileName', self.ctrl.FileName)
+                    self.ctrl.FileName = remote_file
+                    self.ctrl.Format = remote_file.split('.')[1]
+                else:
+                    self.error_output(FileNotFoundError, '远端服务器没有文件')
         else:
-            return ErrorContent(status=401, state=False, reason='UnAuthorization')
+            self.error_output(UnAuthorizationError, '没有权限')
+
+    def info_special_update(self, data):
+        """
+        特别update过程 暂时
+        :param data:
+        :return:
+        """
+        pass
+
+    def graph_update(self, data):
+        if not self.node:
+            self.query_node()
+
+        # 更新info
+        neo_prop = {
+            "Name": self.info.Name,
+        }
+        self.node.update(neo_prop)
+
+        # 更新ctrl
+        ctrl_list = ['Is_Used', 'Is_Common', 'Is_UserMade']
+        for label in ctrl_list:
+            ctrl_value = getattr(self.ctrl, label)
+            if ctrl_value:
+                self.node.add_label(label)
+            else:
+                if self.node.has_label(label):
+                    self.node.remove_label(label)
+
+        # 更新labels
+        self.node.update_labels(self.info.Labels)
+        self.collector.tx.push(self.node)
+    # ---------------- function ----------------
 
     def save(self):
         self.info.save()
         self.ctrl.save()
-        self.authority.save()
+        if self.history:
+            self.history.save()
+        if self.warn.WarnContent:
+            self.warn.save()
         self.collector.tx.commit()
         bulk_add_text_index([self])
 

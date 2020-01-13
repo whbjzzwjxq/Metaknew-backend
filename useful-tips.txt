@@ -21,6 +21,8 @@ es : 7000
 kibana : 7001
 aliyun: 7010
 postgre: 7011
+product: 8000
+dev: 8004
 
 
 //redis

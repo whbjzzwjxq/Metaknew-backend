@@ -1,6 +1,18 @@
 from elasticsearch import Elasticsearch, helpers
+import langdetect
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
+
+
+def language_detect(text):
+    lang = langdetect.detect(text)
+    if lang == 'zh_cn' or lang == 'zh_tw':
+        lang = 'zh'
+    elif lang == 'en':
+        lang = 'en'
+    else:
+        lang = 'auto'
+    return lang
 
 
 #  todo 加入评分 level: 3
@@ -17,19 +29,36 @@ class EsQuery:
         return self.es.search(index=index, body=query_body)
 
     def main(self, query_object):
-        labels = query_object["labels"]
+        body_list = []
+        labels = [label.lower() for label in query_object["labels"]]
         props = query_object["props"]
         keyword = query_object["keyword"]
-        active_types = [_type for _type in self._types if _type in labels]
-        body_list = [
-            self.fuzzy_query_body(keyword, 'auto'),
-            self.fuzzy_alias_body(keyword)
-        ]
-        # todo 详细的搜索引擎 level: 1
+
+        # name-alias
+        if 'language' in query_object:
+            language = query_object["language"]
+        else:
+            language = language_detect(keyword)
+
+        body_list.append(self.name_match_body(keyword, language))
+
+        # type
+        active_types = []
+        for _type in self._types:
+            if _type in labels:
+                active_types.append(_type)
+                labels.remove(_type)
+        if active_types:
+            body_list.append(self.type_match_body(active_types))
+
+        # label topic
+        if labels:
+            body_list.append(self.label_boost_body(labels))
+
         dis_max_body = {
             "dis_max": {
                 "queries": body_list,
-                "tie_breaker": 0.5
+                "tie_breaker": 0.7
             }
         }
         result = self.query(body=dis_max_body, index="nodes")
@@ -40,6 +69,25 @@ class EsQuery:
         should = [{"term": {"type": _type}} for _type in _types]
         body = {
             "should": should
+        }
+        return body
+
+    @staticmethod
+    def name_match_body(keyword, language):
+        if language == 'auto':
+            fields = ["Name_auto", "Name_auto.total",
+                      "Alias"]
+        else:
+            fields = ["Name_auto", "Name_auto.total",
+                      'Name_%s' % language, 'Name_%s.total' % language,
+                      "Alias"]
+        body = {
+            "multi_match": {
+                "query": keyword,
+                "fields": fields,
+                "type": "best_fields",
+                "tie_breaker": 0.7
+            }
         }
         return body
 
@@ -75,7 +123,13 @@ class EsQuery:
 
     @staticmethod
     def label_boost_body(labels):
-        pass
+        body = {
+            'terms': {
+                "Labels": labels,
+                "boost": 2
+            }
+        }
+        return body
 
     @staticmethod
     def get_info_from_result(es_result):
@@ -88,6 +142,12 @@ class EsQuery:
 
 
 def bulk_add_node_index(nodes):
+    """
+    调用了is_create
+    :param nodes:
+    :return:
+    """
+
     def index_nodes():
         for node in nodes:
             body = node.node_index()
@@ -108,6 +168,12 @@ def bulk_add_node_index(nodes):
 
 
 def bulk_add_text_index(nodes):
+    """
+    调用了is_create
+    :param nodes:
+    :return:
+    """
+
     def index_texts():
         for node in nodes:
             body = node.text_index()

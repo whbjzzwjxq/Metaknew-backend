@@ -85,7 +85,7 @@ def id_generator(number, method, jump=3) -> typing.List[int]:
 
 
 def new_block(manager):
-    block = manager.objects.create(RegisterDevice=device_id)
+    block = manager.objects.base_node_create(RegisterDevice=device_id)
     block.save()
     return block
 

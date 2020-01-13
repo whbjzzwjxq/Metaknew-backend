@@ -2,7 +2,6 @@ from django.http import HttpResponse, HttpRequest
 from tools.redis_process import *
 from users.logic_class import BaseGroup
 from functools import reduce
-from subgraph.models import BaseAuthority
 import re
 
 
@@ -194,7 +193,7 @@ class AuthMiddleware:
         :return: (bool, str)
         """
         method = _checker["method"]
-        record = BaseAuthority.objects.filter(SourceId=_id)
+        record = []
         if len(record) == 0:
             self.__anti_spider()
             return HttpResponse(status=404)

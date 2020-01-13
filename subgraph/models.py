@@ -1,8 +1,9 @@
-from django.contrib.postgres.fields import ArrayField, JSONField, HStoreField
+from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
-from users.models import User
 from django.utils.timezone import now
+
 from tools.models import LevelField, TopicField, HotField, NameField, TranslateField, TimeField, LocationField
+from users.models import User
 
 
 # 将可能的模板写在前面
@@ -16,25 +17,49 @@ def feature_vector():
             "label_embedding": []}
 
 
+# ----------------用户权限----------------
+
+# 原则:
+# 1 Common=False的Source 不暴露id和内容
+# 2 Used=False的Source 拦截所有API
+# 3 只有Owner才可以delete
+# 4 ChangeState 是指可以改变状态的用户，拥有除了Delete外的全部权限
+# 5 Collaborator 是指可以完全操作的用户
+# 5 SharedTo 是指可以进行查询级别操作的用户
+
+
+class ItemCtrl(models.Model):
+    ItemId = models.BigIntegerField(primary_key=True, editable=False)
+    ItemType = models.TextField(db_index=True)  # Item的Type
+    PrimaryLabel = models.TextField(db_index=True)  # 主标签
+    Is_Used = models.BooleanField(db_index=True, default=True)  # 是否还在使用
+    Is_UserMade = models.BooleanField(db_index=True, default=True)  # 是否是用户新建的
+    CreateTime = models.DateField(auto_now_add=True, editable=False)  # 创建时间
+    CreateUser = models.BigIntegerField(default=1, editable=False)  # 创建用户
+    Is_Common = models.BooleanField(default=True)  # 是否公开
+    Is_Shared = models.BooleanField(default=False)  # 是否分享
+    Is_OpenSource = models.BooleanField(default=False)  # 是否公开编辑
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["Is_Used", "Is_Common"])
+        ]
+        abstract = True
+
+
 # remake 20191017
-class NodeCtrl(models.Model):
-    NodeId = models.BigIntegerField(primary_key=True, editable=False)
-    Is_Used = models.BooleanField(default=True)
+class NodeCtrl(ItemCtrl):
     # 不传回的控制性内容
+    ItemType = models.TextField(default='node')  # Item的Type
     CountCacheTime = models.DateTimeField(db_column="CacheTime", default=now)  # 最后统计的时间
-    Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
     ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")  # 导入方式
-    CreateTime = models.DateField(db_column="CreateTime", auto_now_add=True, editable=False)  # 创建时间
-    # 直接传回的内容
-    CreateUser = models.BigIntegerField(db_column="CreateUser", default="0", editable=False)  # 创建用户
-    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
-    PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签 注意干燥
 
     # 有意义的评价
     Imp = LevelField()  # 重要度
     HardLevel = LevelField()  # 难易度
     Useful = LevelField()  # 有用的程度
     Star = models.IntegerField(default=0)  # 收藏数量
+    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
 
     # 简易的评价
     IsGood = models.IntegerField(default=0)
@@ -56,7 +81,7 @@ class NodeCtrl(models.Model):
 
 # remake 20191017
 class NodeInfo(models.Model):
-    NodeId = models.BigIntegerField(primary_key=True, editable=False)
+    ItemId = models.BigIntegerField(primary_key=True, editable=False)
     PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
     MainPic = models.TextField(default="")  # 缩略图/主要图片, 注意储存的是url
     IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
@@ -132,19 +157,13 @@ class NodeNormal(NodeInfo):
         db_table = "graph_node_normal"
 
 
-class MediaCtrl(models.Model):
-    MediaId = models.BigIntegerField(primary_key=True)
-    Is_Used = models.BooleanField(default=True)
-    Is_UserMade = models.BooleanField(db_column="UserMade", db_index=True)  # 是否是用户新建的
-    FileName = models.TextField(db_column="Name")  # 储存在阿里云OSS里的Name
+class MediaCtrl(ItemCtrl):
+    ItemType = models.TextField(default='media')  # Item的Type
+    FileName = models.TextField()  # 储存在阿里云OSS里的Name
     Format = models.TextField(db_column="Format", db_index=True)  # 储存在阿里云OSS里的format
     # 控制属性
-    History = ArrayField(HStoreField(), default=list)  # 储存历史文件名
-    CreateUser = models.BigIntegerField()
-    UploadTime = models.DateTimeField(db_column="UploadTime", auto_now_add=True)
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
     TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间 主要是给音频和视频用的
-    PrimaryLabel = models.TextField(db_index=True, default='')
     # 缩略图
     Thumb = models.TextField(default="")
     # 用户相关
@@ -159,7 +178,7 @@ class MediaCtrl(models.Model):
 
 
 class MediaInfo(models.Model):
-    MediaId = models.BigIntegerField(primary_key=True)
+    ItemId = models.BigIntegerField(primary_key=True)
     Name = models.TextField(db_index=True, default="NewMedia")
     Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
     Text = TranslateField()
@@ -198,7 +217,7 @@ class Video(MediaInfo):
 
 # remake 2019-10-17
 class Fragment(models.Model):
-    NodeId = models.BigIntegerField(primary_key=True)
+    ItemId = models.BigIntegerField(primary_key=True)
     Labels = ArrayField(models.TextField(), default=list)
     Content = ArrayField(models.TextField(), default=list)  # 少于16个字符作为Keyword处理
     ExtraProps = JSONField(default=dict)  # 主要是NLP识别用
@@ -212,19 +231,15 @@ class Fragment(models.Model):
 
 
 # remake 2019-10-17 2019-10-20
-class RelationshipCtrl(models.Model):
-    LinkId = models.BigIntegerField(primary_key=True)
-    Is_Used = models.BooleanField(default=True)
-    PrimaryLabel = models.TextField(db_index=True)
-    Start = models.BigIntegerField(db_column="Start", db_index=True)
-    End = models.BigIntegerField(db_column="End", db_index=True)
-    StartType = models.TextField(db_index=True)
-    EndType = models.TextField(db_index=True)
-    StartPLabel = models.TextField(db_index=True)
-    EndPLabel = models.TextField(db_index=True)
-    Is_UserMade = models.BooleanField(db_column="Is_UserMade", db_index=True, default=True)
-    CreateUser = models.BigIntegerField(db_column="CreatorId", db_index=True, default=0)
-    CreateTime = models.DateTimeField(db_column="CreateTime", auto_now_add=True)
+class RelationshipCtrl(ItemCtrl):
+    ItemType = models.TextField(default='link')  # Item的Type
+
+    Start = models.BigIntegerField(db_index=True)
+    End = models.BigIntegerField(db_index=True)
+    StartType = models.TextField()
+    EndType = models.TextField()
+    StartPLabel = models.TextField()
+    EndPLabel = models.TextField()
 
     class Meta:
         indexes = [
@@ -242,7 +257,7 @@ class RelationshipCtrl(models.Model):
 
 
 class RelationshipInfo(models.Model):
-    LinkId = models.BigIntegerField(primary_key=True)
+    ItemId = models.BigIntegerField(primary_key=True)
     PrimaryLabel = models.TextField(db_index=True)
 
     class Meta:
@@ -283,39 +298,3 @@ class KnowLedge(RelationshipInfo):
 
     class Meta:
         db_table = "graph_link_knowledge"
-
-
-# ----------------用户权限----------------
-
-# 原则:
-# 1 Common=False的Source 不暴露id和内容
-# 2 Used=False的Source 拦截所有API
-# 3 只有Owner才可以delete
-# 4 ChangeState 是指可以改变状态的用户，拥有除了Delete外的全部权限
-# 5 Collaborator 是指可以完全操作的用户
-# 5 SharedTo 是指可以进行查询级别操作的用户
-
-
-# done 07-22 remake 2019-10-21
-# 控制主题
-
-
-class BaseAuthority(models.Model):
-    SourceId = models.BigIntegerField(primary_key=True)  # 资源id
-    SourceType = models.TextField(db_index=True)
-    # 状态
-    Used = models.BooleanField(db_column="used", default=True)
-    Common = models.BooleanField(db_column="common", default=True)
-    Shared = models.BooleanField(db_column="shared", default=False)
-    OpenSource = models.BooleanField(db_column="open", default=False)
-
-    # 暂时默认
-    Payment = models.BooleanField(db_column="payment", default=False)
-    Vip = models.BooleanField(db_column="vip", default=False)
-    HighVip = models.BooleanField(db_column="high_vip", default=False)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["Used", "Common"])
-        ]
-        db_table = "graph_authority"

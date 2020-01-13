@@ -1,29 +1,21 @@
 import json
-from datetime import datetime, timezone
-from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max
+from py2neo.data import Node as NeoNode
 
-from es_module.logic_class import bulk_add_node_index
-from record.logic_class import error_check
-from record.models import WarnRecord, NodeVersionRecord
+from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
+from record.logic_class import UnAuthorizationError
+from subgraph.class_base import BaseModel
 from subgraph.class_media import BaseMedia
-from subgraph.models import NodeCtrl, MediaCtrl
+from subgraph.models import MediaCtrl
 from tools import base_tools
-from tools.base_tools import neo4j_create_node
+from tools.redis_process import get_user_name
 
 
-class BaseNode(base_tools.BaseModel):
+class BaseNode(BaseModel):
 
     def __init__(self, _id: int, user_id: int, _type='node', collector=base_tools.NeoSet()):
-
-        # 以下是模型
         super().__init__(_id, user_id, _type, collector)
-
-        self.warn: Optional[WarnRecord] = None
-        self.loading_history: Optional[NodeVersionRecord] = None
-        self.history = NodeVersionRecord.objects.none()
 
     # ----------------- query ----------------
 
@@ -38,137 +30,209 @@ class BaseNode(base_tools.BaseModel):
             self.query_history()
         return self
 
-    def query_with_label(self, p_label):
-        """
-        带有主标签的查询
-        :param p_label:
-        :return:
-        """
-        ctrl_set = NodeCtrl.objects.filter(PrimaryLabel=p_label)
-        try:
-            self.ctrl = ctrl_set.objects.get(pk=self.id)
-            self.p_label = self.ctrl.PrimaryLabel
-            self.__query_info()
-            return self
-        except ObjectDoesNotExist:
-            return None
-
-    def query_history(self):
-        self.history = NodeVersionRecord.objects.filter(SourceId=self.id)
-        if len(self.history) == 0:
-            self.lack.append("history")
+    def query_node(self):
+        if self.type != "link":
+            self.node = self.collector.Nmatcher.match(self.p_label, _id=self.id).first()
+            if not self.node:
+                self.error_output(ObjectDoesNotExist, 'NeoNode不存在，可能是没有保存')
+        else:
+            self.error_output(TypeError, '异常调用')
 
     # ---------------- create ----------------
-    # @error_check
     def create(self, data):
-        self.is_draft = False
+        """
+        别名
+        :param data: info
+        :return:
+        """
+        return self.base_node_create(data)
+
+    def base_node_create(self, data):
         self.is_create = True
         assert "Name" in data
         assert "PrimaryLabel" in data
         self.p_label = data["PrimaryLabel"]
-        self.__history_create(data=data)  # done 09-05
-
-        self.__ctrl_create(data=data)  # done 09-10
-        self.__info_create(data=data)  # done 09-10
-        self.name_checker()  # done 09-13
-        self.auth_create(data=data)  # done 09-10
-        props = {
-            "Name": data["Name"],
-            "Imp": data["BaseImp"],
-            "HardLevel": data["BaseHardLevel"]
-        }
-        self.node = neo4j_create_node(
-            labels=data["Labels"] + data["Topic"],
-            _id=self.id,
-            _type=self.type,
-            plabel=self.p_label,
-            props=props,
-            is_user_made=self.is_user_made,
-            is_common=data["$_IsCommon"],
-            collector=self.collector)
-        self.collector.tx.create(self.node)
-        return self
-
-    # ---------------- __private_create ----------------
-    def __info_create(self, data):
-        """
-        info创建过程
-        :param data:
-        :return:
-        """
-        # 初始化
-        self.info = base_tools.node_init(self.p_label)()
-        self.info.NodeId = self.id
-        self.info.PrimaryLabel = self.p_label
-        if type(data["MainPic"]) == str and data["MainPic"] != " ":
-            self.main_pic_setter(data["MainPic"])
-        if data["IncludedMedia"]:
-            self.media_setter(data["IncludedMedia"])
-
-        # update其他数据
+        self._ctrl_create()
+        self.ctrl_update_by_user(data)
+        self._info_create()
+        self.__node_create()
         self.info_update(data)
         return self
 
-    # 设置控制信息 done
-    def __ctrl_create(self, data):
-        if self.is_user_made:
-            contributor = {"create": "system", "update": []}
-        else:
-            contributor = {"create": "", "update": []}
-        self.ctrl = NodeCtrl(
-            NodeId=self.id,
-            CountCacheTime=datetime.now(tz=timezone.utc).replace(microsecond=0),
-            Is_UserMade=self.is_user_made,
-            CreateUser=self.user_id,
-            PrimaryLabel=self.p_label,
-            Contributor=contributor
-        )
+    def __node_create(self):
+        node = NeoNode(self.p_label)
+        node["_id"] = self.id
+        node["_type"] = self.type
+        node["_label"] = self.p_label
+        node.__primarylabel__ = self.p_label
+        node.__primarykey__ = "_id"
+        node.__primaryvalue__ = self.id
+        self.node = node
+        self.collector.tx.create(self.node)
 
-    def __history_create(self, data):
-        if self.is_create:
-            version_id = 1
-        else:
-            self.query_history()
-            version_id = self.history.aggregate(Max("VersionId"))
-            version_id += 1
-        self.loading_history = NodeVersionRecord(VersionId=version_id,
-                                                 SourceId=self.id,
-                                                 SourceType=self.p_label,
-                                                 CreateUser=self.user_id,
-                                                 Name=data["Name"],
-                                                 Content=data,
-                                                 Is_Draft=self.is_draft
-                                                 )
+    # ---------------- update ----------------
 
-    def name_checker(self):
+    def ctrl_update_by_user(self, ctrl):
+        """
+        用户能够改变权限的信息
+        :param ctrl: ctrl
+        :return:
+        """
+        auth_ctrl_props = ['Is_Common', 'Is_Used', 'Is_Shared', 'Is_OpenSource']
+        if self.ctrl.CreateUser == self.user_id:
+            for prop in auth_ctrl_props:
+                if '$_' + prop in ctrl:
+                    setattr(self.ctrl, prop, ctrl['$_' + prop])
+                else:
+                    pass
+            # 更新contributor
+            if self.is_create:
+                self.ctrl.Contributor = {"create": "", "update": []}
+                if self.is_user_made:
+                    self.ctrl.Contributor['create'] = get_user_name(self.user_id)
+                else:
+                    self.ctrl.Contributor['create'] = 'system'
+            else:
+                if self.is_user_made:
+                    name = get_user_name(self.user_id)
+                    if name not in self.ctrl.Contributor['update']:
+                        self.ctrl.Contributor['update'].append(name)
+                    else:
+                        pass
+                else:
+                    pass
+        else:
+            self.error_output(UnAuthorizationError, '没有权限')
+
+    def info_special_update(self, data):
+        """
+        特殊的更新内容
+        :param data: Info
+        :return:
+        """
+        if type(data["MainPic"]) == str:
+            self.main_pic_setter(data["MainPic"])
+        if data["IncludedMedia"]:
+            self.media_setter(data["IncludedMedia"])
+        self.name_checker(name=data['Name'])
+        self.name_lang_rewrite(data)
+
+    @staticmethod
+    def name_lang_rewrite(data):
+        """
+        重写一下语言配置 现在有点混乱
+        :param data:
+        :return:
+        """
+        trans = data['Translate']
+        name = data['Name']
+        lang = data['Language']
+        if not lang or lang == 'auto':
+            compute_lang = base_tools.language_detect(name)
+            data['Language'] = compute_lang
+            if compute_lang not in trans and compute_lang != 'auto':
+                trans[compute_lang] = name
+        else:
+            if lang in trans:
+                pass
+            else:
+                trans[lang] = name
+
+    def name_checker(self, name):
         """
         查询是否有类似名字的节点
         :return:
         """
-        similar_node = base_tools.node_init(self.p_label).objects.filter(Name=self.info.Name)
+        similar_node = base_tools.node_init(self.p_label).objects.filter(Name=name)
         if len(similar_node) > 0:
-            warn = {"field": "Name",
-                    "warn_type": "similar_node_id" + json.dumps([node.NodeId for node in similar_node])}
+            name_list = json.dumps([node.ItemId for node in similar_node])
+            warn = {"field": "Name", "warn_type": "similar_node" + name_list}
             self.warn.WarnContent.append(warn)
 
     def main_pic_setter(self, media_name):
+        """
+        设置主图片
+        :param media_name: media的储存路径
+        :return:
+        """
         media_manager = BaseMedia.oss_manager
+        self.query_warn()
+        if not self.is_create:
+            self.history_create()
+            self.history.Content['MainPic'] = self.info.MainPic
         if media_manager.object_exists(media_name):
             self.info.MainPic = media_name
+            return True
         else:
             warn = {"field": "MainPic", "warn_type": "empty_prop"}
             self.warn.WarnContent.append(warn)
-        return self
+            self.warn_update = True
+            return False
 
     def media_setter(self, media_list):
-        for media_id in media_list:
-            try:
-                record = MediaCtrl.objects.get(pk=media_id)
-                if record:
-                    self.info.IncludedMedia.append(media_id)
-            except ObjectDoesNotExist:
-                pass
-        return self
+        """
+        设置包含的媒体
+        :param media_list: list of media_id
+        :return: self
+        """
+        # todo 改写为add_media 所有人 和 media_setter 编辑权限
+        if self.user_id == self.ctrl.CreateUser:
+            available_media = []
+            warn = []
+            self.query_warn()
+            if not self.is_create:
+                self.history_create()
+                self.history.Content['IncludedMedia'] = self.info.IncludedMedia
+            for media_id in media_list:
+                _id = int(media_id)
+                if _id in self.info.IncludedMedia:
+                    available_media.append(_id)
+                else:
+                    try:
+                        record = MediaCtrl.objects.get(pk=_id)
+                        if record:
+                            available_media.append(_id)
+                    except ObjectDoesNotExist:
+                        warn.append(_id)
+            self.info.IncludedMedia = available_media
+
+            if warn:
+                add_warn = {"field": "IncludedMedia", "warn_type": "media_no_exist: " + str(warn)}
+                self.warn.WarnContent.append(add_warn)
+                self.warn_update = True
+                return warn
+            else:
+                return True
+        else:
+            return self.error_output(UnAuthorizationError, '没有编辑权限', strict=False)
+
+    def graph_update(self, data):
+        if not self.node:
+            self.query_node()
+
+        # 更新info
+        neo_prop = {
+            "Name": self.info.Name,
+            "Imp": self.info.BaseImp,
+            "HardLevel": self.info.BaseHardLevel
+        }
+        self.node.update(neo_prop)
+
+        # 更新ctrl
+        ctrl_list = ['Is_Used', 'Is_Common', 'Is_UserMade']
+        for label in ctrl_list:
+            ctrl_value = getattr(self.ctrl, label)
+            if ctrl_value:
+                self.node.add_label(label)
+            else:
+                if self.node.has_label(label):
+                    self.node.remove_label(label)
+
+        # 更新labels
+        self.node.update_labels(self.info.Labels)
+        self.collector.tx.push(self.node)
+
+    # ---------------- function ----------------
 
     def delete(self):
         # todo 节点删除 level: 2
@@ -189,29 +253,34 @@ class BaseNode(base_tools.BaseModel):
         """
         self.ctrl.save()
         self.info.save()
-        self.authority.save()
-        self.loading_history.save()
-        self.warn.save()
+        if self.history:
+            self.history.save()
+        if self.warn.WarnContent:
+            self.warn.save()
+        self.collector.tx.commit()
+        bulk_add_text_index([self])
         bulk_add_node_index([self])
 
     def node_index(self):
         ctrl = self.ctrl
         info = self.info
+        if not info.Language:
+            lang = 'auto'
+        else:
+            lang = info.Language
         body = {
             "id": self.id,
             "type": self.type,
+            "PrimaryLabel": ctrl.PrimaryLabel,
+            "Language": lang,
             "CreateUser": ctrl.CreateUser,
             "UpdateTime": ctrl.UpdateTime,
-            "Language": info.Language,
             "MainPic": info.MainPic,
-            "Name": {
-                "zh": "",
-                "en": "",
-                "auto": info.Name
-            },
+            "Alias": info.Alias,
+            "Name_zh": "",
+            "Name_en": "",
+            "Name_auto": info.Name,
             "Tags": {
-                "PrimaryLabel": info.PrimaryLabel,
-                "Alias": info.Alias,
                 "Labels": info.Labels,
                 "Topic": info.Topic
             },
@@ -222,13 +291,13 @@ class BaseNode(base_tools.BaseModel):
                 "Star": ctrl.Star,
                 "Hot": ctrl.Hot,
                 "TotalTime": ctrl.TotalTime
-            }
+            },
+            "Is_Used": ctrl.Is_Used,
+            "Is_Common": ctrl.Is_Common,
+            "Is_OpenSource": ctrl.Is_OpenSource
         }
-        for lang in body["Name"]:
+        for lang in ['zh', 'en']:
             if lang in info.Translate:
-                body["Name"][lang] = info.Translate[lang]
+                body["Name_%s" % lang] = info.Translate[lang]
 
         return body
-
-    def output_table_create(self):
-        return self.ctrl, self.info, self.authority, self.warn, self.loading_history

@@ -41,7 +41,7 @@ class DocGraphClass:
         self.user_id = int(user_id)
         self.id = int(_id)
         self.collector = collector
-        self.node: Optional[BaseNode] = None
+        self.base_node: Optional[BaseNode] = None
         self.graph: Optional[DocGraph] = None
         self.container: [DocGraph, GraphVersionRecord] = None
         self.new_history: Optional[GraphVersionRecord] = None
@@ -56,12 +56,16 @@ class DocGraphClass:
         self.doc_to_node_links = []  # 缓存容器
 
     def query_base(self):
-        self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
-        result = self.node.query_base()
-        self.node.query_node()
+        self.base_node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
+        result = self.base_node.query_base()
+        self.base_node.query_node()
         if result:
-            self.graph = DocGraph.objects.get(DocId=self.id)
-            return True
+            try:
+                self.graph = DocGraph.objects.get(DocId=self.id)
+                return self
+            except ObjectDoesNotExist:
+                self.graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Conf={})
+                return self
         else:
             return False
 
@@ -77,7 +81,7 @@ class DocGraphClass:
     def graph_create(self, data):
         self.old_id = data["id"]
         self.graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Conf={})
-        self.node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
+        self.base_node = BaseNode(_id=self.id, user_id=self.user_id, _type='document', collector=self.collector)
         self.update_nodes_links_info(data)
         self.container = self.graph
         self.update_doc_to_node(data)
@@ -154,26 +158,27 @@ class DocGraphClass:
                 add_node_list.append(node)
         for node in self.graph.Nodes:
             if node["_id"] not in new_node_id_list:
-                remove_node_list.append(node)
+                neo_node = self.collector.Nmatcher.match(node['_label'], _id=node['_id']).first()
+                remove_node_list.append(neo_node)
         link_id_list = id_generator(number=len(add_node_list), method='link', jump=2)
         for (index, node) in enumerate(add_node_list):
             if node["Setting"]["_id"] != self.id:
                 doc_to_node = SystemMade(_id=link_id_list[index], user_id=self.user_id, collector=self.collector)
                 node_id = node["Setting"]["_id"]
                 doc_to_node.pre_create(
-                    start=self.node.node,
+                    start=self.base_node.node,
                     end=self.bound_node(node),
                     p_label='Doc2Node',
-                    data={"Is_Main": node_id in self.node.info.MainNodes, "DocImp": 50, "Correlation": 50})
+                    data={"Is_Main": node_id in self.base_node.info.MainNodes, "DocImp": 50, "Correlation": 50})
                 self.doc_to_node_links.append(doc_to_node)
 
         # Doc2graph关系取消
         for (index, node) in enumerate(remove_node_list):
-            doc_to_node = SystemMade.query_by_start_end(start=self.node.id,
-                                                        end=node["_id"],
-                                                        user_id=self.user_id,
-                                                        p_label="Doc2Node",
-                                                        single=True)
+            doc_to_node = SystemMade.query_by_node_single(start=self.base_node.node,
+                                                          end=node,
+                                                          user_id=self.user_id,
+                                                          p_label="Doc2Node",
+                                                          _id=0)
             self.doc_to_node_links.append(doc_to_node.delete())
 
     def update_container(self, data):
@@ -192,7 +197,7 @@ class DocGraphClass:
         更新Info部分
         :return:
         """
-        info = self.node.info
+        info = self.base_node.info
         info.Size = len(self.graph.Nodes)
         info.Complete = 50
         info.MainNodes = [node["_id"] for node in self.graph.Nodes
@@ -270,14 +275,14 @@ class DocGraphClass:
             old_id = node["Setting"]["_id"]
             if old_id == self.old_id:
                 new_id = self.id
-                remote_node = self.node
+                remote_node = self.base_node
             else:
                 new_id = id_list[index]
                 remote_node = BaseNode(_id=new_id, user_id=self.user_id, collector=self.collector)
             # 同步一下id
             node["Setting"]["_id"] = new_id
             self.node_id_old_new_map[old_id] = new_id
-            remote_node.create(node["Info"])
+            remote_node.base_node_create(node["Info"])
             result.append(remote_node)
         return result
 
@@ -295,11 +300,10 @@ class DocGraphClass:
             start = self.bound_node(link["Setting"]['_start'])
             end = self.bound_node(link["Setting"]['_end'])
             remote_link = BaseLink(_id=new_id, user_id=self.user_id, collector=self.collector)
-            remote_link.create(start=start,
-                               end=end,
-                               p_label=link["Info"]["PrimaryLabel"],
-                               data=link["Info"],
-                               is_user_made=True)
+            remote_link.base_link_create(start=start,
+                                         end=end,
+                                         p_label=link["Info"]["PrimaryLabel"],
+                                         data=link["Info"])
             result.append(remote_link)
         return result
 
@@ -310,9 +314,9 @@ class DocGraphClass:
         :return: NeoNode
         """
         setting = node_setting["Setting"]
-        labels = [setting['_type'], setting['_label']]
+        labels = setting['_label']
         _id = setting['_id']
-        node = self.collector.Nmatcher.match(*labels, _id=_id).first()
+        node = self.collector.Nmatcher.match(labels, _id=_id).first()
         if not node:
             if self.re_for_old_id.match(str(_id)):
                 _id = self.node_id_old_new_map[_id]
@@ -354,14 +358,14 @@ class DocGraphClass:
 
     def re_count(self):
         result = UserConcern.objects.filter(SourceId=self.id)
-        self.node.ctrl.Useful = result.filter(Useful__gte=0).aggregate(Avg("Useful"))
-        self.node.ctrl.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg("HardLevel"))
-        self.node.ctrl.Imp = result.filter(Imp__gte=0).aggregate(Avg("Imp"))
-        self.node.ctrl.CountCacheTime = time()
+        self.base_node.ctrl.Useful = result.filter(Useful__gte=0).aggregate(Avg("Useful"))
+        self.base_node.ctrl.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg("HardLevel"))
+        self.base_node.ctrl.Imp = result.filter(Imp__gte=0).aggregate(Avg("Imp"))
+        self.base_node.ctrl.CountCacheTime = time()
         # todo hot_count level : 1
 
     def node_index(self):
-        body = self.node.node_index()
+        body = self.base_node.node_index()
         body["type"] = "document"
         return body
 
@@ -373,22 +377,19 @@ class DocGraphClass:
 
     def handle_for_frontend_as_graph(self):
         result = {
-            "Base": self.node.handle_for_frontend(),
+            "Base": self.base_node.handle_for_frontend(),
             "Graph": {
                 "nodes": self.graph.Nodes,
                 "links": self.graph.Links,
                 "notes": []
             },  # todo 把notes加上
             "Conf": self.graph.Conf,
-            "Path": self.graph.Path,
-            "State": {
-                "isSelf": self.node.ctrl.CreateUser == self.user_id,
-            },
+            "Path": self.graph.Path
         }
         return result
 
     def handle_for_frontend(self):
-        return self.node.handle_for_frontend()
+        return self.base_node.handle_for_frontend()
 
 
 class BaseComment:

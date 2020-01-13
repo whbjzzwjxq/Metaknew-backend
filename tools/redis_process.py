@@ -1,6 +1,6 @@
 import redis
 from users.models import User, Privilege
-
+from django.core.exceptions import ObjectDoesNotExist
 second = 1
 minute = 60
 hour = 3600
@@ -50,10 +50,11 @@ def user_login_set(user: User, privilege: Privilege, token):
             "Is_Vip": user.Is_Vip,
             "Is_high_vip": user.Is_high_vip,
             "Is_Active": user.Is_Active,
-            "Is_Banned": user.Is_Banned
+            "Is_Banned": user.Is_Banned,
+            "UserName": user.UserName.encode()
         }
         cache_info = {key: bytes(value) for key, value in cache_info.items()}
-        pipe.hmset("info_" + str(_id), cache_info)
+        pipe.hmset("user_info_" + str(_id), cache_info)
 
         # 加入的组
         if user.Joint_Group:
@@ -110,7 +111,7 @@ def user_query_info_by_id(_id):
         return None
     else:
         # info 定义 上方cache_info
-        info = redis_instance.hgetall("info_" + str(_id))
+        info = redis_instance.hgetall("user_info_" + str(_id))
         info = {key: bool(value) for key, value in info.items()}
 
         # join_group定义 上方
@@ -122,6 +123,14 @@ def user_query_info_by_id(_id):
                 value = redis_instance.smembers(name)
                 privilege.update({field.name: value})
         return {"bool_info": info, "joint_group": join_group, "privilege": privilege}
+
+
+def get_user_name(user_id):
+    try:
+        user = User.objects.get(pk=user_id)
+        return user.UserName
+    except ObjectDoesNotExist:
+        return None
 
 
 # ----------------名字翻译 地名转译相关
