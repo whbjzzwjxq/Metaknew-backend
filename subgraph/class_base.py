@@ -309,9 +309,9 @@ class BaseModel:
         output_info_dict["id"] = self.id
         output_info_dict["type"] = self.type
 
-        output_ctrl_dict["$_Is_Common"] = self.ctrl.Is_Common
-        output_ctrl_dict["$_Is_OpenSource"] = self.ctrl.Is_OpenSource
-        output_ctrl_dict["$_Is_Shared"] = self.ctrl.Is_Shared
+        output_ctrl_dict["$IsCommon"] = self.ctrl.Is_Common
+        output_ctrl_dict["$IsOpenSource"] = self.ctrl.Is_OpenSource
+        output_ctrl_dict["$IsShared"] = self.ctrl.Is_Shared
         result = {
             "Ctrl": output_ctrl_dict,
             "Info": output_info_dict,

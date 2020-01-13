@@ -77,9 +77,9 @@ def upload_media_by_user(request):
             'Name': '1.jpg',
             'Text': {},
             'Labels': [],
-            '$_IsCommon': True,
-            '$_IsShared': True,
-            '$_OpenSource': False
+            '$IsCommon': True,
+            '$IsShared': True,
+            '$OpenSource': False
         }
     }
     :param request:
@@ -155,7 +155,10 @@ def query_multi_source(request):
     for query in query_list:
         _type = query[1]
         p_label = query[2]
-        model = type_label_to_class(_type, p_label)
+        if _type == 'node' or _type == 'link':
+            model = type_label_to_class(_type, p_label)
+        else:
+            model = type_label_to_class(_type, 'unknown')
         output = model(_id=query[0], user_id=user_id)
         output.query_base()
         result.append(output.handle_for_frontend())

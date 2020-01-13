@@ -198,4 +198,4 @@ class JsonChangedCompress:
 # b = "bdd23df2-001b-0010-8fb1-408d5cb77ab1"
 #
 # c = JsonChangedCompress([], [], def_replace="|")
-# print(c.compare(a, b))
+# print(c.compare(a, b)

@@ -384,10 +384,7 @@ class DocGraphClass:
                 "notes": []
             },  # todo 把notes加上
             "Conf": self.graph.Conf,
-            "Path": self.graph.Path,
-            "State": {
-                "isSelf": self.base_node.ctrl.CreateUser == self.user_id,
-            },
+            "Path": self.graph.Path
         }
         return result
 
