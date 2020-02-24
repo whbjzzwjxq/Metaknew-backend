@@ -88,13 +88,12 @@ SITE_ID = 1
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # 注意顺序，必须放在这儿
     "django.middleware.common.CommonMiddleware",
     # "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "users.authority.AuthMiddleware"
+    'middleware.user_model_bound.UserModelBoundMiddleware'
 ]
 
 ROOT_URLCONF = "demo.urls"
@@ -129,18 +128,6 @@ DATABASES = {
         "HOST": "39.96.10.154",
         "PORT": "7011",
     }
-}
-
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://39.96.10.154:6379",
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
-            "PASSWORD": "",
-        },
-    },
 }
 
 REDIS_TIMEOUT = 1 * 60

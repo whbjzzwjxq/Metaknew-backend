@@ -1,53 +1,60 @@
-# -*-coding=utf-8 -*-
-from django.http import HttpResponse
+import datetime
 import json
-from users.models import User, GroupCtrl, UserConcern, UserRepository, Privilege
-from tools.encrypt import make_token
-from tools.redis_process import *
-from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
-import typing
-from tools.base_tools import model_to_dict
+from typing import Union, Optional
+
 from aliyunsdkcore import client
 from aliyunsdkcore.profile import region_provider
 from aliyunsdksts.request.v20150401 import AssumeRoleRequest
-import datetime
+from django.contrib.auth.hashers import make_password
+
+from tools.encrypt import make_user_token
+from tools.redis_process import *
+from users.models import GroupCtrl
 
 salt = "al76vdj895as12cq"
 
 
 class BaseUser:
 
-    def __init__(self, _id: int):
-        self.user_id = _id
-        self.user: typing.Optional[User] = None
-        self.privilege: typing.Optional[Privilege] = None
-        self.repository: typing.Optional[UserRepository] = None
-        self.concern: typing.Optional[UserConcern] = None
+    def __init__(self, _id: Union[int, str]):
+        self.user_id = int(_id)
         self.is_login = False
+        self._user: Optional[User] = None
+        self._privilege: Optional[Privilege] = None
+
+    @property
+    def user_info(self):
+        if not self._user:
+            self._user = User.objects.get(pk=self.user_id)
+        return self._user
+
+    @property
+    def privilege(self):
+        if not self._privilege:
+            self._privilege = Privilege.objects.get(pk=self.user_id)
+        return self._privilege
 
     # 登录成功之后的设置
     def login_success(self):
         self.is_login = True
-        name = self.user.UserName
-        _id = self.user.UserId
-        token = make_token(name, _id)
-        self.query_privilege()
-        user_login_set(self.user, self.privilege, token)
+        name = self.user_info.Name
+        _id = self.user_info.UserId
+        token = make_user_token(name, _id)
+        user_login_set(self.user_info, self.privilege, token)
         result = {
             "content": "登录成功",
             "token": token,
-            "userName": self.user.UserName,
-            "userId": self.user.UserId,
-            "fileToken": self.resource_auth_for_ali_oss()["Credentials"]
+            "userName": self.user_info.Name,
+            "userId": self.user_info.UserId,
+            "fileToken": self.resource_auth_for_ali_oss()["Credentials"],
+            "personalId": self.user_info.PersonalId
         }
-        response = HttpResponse(json.dumps(result), content_type="application/json", status=200)
-        return response
+        return result
 
     def resource_auth_for_ali_oss(self):
-        regionId = 'cn-beijing'
+        region_id = 'cn-beijing'
         endpoint = 'sts-vpc.cn-beijing.aliyuncs.com'
-        authorityKeys = {
+        authority_keys = {
             "guest": {
                 "id": 'LTAI4FwvcibXwt11sCCiDUQB',
                 "secret": '26TNuCRT22WXjUOUnrNH8oQFgakxf1',
@@ -58,8 +65,10 @@ class BaseUser:
             }
         }
         if self.is_login:
-            region_provider.add_endpoint('Sts', regionId, endpoint)
-            clt = client.AcsClient(authorityKeys["guest"]["id"], authorityKeys["guest"]["secret"], regionId)
+            region_provider.add_endpoint('Sts', region_id=region_id, end_point=endpoint)
+            clt = client.AcsClient(ak=authority_keys["guest"]["id"],
+                                   secret=authority_keys["guest"]["secret"],
+                                   region_id=region_id)
             request = AssumeRoleRequest.AssumeRoleRequest()
             role_arn = "acs:ram::1807542795506680:role/webservernormaluser"
             request.set_RoleArn(role_arn)
@@ -74,144 +83,53 @@ class BaseUser:
         else:
             raise AttributeError
 
-    def create(self, info, concern, status):
-        password = info["password"]
+    def create(self, name, phone, password, email, addition=None):
         # todo 前端密码加密 level: 3
         # password = decode(password, info["length"])
-        self.user = User.objects.create(
+        if addition is None:
+            addition = {}
+        self._user = User.objects.create(
             UserId=self.user_id,
-            UserName=info["name"],
-            UserPhone=info["phone"],
-            UserEmail=info["email"],
+            Name=name,
+            Phone=phone,
+            Email=email,
             UserPw=make_password(password=password, salt=salt)
         )
-        if status:
-            self.user.Joint_Group = BaseGroup.apply(self.user_id, concern["group"])
-        self.privilege = Privilege.objects.create(UserId=self.user_id)
-        self.repository = UserRepository.objects.create(UserId=self.user_id)
+        self._privilege = Privilege.objects.create(UserId=self.user_id)
         self.save()
         return self
 
-    @staticmethod
-    def query_user_by_info(criteria):
-        try:
-            user = User.objects.get(criteria)
-        except ObjectDoesNotExist or MultipleObjectsReturned:
-            return None
-        else:
-            return user
-
-    def query_user(self):
-        if not self.user:
-            try:
-                self.user = User.objects.get(pk=self.user_id)
-            except ObjectDoesNotExist:
-                return None
-            else:
-                return self
-        else:
-            return self
-
-    def query_privilege(self):
-        if not self.privilege:
-            try:
-                self.privilege = Privilege.objects.get(UserId=self.user_id)
-                return self
-            except ObjectDoesNotExist as e:
-                return None
-        else:
-            return self
-
-    def query_repository(self):
-        if not self.repository:
-            try:
-                self.repository = UserRepository.objects.get(UserId=self.user_id)
-                return self
-            except ObjectDoesNotExist as e:
-                return None
-        else:
-            return self
-
-    def bulk_create_source(self, id_type_dict: typing.Dict[int, str]):
-        """
-        source的定义:Node Media Document
-        :param id_type_dict: 创建的内容 key-value形式: id: Node
-        :return:
-        """
-        self.query_repository()
-        self.query_privilege()
-        if id_type_dict:
-            for _id, source_type in id_type_dict.items():
-                self.privilege.Is_Owner.append(_id)
-                repositoryList = {
-                    "node": self.repository.CreateNode,
-                    "media": self.repository.CreateFile,
-                    "document": self.repository.CreateDoc,
-                    "fragment": self.repository.Fragments,
-                    "link": self.repository.CreateLink
-                }
-                if source_type in repositoryList:
-                    repositoryList[source_type].append(_id)
-                else:
-                    raise AttributeError("Unknown Source Type")
-            self.repository.save()
-            self.privilege.save()
-
     def save(self):
-        self.user.save()
+        self.user_info.save()
         self.privilege.save()
-        self.repository.save()
-        # 注意Concern是不save的，有独立的保存方法
 
 
 class BaseGroup:
 
     def __init__(self, _id: int):
-
         self.group = GroupCtrl()
         self.privilege = Privilege()
         self._id = _id
 
-    def query_group(self):
-        try:
-            self.group = GroupCtrl.objects.get(GroupId=self._id)
-            return self
-        except ObjectDoesNotExist as e:
-            raise e
-
-    def query_privilege(self):
-        try:
-            self.privilege = Privilege.objects.get(GroupId=self._id)
-            group_privilege_set(_id=self._id, privilege=self.privilege)
-            return self
-        except ObjectDoesNotExist as e:
-            raise e
-
-    def query_privilege_cache(self) -> dict:
-        result = user_group_privilege_info_query(self._id)
-        if result:
-            return result
-        else:
-            try:
-                self.privilege = Privilege.objects.get(GroupId=self._id)
-                group_privilege_set(_id=self._id, privilege=self.privilege)
-                return model_to_dict(self.privilege)
-            except ObjectDoesNotExist as e:
-                raise e
-
     @staticmethod
     def apply(user_id, group_ids):
+        pass
+        # # todo 改成list of group level: 3
+        # groups = GroupCtrl.objects.in_bulk(group_ids)
+        #
+        # def check(group):
+        #     if group.Is_open:
+        #         return 2
+        #     else:
+        #         pass
+        #         # todo 申请 level : 3
+        #         return 3
+        #
+        # output = {group.GroupId: check(group) for group in groups}
+        # return output
 
-        # todo 改成list of group level: 3
-        groups = GroupCtrl.objects.in_bulk(group_ids)
 
-        def check(group):
-            if group.Is_open:
-                return 2
-            else:
-                pass
-                # todo 申请 level : 3
-                return 3
+class UserItem:
 
-        output = {group.GroupId: check(group) for group in groups}
-        return output
+    def __init__(self, user_id: str):
+        pass

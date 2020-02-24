@@ -1,20 +1,20 @@
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 from django.utils.timezone import now
+from django.forms.models import model_to_dict
 
-from tools.models import LevelField, TopicField, HotField, NameField, TranslateField, TimeField, LocationField
+from tools.models import LevelField, TopicField, HotField, NameField, TranslateField, IdField, TypeField
 from users.models import User
-
-
-# 将可能的模板写在前面
-def contributor():
-    return {"create": "system", "update": []}
+from typing import List
+from time import mktime
 
 
 def feature_vector():
-    return {"group_vector": [],
-            "word_embedding": [],
-            "label_embedding": []}
+    return {
+        "group_vector": [],
+        "word_embedding": [],
+        "label_embedding": []
+    }
 
 
 # ----------------用户权限----------------
@@ -27,274 +27,280 @@ def feature_vector():
 # 5 Collaborator 是指可以完全操作的用户
 # 5 SharedTo 是指可以进行查询级别操作的用户
 
+class BaseInfo(models.Model):
+    ItemId = IdField(primary_key=True, editable=False)  # id
+    ItemType = TypeField(default='node', db_index=True, editable=False)  # ItemType
+    PrimaryLabel = models.TextField(db_column="Plabel", db_index=True, editable=False)  # 主标签
+    Name = NameField(db_column="Name")  # 名字
+    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)  # 创建者的标签
+    Description = TranslateField()  # Description
+    Translate = TranslateField()
+    ExtraProps = JSONField(db_column="ExtraProps", default=dict)  # 额外属性
+    StandardProps = JSONField(default=dict)  # 标准属性
 
-class ItemCtrl(models.Model):
-    ItemId = models.BigIntegerField(primary_key=True, editable=False)
-    ItemType = models.TextField(db_index=True)  # Item的Type
-    PrimaryLabel = models.TextField(db_index=True)  # 主标签
-    Is_Used = models.BooleanField(db_index=True, default=True)  # 是否还在使用
-    Is_UserMade = models.BooleanField(db_index=True, default=True)  # 是否是用户新建的
-    CreateTime = models.DateField(auto_now_add=True, editable=False)  # 创建时间
-    CreateUser = models.BigIntegerField(default=1, editable=False)  # 创建用户
-    Is_Common = models.BooleanField(default=True)  # 是否公开
-    Is_Shared = models.BooleanField(default=False)  # 是否分享
-    Is_OpenSource = models.BooleanField(default=False)  # 是否公开编辑
+    @staticmethod
+    def prop_not_to_dict():
+        # 从BaseInfo中去除的Field
+        return ['ItemId', 'ItemType', 'PrimaryLabel']
+
+    @staticmethod
+    def special_update() -> List[str]:
+        """
+        不自动生成的内容
+        :return:
+        """
+        return ['ItemId', 'ItemType', 'PrimaryLabel']
+
+    def to_dict(self, exclude):
+        if not exclude:
+            exclude = BaseInfo.prop_not_to_dict()
+        content = model_to_dict(self, exclude=exclude)
+        content.update({
+            '_id': self.ItemId,
+            'type': self.ItemType,
+            'PrimaryLabel': self.PrimaryLabel
+        })
+        return content
+
+    def to_query_object(self):
+        return {
+            '_id': self.ItemId,
+            '_type': self.ItemType,
+            '_label': self.PrimaryLabel
+        }
 
     class Meta:
-        indexes = [
-            models.Index(fields=["Is_Used", "Is_Common"])
-        ]
         abstract = True
 
 
+class BaseCtrl(models.Model):
+    CREATE_TYPE_CHOICES = [
+        ('AUTO', 'SystemAuto'),
+        ('USER', 'UserMade'),
+        ('OFF', 'Official'),
+        ('REAL', 'RealSource')
+    ]
+    ItemId = IdField(primary_key=True, editable=False)
+    ItemType = models.TextField(db_index=True, editable=False)  # Item的Type
+    PrimaryLabel = models.TextField(db_index=True, editable=False)  # 主标签
+    CreateType = models.TextField(default='USER', choices=CREATE_TYPE_CHOICES, editable=False)  # 新建方式
+    CreateUser = models.BigIntegerField(default=1, editable=False)  # 创建用户
+    CreateTime = models.DateField(auto_now_add=True, editable=False)  # 创建时间
+    UpdateTime = models.DateField(auto_now=True, editable=False)  # 更新时间
+    PropsWarning = JSONField(default=list)  # 属性更新警告
+    IsUsed = models.BooleanField(default=True)  # 是否在使用
+
+    @staticmethod
+    def prop_not_to_dict():
+        # 从BaseInfo中去除的Field
+        return ['ItemId', 'ItemType', 'PrimaryLabel', 'CreateUser', 'CreateTime', 'UpdateTime', 'IsUsed',
+                'PropsWarning']
+
+    def to_dict(self, exclude: List[str] = None):
+        if not exclude:
+            exclude = BaseCtrl.prop_not_to_dict()
+        content = model_to_dict(self, exclude=exclude)
+        content.update({
+            '_id': self.ItemId,
+            'type': self.ItemType,
+            'PrimaryLabel': self.PrimaryLabel,
+            'CreateUser': self.CreateUser,
+            'UpdateTime': mktime(self.UpdateTime.timetuple())
+        })
+        return content
+
+    def to_query_object(self):
+        return {
+            '_id': self.ItemId,
+            '_type': self.ItemType,
+            '_label': self.PrimaryLabel
+        }
+
+    class Meta:
+        abstract = True
+
+
+class PublicItem(models.Model):
+    IsCommon = models.BooleanField(default=True, db_index=True)  # 是否公开
+    IsShared = models.BooleanField(default=False, db_index=True)  # 是否分享
+    IsOpenSource = models.BooleanField(default=False, db_index=True)  # 是否公开编辑
+    Hot = HotField()  # 热度
+    Labels = models.TextField(default=list)  # 统计的用户标签
+    NumStar = models.IntegerField(default=0)  # 收藏数量
+    NumShared = models.IntegerField(default=0)  # 分享数量
+    NumGood = models.IntegerField(default=0)  # 点赞数量
+    NumBad = models.IntegerField(default=0)  # 点踩数量
+
+    class Meta:
+        abstract = True
+
+
+class PublicItemCtrl(BaseCtrl, PublicItem):
+    class Meta:
+        abstract = True
+
+    @staticmethod
+    def props_update_by_user():
+        return ['IsCommon', 'IsOpenSource', 'IsShared']
+
+
 # remake 20191017
-class NodeCtrl(ItemCtrl):
-    # 不传回的控制性内容
-    ItemType = models.TextField(default='node')  # Item的Type
+class NodeCtrl(PublicItemCtrl):
     CountCacheTime = models.DateTimeField(db_column="CacheTime", default=now)  # 最后统计的时间
-    ImportMethod = models.TextField(db_column="ImportMethod", db_index=True, default="Excel")  # 导入方式
 
     # 有意义的评价
     Imp = LevelField()  # 重要度
     HardLevel = LevelField()  # 难易度
     Useful = LevelField()  # 有用的程度
-    Star = models.IntegerField(default=0)  # 收藏数量
-    UpdateTime = models.DateField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
-
-    # 简易的评价
-    IsGood = models.IntegerField(default=0)
-    IsBad = models.IntegerField(default=0)
-
     # 其余参数
-    Hot = HotField()
-    Contributor = JSONField(default=contributor)  # 贡献者
-    UserLabels = ArrayField(models.TextField(), db_column="UserLabels", default=list)  # 用户打的标签
-
+    Contributor = ArrayField(IdField(), default=list)  # 贡献者
     # 从数据分析统计的内容 更新频率 低
-    Structure = LevelField()  # 结构化的程度
+    Structure = LevelField()  # 数据完整的程度
     FeatureVec = JSONField(default=feature_vector)  # 特征值
     TotalTime = models.IntegerField(db_column="TotalTime", default=50)  # 需要的时间
 
     class Meta:
-        db_table = "graph_node_ctrl"
+        db_table = "item_node_ctrl"
 
 
 # remake 20191017
-class NodeInfo(models.Model):
-    ItemId = models.BigIntegerField(primary_key=True, editable=False)
-    PrimaryLabel = models.TextField(db_column="Plabel", db_index=True)  # 主标签
-    MainPic = models.TextField(default="")  # 缩略图/主要图片, 注意储存的是url
-    IncludedMedia = ArrayField(models.BigIntegerField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
-    ExtraProps = JSONField(db_column="ExtraProps", default=dict)  # 额外的属性
-    # 以上不是自动处理
-
+class NodeInfo(BaseInfo):
     # 直接迭代处理的Field
-    Name = models.TextField(db_column="Name")
     Alias = ArrayField(NameField(), db_column="Alias", default=list)
     Topic = TopicField()
-    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    Text = TranslateField(default=dict)  # Description
-    Translate = JSONField(default=dict)  # 名字的翻译
     BaseImp = LevelField()  # 基础重要度
     BaseHardLevel = LevelField()  # 基础难易度
+    BaseUseful = LevelField()  # 基础有用程度
     Language = models.TextField(db_column="Language", default="auto")
 
-    # 写成abstract的理由 不在Info表里存 减小查询规模
-    class Meta:
-        abstract = True
+    # 以下不是自动处理
+    MainPic = models.TextField(default="")  # 缩略图/主要图片, 注意储存的是url
+    IncludedMedia = ArrayField(IdField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
 
+    @staticmethod
+    def prop_not_to_dict():
+        # 从BaseInfo中去除的Field
+        parent_list = BaseInfo.prop_not_to_dict()
+        return parent_list.extend([])
 
-# todo 更多标签 level: 1
-# remake 2019-10-17
-class Person(NodeInfo):
-    DateOfBirth = TimeField(db_column="DateOfBirth")
-    DateOfDeath = TimeField(db_column="DateOfDeath")
-    BirthPlace = LocationField(db_column="BirthPlace", max_length=30)
-    Nation = models.TextField(db_column="Nation", max_length=30)
-    Job = models.TextField(db_column='Job', default='')
-    Gender = models.TextField(db_column='Gender', default='Man', db_index=True)
-
-    class Meta:
-        db_table = "graph_node_person"
-
-
-class Project(NodeInfo):
-    PeriodStart = TimeField(db_column="Period_Start")
-    PeriodEnd = TimeField(db_column="Period_End")
-    Nation = models.TextField(db_column="Nation", max_length=30)
-    Leader = ArrayField(NameField(), db_column="Leader", default=list)  # 领头人
+    @staticmethod
+    def special_update() -> List[str]:
+        field_list = BaseInfo.special_update()
+        field_list.extend(['Alias', 'Topic', 'BaseImp', 'BaseHardLevel', 'BaseUseful', 'Language', 'Translate'])
+        return field_list
 
     class Meta:
-        db_table = "graph_node_project"
+        db_table = 'item_node_info'
 
 
-class ArchProject(NodeInfo):
-    PeriodStart = TimeField(db_column="Period_Start")
-    PeriodEnd = TimeField(db_column="Period_End")
-    Nation = models.TextField(db_column="Nation", max_length=30)
-    Leader = ArrayField(NameField(), db_column="Leader", default=list)  # 领头人
-    Location = LocationField(db_column="Location", default="Beijing")
-    WorkTeam = ArrayField(NameField(), db_column="WorkTeam", default=list)
-
-    class Meta:
-        db_table = "graph_node_arch_project"
-
-
-# remake 2019-10-17
-class BaseDocGraph(NodeInfo):
-    # 主要是给Cache使用 也就是请求Graph信息可能用到
-    MainNodes = ArrayField(models.BigIntegerField(), db_column="MainNodes", default=list)  # 主要节点的id
-    Size = models.IntegerField(db_column="Size", default=1)  # 专题的规模
-    Complete = LevelField()  # 计算得出
-
-    class Meta:
-        db_table = "graph_node_doc_base"
-
-
-# 如果pLabel识别不了那么就使用基础模型
-class NodeNormal(NodeInfo):
-    class Meta:
-        db_table = "graph_node_normal"
-
-
-class MediaCtrl(ItemCtrl):
-    ItemType = models.TextField(default='media')  # Item的Type
+class MediaCtrl(PublicItemCtrl):
+    ItemType = TypeField(default='media')  # Item的Type
     FileName = models.TextField()  # 储存在阿里云OSS里的Name
     Format = models.TextField(db_column="Format", db_index=True)  # 储存在阿里云OSS里的format
+    Thumb = models.TextField(default="")  # 缩略图
     # 控制属性
     CountCacheTime = models.DateTimeField(db_column='CountCacheTime', default=now)
     TotalTime = models.IntegerField(db_column="TotalTime", default=10)  # 需要的时间 主要是给音频和视频用的
-    # 缩略图
-    Thumb = models.TextField(default="")
-    # 用户相关
-    IsGood = models.BigIntegerField(default=0)
-    IsBad = models.BigIntegerField(default=0)
-    Star = models.BigIntegerField(default=0)
-    Hot = HotField()
-    UserLabels = ArrayField(models.TextField(), default=list, db_index=True)
 
     class Meta:
-        db_table = 'graph_media_ctrl'
+        db_table = 'item_media_ctrl'
 
 
-class MediaInfo(models.Model):
-    ItemId = models.BigIntegerField(primary_key=True)
-    Name = models.TextField(db_index=True, default="NewMedia")
-    Labels = ArrayField(models.TextField(), db_column="Labels", default=list, db_index=True)
-    Text = TranslateField()
-    PrimaryLabel = models.TextField(db_index=True)
+class MediaInfo(BaseInfo):
+    ItemType = TypeField(default='media')  # Item的Type
 
-    class Meta:
-        abstract = True
-
-
-class Image(MediaInfo):
-    Size = models.TextField(default='large')
-    dpiX = models.IntegerField(default=1920)
-    dpiY = models.IntegerField(default=1080)
-    ContainObject = JSONField(default=dict)
+    @staticmethod
+    def prop_not_to_dict():
+        # 从BaseInfo中去除的Field
+        parent_list = BaseInfo.prop_not_to_dict()
+        return parent_list.extend([])
 
     class Meta:
-        db_table = 'graph_media_info_image'
+        db_table = 'item_media_info'
 
 
-class Text(MediaInfo):
-    Pages = models.IntegerField(default=1)
+class FragmentInfo(BaseInfo):
+    ItemType = TypeField(default='fragment')  # Item的Type
+    Src = models.URLField(default='')  # 如果是图片, 那么有来源
 
-    class Meta:
-        db_table = 'graph_media_info_text'
-
-
-class Audio(MediaInfo):
-    class Meta:
-        db_table = 'graph_media_info_audio'
-
-
-class Video(MediaInfo):
-    class Meta:
-        db_table = 'graph_media_info_video'
-
-
-# remake 2019-10-17
-class Fragment(models.Model):
-    ItemId = models.BigIntegerField(primary_key=True)
-    Labels = ArrayField(models.TextField(), default=list)
-    Content = ArrayField(models.TextField(), default=list)  # 少于16个字符作为Keyword处理
-    ExtraProps = JSONField(default=dict)  # 主要是NLP识别用
-
-    OriginSource = models.BigIntegerField(default=0)
-    CreateTime = models.DateField(default=now)
-    CreateUser = models.BigIntegerField(db_index=True)
+    @staticmethod
+    def prop_not_to_dict():
+        # 从BaseInfo中去除的Field
+        parent_list = BaseInfo.prop_not_to_dict()
+        return parent_list.extend([])
 
     class Meta:
-        db_table = "graph_node_fragment"
+        db_table = "item_fragment_info"
+
+
+class FragmentCtrl(BaseCtrl):
+    SourceId = IdField(db_index=True)
+    SourceType = TypeField(db_index=True)
+    SourceLabel = models.TextField()
+    IsLinked = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "item_fragment_ctrl"
+
+
+class DocumentCtrl(NodeCtrl):
+    Complete = LevelField()
+    MainNodes = ArrayField(IdField())
+    Size = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'item_document_ctrl'
 
 
 # remake 2019-10-17 2019-10-20
-class RelationshipCtrl(ItemCtrl):
-    ItemType = models.TextField(default='link')  # Item的Type
-
-    Start = models.BigIntegerField(db_index=True)
-    End = models.BigIntegerField(db_index=True)
-    StartType = models.TextField()
-    EndType = models.TextField()
+class RelationshipCtrl(BaseCtrl):
+    ItemType = TypeField(default='link')  # Item的Type
+    StartId = IdField(db_index=True)
+    EndId = IdField(db_index=True)
+    StartType = TypeField()
+    EndType = TypeField()
     StartPLabel = models.TextField()
     EndPLabel = models.TextField()
 
     class Meta:
-        indexes = [
-            models.Index(fields=["Start", "End"], name="start_end"),
-            models.Index(fields=[
-                "Start",
-                "End",
-                "StartType",
-                "EndType",
-                "StartPLabel",
-                "EndPLabel"
-            ], name="complete_index")
-        ]
-        db_table = "graph_link_ctrl"
-
-
-class RelationshipInfo(models.Model):
-    ItemId = models.BigIntegerField(primary_key=True)
-    PrimaryLabel = models.TextField(db_index=True)
-
-    class Meta:
         abstract = True
 
 
-# todo 日志聚合 level: 2
-class FrequencyCount(RelationshipInfo):
-    Count = models.IntegerField(db_column="Count", default=1)
-    Frequency = models.FloatField(db_column="Frequency", default=0)
-    UpdateTime = models.DateTimeField(auto_now=True)
+class RelationshipInfo(BaseInfo):
+
+    @staticmethod
+    def prop_not_to_dict():
+        # 从BaseInfo中去除的Field
+        parent_list = BaseInfo.prop_not_to_dict()
+        return parent_list.extend([])
 
     class Meta:
-        db_table = "graph_link_frequency"
+        db_table = "item_link_info"
+
+
+# systemMade 没有info!!!
+class FrequencyCount(RelationshipCtrl):
+    Count = models.IntegerField(db_column="Count", default=1)
+    Frequency = models.FloatField(db_column="Frequency", default=0)
+
+    class Meta:
+        db_table = "item_link_ctrl_frequency"
 
 
 # 专题和节点的连接
-class Doc2Node(RelationshipInfo):
-    Is_Main = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
-    Correlation = models.IntegerField(db_column="Correlation", default=1)  # 相关度
-    DocImp = models.IntegerField(db_column="DocImp", default=1)  # 节点在该话题下的重要度
+class DocToNode(RelationshipCtrl):
+    IsMain = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
+    Correlation = LevelField(db_column="Correlation")  # 相关度
+    DocumentImp = LevelField(db_column="DocImp")  # 节点在该话题下的重要度
 
     class Meta:
-        db_table = "graph_link_doc2node"
+        db_table = "item_link_ctrl_doc_to_node"
 
 
 # 图谱上的关系
-class KnowLedge(RelationshipInfo):
+class KnowLedge(RelationshipCtrl, PublicItem):
     Confidence = models.SmallIntegerField(db_column="Confidence", default=50)
-    # 被他人选中的次数
-    SelectTimes = models.IntegerField(default=0)
-    Star = models.IntegerField(default=0)
-    Hot = HotField()
-    Name = models.TextField(default="")
-    Labels = ArrayField(models.TextField(), default=list)
-    ExtraProps = JSONField(default=dict)
-    Text = JSONField(default=dict)
+    SelectTimes = models.IntegerField(default=0)  # 被他人选中的次数
 
     class Meta:
-        db_table = "graph_link_knowledge"
+        db_table = "item_link_ctrl_knowledge"

@@ -1,39 +1,53 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, HStoreField, JSONField
-from tools.models import TopicField, LevelField
+from tools.models import TopicField, LevelField, IdField, TypeField, SettingField, NameField
 
-# Create your models here.
+
+def user_setting():
+    return {
+        'fragmentCollect': {},
+    }
+
+
+def note_content():
+    setting = {
+        "_title": "",
+        "_content": ""
+    }
+    return setting
 
 
 # todo 角色整理 level : 3
 class User(models.Model):
-    UserId = models.BigIntegerField(db_column="USER_ID", primary_key=True)  # 用户id
-    UserName = models.TextField(db_column="USER_NAME", unique=True)  # 用户名
-    UserPw = models.TextField(db_column="USER_PASSWORD")  # 用户密码
-    UserEmail = models.TextField(db_column="USER_EMAIL")  # 用户邮箱
-    UserPhone = models.CharField(db_column="USER_PHONE", max_length=11, unique=True)  # 用户手机号（用于登录的账号）
-    DateTime = models.DateTimeField(db_column="USER_TIME", auto_now_add=True)  # 注册时间
-
+    UserId = IdField(primary_key=True)  # 用户id
+    Name = models.TextField(unique=True, db_index=True)  # 用户名
+    UserPw = models.TextField()  # 用户密码
+    Email = models.TextField(unique=True, db_index=True)  # 用户邮箱
+    Phone = models.CharField(max_length=11, unique=True)  # 用户手机号（用于登录的账号）
+    CreateTime = models.DateTimeField(auto_now_add=True)  # 注册时间
+    Setting = JSONField(default=user_setting)  # 用户设置
+    PersonalId = models.BigIntegerField(default=0)  # 记录一个用户创建内容的id
     # 状态部分
-    Is_Superuser = models.BooleanField(db_column="ROOT", default=False)  # 是否是管理员
-    Is_Developer = models.BooleanField(db_column="DEV", default=False)  # 开发账号
-    Is_Publisher = models.BooleanField(db_column="PUBLISH", default=False)  # 是否是发布者
-    Is_Vip = models.BooleanField(db_column="VIP", default=False)
-    Is_high_vip = models.BooleanField(db_column="HighVIP", default=False)
+    IsSuperuser = models.BooleanField(default=False)  # 是否是管理员
+    IsDeveloper = models.BooleanField(default=False)  # 开发账号
+    IsPublisher = models.BooleanField(default=False)  # 是否是发布者
+    IsVip = models.BooleanField(default=False)
+    IsHighVip = models.BooleanField(default=False)
+    IsGroup = models.BooleanField(default=False)
     # 用户控制
-    Is_Active = models.BooleanField(db_column="Active", default=True)
+    IsActive = models.BooleanField(default=True)
     # 系统控制
-    Is_Banned = models.BooleanField(db_column="Banned", default=False)
+    IsBanned = models.BooleanField(default=False)
     # 参与的组别
-    Joint_Group = HStoreField(db_column="JOINT_GROUP", default=dict)
+    JointGroup = HStoreField(default=dict)
 
     class Meta:
-        db_table = "user_info_base"
+        db_table = "user_info_base_user"
 
 
 # GroupId 与 UserId 使用同一个id_generator
 class GroupCtrl(models.Model):
-    GroupId = models.BigIntegerField(db_column="Group_Id", primary_key=True)
+    GroupId = IdField(primary_key=True)
     GroupName = models.TextField(db_column="Group_Name", unique=True)
     CreateUser = models.BigIntegerField(db_column="Create_User")
     Owner = models.BigIntegerField(db_column="Owner")
@@ -41,8 +55,8 @@ class GroupCtrl(models.Model):
     Member = ArrayField(models.BigIntegerField(), db_column="Member")
     Topic = TopicField()
     Labels = ArrayField(models.TextField(), default=list)
-    Is_Auto = models.BooleanField(db_column="Auto", default=False)
-    Is_Open = models.BooleanField(db_column="Open", default=True)
+    IsAuto = models.BooleanField(db_column="Auto", default=False)
+    IsOpen = models.BooleanField(db_column="Open", default=True)
 
     class Meta:
         db_table = "user_info_base_group"
@@ -51,62 +65,39 @@ class GroupCtrl(models.Model):
 # 用户/组 权限
 class Privilege(models.Model):
     # 注意GroupId和UserId不能重复 因此生成的时候使用同一个IdBlock
-    UserId = models.BigIntegerField(primary_key=True, db_index=True)
+    UserId = IdField(primary_key=True)
     # 是拥有者的资源
-    Is_Owner = ArrayField(models.BigIntegerField(), db_column="Owner", default=list)
+    IsOwner = ArrayField(models.BigIntegerField(), db_column="Owner", default=list)
     # 拥有修改状态权限的资源
-    Is_Manager = ArrayField(models.BigIntegerField(), db_column="Manager", default=list)
+    IsManager = ArrayField(models.BigIntegerField(), db_column="Manager", default=list)
     # 拥有完整权限的资源
-    Is_Collaborator = ArrayField(models.BigIntegerField(), db_column="Coll", default=list)
+    IsCollaborator = ArrayField(models.BigIntegerField(), db_column="Coll", default=list)
     # 获得的分享
-    Is_SharedTo = ArrayField(models.BigIntegerField(), db_column="ShareTo", default=list)
+    IsSharedTo = ArrayField(models.BigIntegerField(), db_column="ShareTo", default=list)
     # 可以免费使用的资源
-    Is_FreeTo = ArrayField(models.BigIntegerField(), db_column="FreeTo", default=list)
+    IsFreeTo = ArrayField(models.BigIntegerField(), db_column="FreeTo", default=list)
     # 已经购买了的资源
-    Is_Paid = ArrayField(models.BigIntegerField(), db_column="Paid", default=list)
+    IsPaid = ArrayField(models.BigIntegerField(), db_column="Paid", default=list)
 
     class Meta:
         db_table = "user_authority_count"
 
 
-# 用户私有仓库 remake 2019-10-20
-class UserRepository(models.Model):
-    """
-    记录所有用户创建的内容的表
-    """
-    UserId = models.IntegerField(primary_key=True)
-    # 以下是CommonSource
-    CreateDoc = ArrayField(models.BigIntegerField(), default=list)
-    CreateNode = ArrayField(models.BigIntegerField(), default=list)
-    CreateCourse = ArrayField(models.BigIntegerField(), default=list)
-    CreateFile = ArrayField(models.BigIntegerField(), default=list)
-    CreatePath = ArrayField(models.BigIntegerField(), default=list)
-    CreateLink = ArrayField(models.BigIntegerField(), default=list)
-    CreateTopic = ArrayField(models.BigIntegerField(), default=list)
-    # 以下是PrivateSource
-    Fragments = ArrayField(models.BigIntegerField(), default=list)
-    Notes = ArrayField(models.BigIntegerField(), default=list)
-    Comments = ArrayField(models.BigIntegerField(), default=list)
-
-    class Meta:
-        db_table = "user_info_collection"
-
-
 # 用户关注的内容 更加宽泛一些
 class UserConcern(models.Model):
-    UserId = models.BigIntegerField(db_index=True)
+    UserId = IdField(primary_key=True)
     # 用户关心的Source
-    SourceId = models.BigIntegerField(db_index=True)
-    SourceType = models.TextField(db_index=True)
-
+    SourceId = IdField(db_index=True)
+    SourceType = TypeField(db_index=True)
+    SourceLabel = models.TextField()
     Labels = ArrayField(models.TextField(), default=list)
     Imp = LevelField()
     HardLevel = LevelField()
     Useful = LevelField()
-    Is_Star = models.BooleanField(default=False)  # 是否收藏
-    Is_Good = models.BooleanField(default=False)  # 是否点赞
-    Is_Shared = models.BooleanField(default=False)  # 是否分享给别人
-    Is_Bad = models.BooleanField(default=False)  # 是否点踩
+    IsStar = models.BooleanField(default=False)  # 是否收藏
+    IsGood = models.BooleanField(default=False)  # 是否点赞
+    IsShared = models.BooleanField(default=False)  # 是否分享给别人
+    IsBad = models.BooleanField(default=False)  # 是否点踩
 
     class Meta:
         indexes = [
@@ -115,20 +106,32 @@ class UserConcern(models.Model):
         db_table = "user_info_concern"
 
 
-class UserDraft(models.Model):
-    UserId = models.BigIntegerField(db_column="UserId", db_index=True)
-    SourceId = models.BigIntegerField(db_column="SourceId", db_index=True)
-    SourceType = models.TextField(db_column="SourceType", db_index=True)
-    VersionId = models.IntegerField()  # 版本
-
-    Name = models.TextField()
-    UpdateTime = models.DateTimeField(db_column="UpdateTime", auto_now=True)  # 最后更新时间
-    Content = JSONField(default=dict)
-    DontClear = models.BooleanField(default=False)
-    Deleted = models.BooleanField(default=False)  # 是否被删除
+class UserItem(models.Model):
+    UserId = IdField(db_index=True)
+    ItemId = IdField(db_index=True)  # Item的id
+    CreateTime = models.DateTimeField(auto_now_add=True)
+    UpdateTime = models.DateTimeField(auto_now=True)
+    IsUsed = models.BooleanField(default=True)  # 是否删除了
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["SourceId", "VersionId"], name="DraftVersionControl")
+            models.UniqueConstraint(fields=['UserId', 'ItemId'], name='UserItemUnique')
         ]
-        db_table = "user_draft"
+        abstract = True
+
+
+class Note(UserItem):
+    DocumentId = IdField(db_index=True)  # 所属专题id
+    Content = SettingField(default=note_content)  # 内容Dict
+
+    class Meta:
+        db_table = "user_item_note"
+
+
+class NoteBook(UserItem):
+    Name = NameField(default='')
+    Text = models.TextField(default='')
+    Svg = JSONField(default=dict)
+
+    class Meta:
+        db_table = "user_item_notebook"

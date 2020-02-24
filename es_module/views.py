@@ -1,9 +1,10 @@
 import json
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import HttpResponse
 
-from es_module.logic_class import bulk_add_node_index, es, EsQuery
-from subgraph.class_node import BaseNode
+from es_module.logic_class import es, EsQuery, bulk_add_text_index
+from subgraph.class_node import NodeModel
 from subgraph.models import NodeCtrl
 
 hits_format = {"took": 1,
@@ -62,24 +63,28 @@ def language_support(lang):
 
 
 def reindex_nodes(request):
-    def query_common_node(ctrl):
+    """
+    重新索引所有node
+    :param request:
+    :return:
+    """
+    def node_ctrl_to_node_model(ctrl):
         _id = ctrl.ItemId
-        base_node = BaseNode(_id=_id, user_id=user_id)
-        base_node.ctrl = ctrl
-        base_node.is_create = True
+        base_node = NodeModel(_id=_id, user_id=user_id)
+        base_node._ctrl = ctrl
         try:
-            base_node.query_base()
+            base_node.info()
             return base_node
-        except Exception:
+        except ObjectDoesNotExist:
             return None
 
     user_id = request.GET.get("user_id")
-    ctrl_list = NodeCtrl.objects.filter(Is_Common=True, Is_Used=True, ItemType='node')
-    base_nodes = [query_common_node(ctrl)for ctrl in ctrl_list]
+    ctrl_list = NodeCtrl.objects.filter(IsCommon=True, IsUsed=True)
+    base_nodes = [node_ctrl_to_node_model(ctrl) for ctrl in ctrl_list]
     base_nodes = [node for node in base_nodes if node]
     batch_size = 256
     batch = int(len(base_nodes) / batch_size) + 1
     for i in range(0, batch):
-        nodes = base_nodes[i * batch_size: (i+1) * batch_size - 1]
-        bulk_add_node_index(nodes)
+        nodes = base_nodes[i * batch_size: (i + 1) * batch_size - 1]
+        bulk_add_text_index(nodes)
     return HttpResponse(status=200)

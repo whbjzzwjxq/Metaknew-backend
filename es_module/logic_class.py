@@ -1,5 +1,6 @@
 from elasticsearch import Elasticsearch, helpers
 import langdetect
+from typing import List
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
@@ -141,36 +142,10 @@ class EsQuery:
             return []
 
 
-def bulk_add_node_index(nodes):
-    """
-    调用了is_create
-    :param nodes:
-    :return:
-    """
-
-    def index_nodes():
-        for node in nodes:
-            body = node.node_index()
-            if node.is_create:
-                _type = 'create'
-            else:
-                _type = 'update'
-                body = {"doc": body}
-            yield {
-                "_op_type": _type,
-                "_index": "nodes",
-                "_id": node.id,
-                "_source": body
-            }
-
-    result = helpers.bulk(es, index_nodes())
-    return result
-
-
 def bulk_add_text_index(nodes):
     """
-    调用了is_create
-    :param nodes:
+    自动判断是否是update
+    :param nodes: 公开资源PublicItem的列表 PublicItemModel
     :return:
     """
 

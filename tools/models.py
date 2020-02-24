@@ -3,6 +3,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import ArrayField, HStoreField, JSONField
 from django.core.exceptions import ValidationError
 
+
 # 预定义的Field和Checker
 max_value = MaxValueValidator(limit_value=100)
 min_value = MinValueValidator(limit_value=-1)
@@ -15,14 +16,35 @@ def setting_check(value):
             raise ValidationError('setting need param %(key)s', params={'key': word})
 
 
+def type_check(value):
+    available_type = ['node', 'media', 'link', 'svg', 'document', 'fragment', 'note']
+    if value not in available_type:
+        raise ValidationError('_type %(value) is not available', params={'value': value})
+
+
 def default_text():
     return {
         "auto": ""
     }
 
 
+class IdField(models.BigIntegerField):
+    description = "IdField"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class TypeField(models.TextField):
+    description = 'TypeField'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        kwargs["validators"] = [type_check]
+
+
 class HotField(models.IntegerField):
-    description = "热度的Field"
+    description = "热度Field"
 
     def __init__(self, *args, **kwargs):
         kwargs["default"] = 100
@@ -103,22 +125,22 @@ class BaseBlockManager(models.Model):
 
 class NodeBlockManager(BaseBlockManager):
     class Meta:
-        db_table = "global_node_block_manager"
+        db_table = "block_manager_node"
 
 
 class LinkBlockManager(BaseBlockManager):
     class Meta:
-        db_table = "global_link_block_manager"
+        db_table = "block_manager_link"
 
 
 class DeviceBlockManager(BaseBlockManager):
     class Meta:
-        db_table = "global_device_block_manager"
+        db_table = "block_manager_device"
 
 
 class TimeBlockManager(BaseBlockManager):
     class Meta:
-        db_table = "global_time_block_manager"
+        db_table = "block_manager_time"
 
 
 # 每个Block的管理记录 例如Block5 OutId 20 就是第五个Block的id=20位置已经使用
@@ -133,22 +155,22 @@ class BlockIdRecord(models.Model):
 
 class NodeBlockIdRecord(BlockIdRecord):
     class Meta:
-        db_table = "device_node_block"
+        db_table = "block_record_node"
 
 
 class LinkBlockIdRecord(BlockIdRecord):
     class Meta:
-        db_table = "device_link_block"
+        db_table = "block_record_link"
 
 
 class DeviceBlockIdRecord(BlockIdRecord):
     class Meta:
-        db_table = "device_device_block"
+        db_table = "block_record_device"
 
 
 class TimeBlockIdRecord(BlockIdRecord):
     class Meta:
-        db_table = "device_time_block"
+        db_table = "block_record_time"
 
 
 # 暂时未使用 word的Index
@@ -157,7 +179,7 @@ class GlobalWordIndex(models.Model):
     Word = models.TextField(db_column="Word", db_index=True, unique=True, editable=False)
 
     class Meta:
-        db_table = "global_word_index"
+        db_table = "source_global_word_index"
 
 
 # 以下是更加基础的资源 地理位置映射 / 名字翻译 / 描述文件记录
@@ -170,7 +192,7 @@ class LocationDoc(models.Model):
     Doc = JSONField(db_column="Content", default=dict)
 
     class Meta:
-        db_table = "graph_source_location_doc"
+        db_table = "source_location_doc"
 
 
 class Chronology(models.Model):
@@ -180,4 +202,4 @@ class Chronology(models.Model):
     Content = models.TextField(db_column="Content")
 
     class Meta:
-        db_table = "graph_source_chronology"
+        db_table = "source_chronology"

@@ -10,7 +10,7 @@ block_size = 16
 re_label_id = regex.compile("(\w*)(\|)(\d*)(h{0,15})")
 
 
-def make_token(user_name, user_id):
+def make_user_token(user_name, user_id):
     """
     登录用的令牌
     :param user_name:

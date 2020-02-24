@@ -1,15 +1,73 @@
-from typing import Optional, Type, Union
+import datetime
+from typing import Optional, Type
 
+import numpy as np
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max
-from py2neo import Node as NeoNode
+from django.db import transaction, DatabaseError
+from django.db.models import Field
+from django.forms.models import model_to_dict
+from py2neo.data import Node as NeoNode
+from py2neo.database import TransactionError
 
-from record.logic_class import field_check, UnAuthorizationError, RewriteMethodError
-from record.models import WarnRecord, VersionRecord
-from tools.base_tools import NeoSet, type_label_to_info_model, ctrl_dict, check_is_user_made, get_update_props
-from functools import wraps
+from es_module.logic_class import bulk_add_text_index
+from record.exception import UnAuthorizationError, RewriteMethodError, ErrorForWeb
+from record.logic_class import History
+from record.models import ItemVersionRecord
+from subgraph.models import BaseInfo, BaseCtrl, NodeInfo, MediaInfo, NodeCtrl, MediaCtrl, PublicItemCtrl
+from tools.base_tools import NeoSet
+from tools.global_const import item_id, item_type, type_and_label_to_ctrl_model, type_and_label_to_info_model
+from base_api.interface_frontend import InfoFrontend
 
-str_types = Union['node', 'link', 'course', 'media']
+
+def field_check(_func):
+    def wrapped(self, field: Field, new_prop, old_prop):
+        warn_type = ''
+        if isinstance(new_prop, str) and len(new_prop) > 1024:
+            warn_type = 'toolong_str'
+
+        if isinstance(new_prop, list) and len(new_prop) > 128:
+            warn_type = 'toolong_list'
+
+        if isinstance(new_prop, dict) and len(new_prop) > 128:
+            warn_type = 'toolong_dict'
+
+        if not bool(new_prop):
+            warn_type = 'empty_prop'
+
+        # 这里主要是针对JSONField 和 ArrayField
+        if type(new_prop) != type(old_prop):
+            warn_type = 'error_type'
+        if warn_type != '':
+            self.warn_add(field.name, warn_type)
+        return _func(self, field, new_prop, old_prop)
+
+    return wrapped
+
+
+class FieldWarn:
+
+    def __init__(self, fn, wt, ui):
+        """
+        变量名都是缩写
+        :param fn: field_name
+        :param wt: warn_type
+        :param ui: user_id
+        """
+        self.field_name = fn
+        self.warn_type = wt
+        self.user_id = ui
+
+    @property
+    def to_dict(self):
+        return {
+            'fn': self.field_name,
+            'wt': self.warn_type,
+            'ui': self.user_id
+        }
+
+    @staticmethod
+    def dict_to_class(data):
+        return FieldWarn(**data)
 
 
 class BaseModel:
@@ -17,34 +75,82 @@ class BaseModel:
     提供的方法
     query_ctrl, query_info, query_node, query_authority, auth_create, info_update
     """
+    info_class = BaseInfo
+    ctrl_class = BaseCtrl
 
-    def __init__(self, _id: int, user_id: int, _type: str_types, collector=NeoSet()):
-        default = 'default'
-        self.node: Optional[NeoNode] = None
-        self.info: Optional[type_label_to_info_model(_type, default)] = None
-        self.ctrl: Optional[ctrl_dict[_type]] = None
-        self.warn: Optional[WarnRecord] = None
-        self.history: Optional[VersionRecord] = None
-        self.history_list = VersionRecord.objects.none()
+    def __init__(self, _id: item_id, user_id: item_id, _type: item_type, collector=NeoSet()):
+        self._info: Optional[Type[BaseInfo]] = None
+        self._ctrl: Optional[Type[BaseCtrl]] = None
+        self._history = None
 
         # 以下是值
         self.collector = collector  # neo4j连接池
-        self.id = _id  # _id
-        self.user_id = int(user_id)
-        self.type = _type
-        self.p_label = ""  # 主标签
+        self.id = int(_id)  # _id
+        self.user_id = int(user_id)  # 操作用户的id
+        self.type = _type  # model type
+        self.frontend_id = ''  # 前端的id
 
         self.is_create = False  # 是否是创建状态
-        self.is_user_made = check_is_user_made(user_id)
-        self.current_func = ''
-        self.warn_update = False  # 局部更新的时候警告记录
 
-    def error_output(self, error: Type[BaseException], reason, dev=False, strict=True):
+    @property
+    def ctrl(self) -> Optional[Type[BaseCtrl]]:
+        if not self._ctrl:
+            try:
+                self._ctrl = self.ctrl_class.objects.get(pk=self.id)
+                return self._ctrl
+            except ObjectDoesNotExist:
+                self.error_output(ObjectDoesNotExist, 'Ctrl不存在')
+                return None
+        else:
+            return self._ctrl
+
+    @property
+    def info(self) -> Optional[Type[BaseInfo]]:
+        if not self._info:
+            try:
+                self._info = self.info_class.objects.get(pk=self.id)
+                return self._info
+            except ObjectDoesNotExist:
+                self.error_output(ObjectDoesNotExist, 'Info不存在')
+        else:
+            return self._info
+
+    @property
+    def history(self):
+        if not self._history:
+            self._history = History(user_id=self.user_id, query_object=self.ctrl.to_query_object())
+            return self._history
+        else:
+            return self._history
+
+    @property
+    def editable(self):
+        if not self.ctrl:
+            return False
+        else:
+            return self.ctrl.CreateUser == self.user_id
+
+    @property
+    def p_label(self):
+        return self.ctrl.PrimaryLabel
+
+    @property
+    def query_object(self):
+        return {
+            '_id': self.id,
+            '_type': self.type,
+            '_label': self.p_label
+        }
+
+    def warn_add(self, field_name, warn_type):
+        self.ctrl.PropsWarning.append(FieldWarn(fn=field_name, wt=warn_type, ui=self.user_id).to_dict)
+
+    def error_output(self, error: Type[BaseException], description: str, is_dev=False, strict=True):
         """
         捕获错误
         :param error: 错误object
-        :param reason: 推测原因
-        :param dev: 这个原因是否是开发模式 dev=False会传回前端
+        :param description: 错误描述
+        :param is_dev: 这个原因是否是开发模式 dev=False会传回前端
         :param strict: 这个错误是否是严格的 如果是会raise
         :return:
         """
@@ -52,130 +158,42 @@ class BaseModel:
             'type': self.type,
             'name': error.__name__,
             'id': self.id,
-            'user': self.user_id,
-            'reason': reason
+            'user': self.user_id
         }
+        error = ErrorForWeb(error=error, description=description, content=output, is_dev=is_dev, is_error=strict)
         if not strict:
-            return Error(content=output, _func_name=self.current_func, dev=dev)
+            return error
         else:
-            raise error(output)
+            raise error
 
     # ----------------- create ----------------
 
-    def history_create(self):
-        if not self.history:
-            if self.type != 'link' and not self.is_create:
-                self.query_history()
-                if self.history_list:
-                    new_version = self.history_list.aggregate(Max('VersionId'))
-                    if new_version['VersionId__max']:
-                        new_version_id = new_version['VersionId__max'] + 1
-                    else:
-                        new_version_id = 1
-                        self.error_output(ObjectDoesNotExist, '历史文件不存在', strict=True)
-                else:
-                    new_version_id = 1
+    def _ctrl_init(self, primary_label, create_type):
+        self._ctrl = type_and_label_to_ctrl_model(_type=self.type, _label=primary_label)(
+            ItemId=self.id,
+            ItemType=self.type,
+            PrimaryLabel=primary_label,
+            CreateType=create_type,
+            CreateUser=self.user_id,
+            PropsWarning=[]
+        )
 
-                self.history = VersionRecord(
-                    CreateUser=self.user_id,
-                    SourceId=self.id,
-                    SourceType=self.type,
-                    SourceLabel=self.p_label,
-                    VersionId=new_version_id,
-                    Content={}
-                )
-            else:
-                pass
-        else:
-            pass
+    def _info_init(self, primary_label):
+        self._info = type_and_label_to_info_model(_type=self.type, _label=primary_label)(
+            ItemId=self.id,
+            ItemType=self.type,
+            PrimaryLabel=primary_label,
+        )
 
-    def warn_create(self):
-        self.query_warn()
-
-    # ----------------- query ----------------
-
-    def query_base(self):
+    def create(self, frontend_data: Type[InfoFrontend], create_type):
         """
-        查询info,ctrl,text, authority的内容 也就是前端 索引的基本内容
+        把前端id记录下来
+        :param frontend_data:
+        :param create_type: 创建方式
         :return:
         """
-        result = self.query_ctrl()
-        if result:
-            return self.query_info()
-        else:
-            return result
-
-    def query_ctrl(self):
-        if not self.ctrl:
-            try:
-                self.ctrl = ctrl_dict[self.type].objects.get(pk=self.id)
-                if self.ctrl.PrimaryLabel:
-                    self.p_label = self.ctrl.PrimaryLabel
-                return True
-            except ObjectDoesNotExist:
-                return self.error_output(ObjectDoesNotExist, 'Ctrl不存在', strict=True)
-        else:
-            self.p_label = self.ctrl.PrimaryLabel
-            return True
-
-    def query_info(self):
-        if not self.ctrl:
-            result = self.query_ctrl()
-            if result:
-                return self.query_info()
-        elif not self.info:
-            try:
-                self.info = type_label_to_info_model(self.type, self.p_label).objects.get(pk=self.id)
-                return True
-            except ObjectDoesNotExist:
-                return self.error_output(ObjectDoesNotExist, 'Info不存在,可能是标签有误', strict=True)
-        else:
-            return True
-
-    def query_history(self):
-        if self.type != 'link':
-            self.history_list = VersionRecord.objects.filter(SourceType=self.type, SourceId=self.id)
-        else:
-            self.error_output(TypeError, 'link没有历史记录', strict=True)
-
-    def query_warn(self):
-        remote_warn = WarnRecord.objects.filter(SourceType=self.type, SourceId=self.id)
-        if remote_warn:
-            self.warn = remote_warn.first()
-        else:
-            self.warn = WarnRecord(
-                SourceId=self.id,
-                SourceType=self.type,
-                SourceLabel=self.p_label,
-                CreateUser=self.user_id,
-                BugType='Warn',
-                WarnContent=[]
-            )
-
-    # ----------------- create ----------------
-
-    def _ctrl_create(self):
-        self.ctrl = ctrl_dict[self.type]()
-        self.ctrl.ItemId = self.id
-        self.ctrl.ItemType = self.type
-        self.ctrl.PrimaryLabel = self.p_label
-        self.ctrl.Is_UserMade = self.is_user_made
-        self.ctrl.Is_Used = True
-        self.ctrl.Is_Common = True
-        self.ctrl.Is_Shared = False
-        self.ctrl.Is_OpenSource = False
-        self.ctrl.CreateUser = self.user_id
-
-    def _info_create(self):
-        if not self.p_label:
-            self.error_output(AttributeError, '主标签不能为空')
-        else:
-            self.info = type_label_to_info_model(self.type, self.p_label)()
-            self.info.PrimaryLabel = self.p_label
-            self.info.ItemId = self.id
-            if self.type == 'node' or self.type == 'document':
-                self.info.IncludedMedia = []
-            return self
+        self.is_create = True
+        self.frontend_id = frontend_data._id
 
     # ----------------- update ----------------
 
@@ -183,162 +201,297 @@ class BaseModel:
     def __update_prop(self, field, new_prop, old_prop):
         if new_prop != old_prop:
             setattr(self.info, field.name, new_prop)
-            self._history_update(field.name, old_prop)
         else:
             pass
 
-    def _history_update(self, prop, value):
-        if self.type != 'link' and not self.is_create:
-            try:
-                self.history.Content.update({prop: value})
-            except KeyError or AttributeError as e:
-                self.error_output(e, '更新历史文件出错', dev=False)
-
-    def info_update(self, data):
+    def update_by_user(self, frontend_data: Type[InfoFrontend], create_type: str):
         """
         更新info的过程 special -> props -> neo object
-        :param data:
-        :return:
+        :param frontend_data: 前端传回的过程
+        :param create_type: 更新的方式
+        :return: self
         """
-        # todo authority
-        if self.user_id == self.ctrl.CreateUser:
-            self.query_warn()
-            # 重新更新warn
-            self.warn.WarnContent = []
-            self.history_create()
-            self.query_info()
 
-            self.info_special_update(data)
-            if 'Text' in data:
-                if data["Text"]:
-                    self.info.Text = data["Text"]
-                else:
-                    self.info.Text = {"auto": ""}
-            needed_props = get_update_props(self.type, self.p_label)
-            for field in needed_props:
+        if self.editable:
+            content = model_to_dict(self.info, exclude=self.info.prop_not_to_dict())
+            if not self.is_create:
+                name = self.info.Name + str(datetime.datetime.now())
+                self.history.add_record(content=content, name=name, create_type=create_type)
+            # 特殊的属性update
+            self.info_special_update(frontend_data)
+            fields = self.info_class._meta.fields
+            fields = [field for field in fields
+                      if not field.auto_created and field.name not in self.info_class.special_update()]
+            # field属性update
+            for field in fields:
                 old_prop = getattr(self.info, field.name)
-                if field.name in data:
-                    new_prop = data[field.name]
-                else:
+                new_prop = getattr(frontend_data, field.name, None)
+                if new_prop is None:
                     new_prop = field.default
                     # 如果是dict list等构造类 实例化
                     if isinstance(new_prop, type):
                         new_prop = new_prop()
                 self.__update_prop(field, new_prop, old_prop)
-                # todo field resolve
-                self.graph_update(data)
+            return True
         else:
-            self.error_output(UnAuthorizationError, '没有编辑权限', dev=False)
+            return self.error_output(UnAuthorizationError, '没有权限')
 
     def info_special_update(self, data):
-        self.error_output(RewriteMethodError, '方法需要重写', dev=False)
+        self.error_output(RewriteMethodError, '方法需要重写', is_dev=True)
 
-    def graph_update(self, data):
+    def output_table_create(self):
+        return self.ctrl, self.info, self.history
+
+    def save(self, history_save=True, neo4j_save=True):
         """
-        更新图数据库里的内容
+        整体的save过程
+        :return: None
+        """
+        try:
+            with transaction.atomic():
+                self.ctrl.save()
+                self.info.save()
+                if history_save:
+                    self.history.save()
+        except DatabaseError:
+            pass
+        try:
+            if neo4j_save:
+                self.collector.tx.commit()
+        except TransactionError:
+            pass
+
+    @classmethod
+    def bulk_save_create(cls, model_list, collector):
+        """
+        create的时候集体保存
+        :param model_list: 逻辑的model_list
+        :param collector: neo4j连接池
         :return:
         """
-        self.error_output(RewriteMethodError, reason='方法需要重写', dev=False)
+        output_model = np.array([model.output_table_create() for model in model_list])
+        try:
+            if len(output_model) > 0:
+                with transaction.atomic():
+                    ctrl_model_list = list(output_model[:, 0])
+                    cls.ctrl_class.objects.bulk_create(ctrl_model_list)
+                    info_model_list = list(output_model[:, 1])
+                    cls.info_class.objects.bulk_create(info_model_list)
+                    frontend_id_current_id_map = {model.frontend_id: model.id for model in model_list}
+                    return frontend_id_current_id_map
+            else:
+                return {}
+        except DatabaseError or TransactionError:
+            return None
+
+    @classmethod
+    def bulk_save_update(cls, model_list, collector):
+        """
+        update的时候集体保存
+        :param model_list: 逻辑的model_list
+        :param collector: neo4j连接池
+        :return:
+        """
+        output_model = np.array([model.output_table_create() for model in model_list])
+        try:
+            if len(output_model) > 0:
+                with transaction.atomic():
+                    ctrl_model_list = list(output_model[:, 0])
+                    cls.ctrl_class.objects.bulk_update(ctrl_model_list)
+                    info_model_list = list(output_model[:, 1])
+                    cls.info_class.objects.bulk_update(info_model_list)
+                return True
+        except DatabaseError or TransactionError:
+            return None
+
+
+class PublicItemModel(BaseModel):
+    """
+    公开的可以检索的内容
+    """
+
+    ctrl_class = PublicItemCtrl
+
+    def __init__(self, _id: item_id, user_id: item_id, _type: item_type, collector=NeoSet()):
+        super().__init__(_id, user_id, _type, collector)
+        self._ctrl: Optional[Type[PublicItemCtrl]] = None
+
+    def ctrl_update_by_user(self, frontend_data: InfoFrontend):
+        """
+        用户能够改变权限的信息
+        :param frontend_data: 前端传回的数据
+        :return:
+        """
+
+        if self.editable:
+            for prop in self.ctrl_class.props_update_by_user():
+                value = getattr(frontend_data, prop, None)
+                if value is not None:
+                    setattr(self.ctrl, prop, value)
+                else:
+                    pass
+            return True
+        else:
+            return self.error_output(UnAuthorizationError, '没有权限')
+
+    def editable(self):
+        if not self.ctrl:
+            return False
+        else:
+            return self.ctrl.CreateUser == self.user_id or self.ctrl.IsOpenSource
 
     def text_index(self):
-        if len(list(self.info.Text.keys())) > 0:
-            language = list(self.info.Text.keys())[0]
-            text = self.info.Text[language]
+        ctrl: PublicItemCtrl = self.ctrl
+        info: BaseInfo = self.info
+        language_list = list(self.info.Description.keys())
+        if len(language_list) > 0:
+            language = language_list[0]
+            description = self.info.Description[language]
         else:
             language = "auto"
-            text = ""
-        if self.type == 'link':
-            hot = self.info.Hot
-            star = self.info.Star
-        else:
-            hot = self.ctrl.Hot
-            star = self.ctrl.Star
+            description = ""
 
         body = {
             "id": self.id,
             "type": self.type,
             "PrimaryLabel": self.p_label,
             "Language": language,
-            "Name": self.info.Name,
-            "Tags": {
-                "Labels": self.info.Labels,
-            },
-            "Text": {
+            "CreateUser": ctrl.CreateUser,
+            "UpdateTime": str(ctrl.UpdateTime),
+            "MainPic": getattr(info, 'MainPic', ''),
+            "Alias": getattr(info, 'Alias', []),
+            "Hot": ctrl.Hot,
+            "Name": {
                 "zh": "",
                 "en": "",
-                "auto": text
+                "auto": info.Name
             },
-            "Hot": hot,
-            "Star": star
+            "Description": {
+                "zh": "",
+                "en": "",
+                "auto": description
+            },
+            "Tags": {
+                "UserLabels": info.Labels,
+                "Labels": ctrl.Labels,
+                "Topic": getattr(info, 'Topic', [])
+            },
+            "Num": {
+                "NumStar": ctrl.NumStar,
+                "NumShared": ctrl.NumShared,
+                "NumGood": ctrl.NumGood,
+                "NumBad": ctrl.NumBad,
+            },
+            "Auth": {
+                "IsUsed": ctrl.IsUsed,
+                "IsCommon": ctrl.IsCommon,
+                "IsOpenSource": ctrl.IsOpenSource
+            }
         }
-        for lang in body["Text"]:
-            if lang in self.info.Text:
-                body["Text"][lang] = self.info.Text[lang]
+        for lang in body["Description"]:
+            if lang in info.Description:
+                body["Description"][lang] = info.Description[lang]
+
+        for lang in ['zh', 'en']:
+            if lang in info.Translate:
+                body["Name"]["%s" % lang] = info.Translate[lang]
         return body
 
-    def output_table_create(self):
-        return self.ctrl, self.info, self.warn, self.history
+    def save(self, history_save=True, neo4j_save=False, es_index_text=True):
+        super().save(history_save, neo4j_save)
+        if es_index_text:
+            bulk_add_text_index([self])
 
-    def handle_for_frontend(self):
-        """
-        前端所用格式
-        :return:
-        """
-        unused_props = ["CountCacheTime",
-                        "Is_Used",
-                        "Is_UserMade",
-                        "Is_Common",
-                        "Is_Shared",
-                        "Is_OpenSource",
-                        "ImportMethod",
-                        "CreateTime",
-                        "ItemId",
-                        "ItemType",
-                        "Format",
-                        "History",
-                        "MediaId",
-                        ]
-        self.query_base()
-        ctrl_fields = self.ctrl._meta.get_fields()
-        output_ctrl_dict = {field.name: getattr(self.ctrl, field.name)
-                            for field in ctrl_fields if field.name not in unused_props}
+    @classmethod
+    def bulk_save_create(cls, model_list, collector):
+        result = super().bulk_save_create(model_list, collector)
+        if result is not None:
+            bulk_add_text_index(model_list)
+        return result
 
-        info_fields = self.info._meta.get_fields()
-        output_info_dict = {field.name: getattr(self.info, field.name)
-                            for field in info_fields if field.name not in unused_props}
-        output_info_dict["id"] = self.id
-        output_info_dict["type"] = self.type
-
-        output_ctrl_dict["$IsCommon"] = self.ctrl.Is_Common
-        output_ctrl_dict["$IsOpenSource"] = self.ctrl.Is_OpenSource
-        output_ctrl_dict["$IsShared"] = self.ctrl.Is_Shared
-        result = {
-            "Ctrl": output_ctrl_dict,
-            "Info": output_info_dict,
-        }
+    @classmethod
+    def bulk_save_update(cls, model_list, collector):
+        result = super().bulk_save_update(model_list, collector)
+        if result:
+            bulk_add_text_index(model_list)
         return result
 
 
-class Error:
-    def __init__(self, content, _func_name, dev=False):
-        self.content = content
-        self._func = _func_name
-        self.dev = dev
-
-    def __bool__(self):
-        return False
-
-
-def error_handler(_func):
+class BaseNodeModel(PublicItemModel):
     """
-    类方法运行时记录方法名
-    :param _func:
-    :return:
+    在图数据库里作为节点的内容
     """
 
-    @wraps(_func)
-    def handler(self, *args, **kwargs):
-        self.current_func = _func.__name__
-        return _func(self, *args, **kwargs)
+    def __init__(self, _id: item_id, user_id: item_id, _type: item_type, collector=NeoSet()):
+        super().__init__(_id, user_id, _type, collector)
+        self._graph_node: Optional[NeoNode] = None
+        self._info: Optional[Type[NodeInfo], Type[MediaInfo]] = None
+        self._ctrl: Optional[Type[NodeCtrl], Type[MediaCtrl]] = None
 
-    return handler
+    def update_by_user(self, frontend_data: Type[InfoFrontend], create_type):
+        super().update_by_user(frontend_data, create_type)
+        self.graph_node_update()
+
+    @property
+    def graph_node(self):
+        if not self._graph_node:
+            self._graph_node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
+            if not self.graph_node:
+                self.error_output(ObjectDoesNotExist, 'NeoNode不存在，可能是没有保存')
+                return None
+            else:
+                return self._graph_node
+        else:
+            return self._graph_node
+
+    def _graph_node_init(self):
+        node = NeoNode(self.p_label)
+        node["_id"] = self.id
+        node["_type"] = self.type
+        node["_label"] = self.p_label
+        node.__primarylabel__ = self.p_label
+        node.__primarykey__ = "_id"
+        node.__primaryvalue__ = self.id
+        self._graph_node = node
+        self.collector.tx.create(self._graph_node)
+
+    def graph_node_update(self):
+        # 更新info
+        neo_prop = {
+            "Name": self.info.Name,
+            "Imp": self.info.BaseImp,
+            "HardLevel": self.info.BaseHardLevel,
+            "CreateType": self.ctrl.CreateType,
+        }
+        self.graph_node.update(neo_prop)
+        # 更新ctrl
+        for label in self.ctrl_class.props_update_by_user():
+            ctrl_value = getattr(self.ctrl, label)
+            if ctrl_value:
+                self.graph_node.add_label(label)
+            else:
+                if self.graph_node.has_label(label):
+                    self.graph_node.remove_label(label)
+        # 更新labels
+        self.graph_node.update_labels(self.info.Labels)
+        self.collector.tx.push(self.graph_node)
+
+    def save(self, history_save=True, neo4j_save=True, es_index_text=True):
+        super().save(history_save, neo4j_save, es_index_text)
+
+    @classmethod
+    def bulk_save_create(cls, model_list, collector):
+        result = super().bulk_save_create(model_list, collector)
+        if result is not None:
+            collector.tx.commit()
+        return result
+
+    @classmethod
+    def bulk_save_update(cls, model_list, collector):
+        result = super().bulk_save_update(model_list, collector)
+        if result:
+            # history
+            history_model_list = [model.history.current_record for model in model_list]
+            ItemVersionRecord.objects.bulk_create(history_model_list)
+            collector.tx.commit()
+        return result

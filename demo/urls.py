@@ -13,16 +13,12 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path("blog/", include("blog.urls"))
 """
-from django.urls import include, path
+from base_api.user import login
+from base_api.subgraph import node
 from django.conf.urls.static import static
 from django.conf import settings
-from subgraph import views
 
+all_api = login.apis + node.apis
 urlpatterns = [
-    # path("admin/", admin.site.urls),
-    path("apis/document/", include("document.urls")),
-    path("apis/user/", include("users.urls")),
-    path("apis/subgraph/", include("subgraph.urls")),
-    path("apis/es_query/", include("es_module.urls")),
-    path("apis/tools/", include("tools.urls")),
+    api().url_pattern for api in all_api if api.meta.is_active and not api.abstract
 ] + static(settings.STATIC_URL)

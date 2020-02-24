@@ -8,7 +8,7 @@ from tools.models import *
 batch_size = 256
 small_integer = 65535
 device_id = 0
-base_time = datetime.date(year=2019, month=7, day=23)
+base_time = datetime.date(year=2020, month=1, day=1)
 
 methods = {
     # node取号
@@ -18,8 +18,8 @@ methods = {
     },
     # link取号
     "link": {
-        "manager": NodeBlockManager,
-        "record": NodeBlockIdRecord
+        "manager": LinkBlockManager,
+        "record": LinkBlockIdRecord
     },
     # 按照设备取号
     "device": {
@@ -36,6 +36,7 @@ methods = {
 
 # todo 把这个服务配置成主-从模式 level: 2
 def id_generator(number, method, jump=3) -> typing.List[int]:
+    assert method in ['node', 'link', 'device', 'time']
     if number <= 0:
         return []
     else:
@@ -85,7 +86,7 @@ def id_generator(number, method, jump=3) -> typing.List[int]:
 
 
 def new_block(manager):
-    block = manager.objects.base_node_create(RegisterDevice=device_id)
+    block = manager.objects.create(RegisterDevice=device_id)
     block.save()
     return block
 

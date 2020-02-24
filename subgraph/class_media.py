@@ -1,18 +1,17 @@
 import mimetypes
+from typing import Optional
 
 import oss2
-from django.core.exceptions import ObjectDoesNotExist
-from py2neo.data import Node as NeoNode
 
-from es_module.logic_class import bulk_add_text_index
-from record.logic_class import UnAuthorizationError
-from subgraph.class_base import BaseModel
+import tools.global_const
+from subgraph.class_base import BaseNodeModel
+from subgraph.models import MediaCtrl, MediaInfo
 from tools import base_tools
 from tools.aliyun import authorityKeys
 from tools.redis_process import mime_type_query, mime_type_set
 
 
-class BaseMedia(BaseModel):
+class MediaModel(BaseNodeModel):
     access_key_id = authorityKeys["developer"]["access_key_id"]
     access_key_secret = authorityKeys["developer"]["access_key_secret"]
     bucket_name = authorityKeys["developer"]["bucket_name"]
@@ -22,115 +21,66 @@ class BaseMedia(BaseModel):
 
     def __init__(self, _id: int, user_id: int, _type="media", collector=base_tools.NeoSet()):
         super().__init__(_id, user_id, _type, collector)
-
-    def query_node(self):
-        if self.type != "link":
-            self.node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
-            if not self.node:
-                self.error_output(ObjectDoesNotExist, 'NeoNode不存在，可能是没有保存')
-        else:
-            self.error_output(TypeError, '异常调用')
+        self._ctrl: Optional[MediaCtrl] = None
+        self._info: Optional[MediaInfo] = None
+        self.info_class = MediaInfo
+        self.ctrl_class = MediaCtrl
 
     # ---------------- create ----------------
-    # remake 2019-11-1
-    def create(self, data):
+
+    def create(self, frontend_data):
         """
-        别名
-        :param data:
+        base_media_create的别名
+        :param frontend_data: 前端的数据
         :return:
         """
-        return self.base_media_create(data)
+        return self.create(frontend_data)
 
-    def base_media_create(self, data: dict):
-        remote_file = data['remote_file']
-        self.is_create = True
-        self.p_label = data["PrimaryLabel"]
-        self._ctrl_create()
-        self._info_create()
-        self.__node_create()
-        self.info_update(data)
-        self.ctrl_update_by_user(data, remote_file)
+    def create(self, frontend_data: dict):
+        super().create(frontend_data)
+        assert "Name" in frontend_data
+        assert "PrimaryLabel" in frontend_data
+        assert "CreateType" in frontend_data
+        assert 'FileName' in frontend_data
+        self._ctrl_init(frontend_data["PrimaryLabel"], frontend_data["CreateType"])
+        self.ctrl_update_by_user(frontend_data)
+        self.history().add_record()
+        self._info_init(frontend_data["PrimaryLabel"])
+        self._graph_node_create()
+        self.update_by_user(frontend_data)
         return self
-
-    def __node_create(self):
-        node = NeoNode(self.p_label)
-        node["_id"] = self.id
-        node["_type"] = self.type
-        node["_label"] = self.p_label
-        node.__primarylabel__ = self.p_label
-        node.__primarykey__ = "_id"
-        node.__primaryvalue__ = self.id
-        self.node = node
-        self.collector.tx.create(self.node)
 
     # ---------------- update ----------------
 
-    def ctrl_update_by_user(self, data, remote_file):
+    def ctrl_update_by_user(self, frontend_data):
         """
-        用户能改变权限和文件位置 放在history初始化之后进行
-        :param data:
-        :param remote_file:
+        用户能改变权限和文件位置
+        :param frontend_data: 前端的数据
         :return:
         """
-        auth_ctrl_props = ['Is_Common', 'Is_Used', 'Is_Shared', 'Is_OpenSource']
-        if self.ctrl.CreateUser == self.user_id:
-            for prop in auth_ctrl_props:
-                if '$_' + prop in data:
-                    setattr(self.ctrl, prop, data['$_' + prop])
-                else:
-                    pass
-            if self.ctrl.FileName != remote_file:
-                if self.oss_manager.object_exists(remote_file):
-                    self._history_update('FileName', self.ctrl.FileName)
-                    self.ctrl.FileName = remote_file
-                    self.ctrl.Format = remote_file.split('.')[1]
-                else:
-                    self.error_output(FileNotFoundError, '远端服务器没有文件')
+        super().ctrl_update_by_user(frontend_data)
+        file_name = frontend_data['FileName']
+        if self.ctrl.FileName != file_name:
+            if self.oss_manager.object_exists(file_name):
+                self.ctrl.FileName = file_name
+                self.ctrl.Format = file_name.split('.')[1]
+                self.ctrl.Thumb = ''  # todo 缩略图生成
+            else:
+                self.error_output(FileNotFoundError, '远端服务器没有文件')
         else:
-            self.error_output(UnAuthorizationError, '没有权限')
+            pass
 
     def info_special_update(self, data):
         """
-        特别update过程 暂时
+        特别update过程 暂时没有
         :param data:
         :return:
         """
         pass
-
-    def graph_update(self, data):
-        if not self.node:
-            self.query_node()
-
-        # 更新info
-        neo_prop = {
-            "Name": self.info.Name,
-        }
-        self.node.update(neo_prop)
-
-        # 更新ctrl
-        ctrl_list = ['Is_Used', 'Is_Common', 'Is_UserMade']
-        for label in ctrl_list:
-            ctrl_value = getattr(self.ctrl, label)
-            if ctrl_value:
-                self.node.add_label(label)
-            else:
-                if self.node.has_label(label):
-                    self.node.remove_label(label)
-
-        # 更新labels
-        self.node.update_labels(self.info.Labels)
-        self.collector.tx.push(self.node)
     # ---------------- function ----------------
 
-    def save(self):
-        self.info.save()
-        self.ctrl.save()
-        if self.history:
-            self.history.save()
-        if self.warn.WarnContent:
-            self.warn.save()
-        self.collector.tx.commit()
-        bulk_add_text_index([self])
+    def save(self, history_save=True, neo4j_save=True, es_index_text=True):
+        super().save(history_save, neo4j_save, es_index_text)
 
     def check_remote_file(self) -> bool:
         """
@@ -141,12 +91,15 @@ class BaseMedia(BaseModel):
 
     def move_remote_file(self, new_location):
         """
-        移动远端文件
+        移动远端文件 会修改ctrl
         :param new_location:
         :return:
         """
         if self.check_remote_file():
-            return self.oss_manager.copy_object(self.bucket_name, self.ctrl.FileName, new_location)
+            result = self.oss_manager.copy_object(self.bucket_name, self.ctrl.FileName, new_location)
+            if result.status == 200:
+                self.ctrl.FileName = new_location
+                return True
         else:
             raise FileNotFoundError
 
@@ -159,7 +112,7 @@ class BaseMedia(BaseModel):
         """
         mime_type_dict = mime_type_query()
         if mime_type_dict == {}:
-            mime_type_dict = mimetypes.read_mime_types(base_tools.basePath + "/tools/mime.types")
+            mime_type_dict = mimetypes.read_mime_types(tools.global_const.basePath + "/tools/mime.types")
             mime_type_set(mime_type_dict)
 
         if "." + file_format in mime_type_dict:
@@ -167,3 +120,9 @@ class BaseMedia(BaseModel):
             return media_type
         else:
             return "unknown"
+
+    def handle_for_frontend(self):
+        return {
+            'Info': self.info.to_dict(exclude=None),
+            'Ctrl': self.ctrl.to_dict(exclude=None)
+        }

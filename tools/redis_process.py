@@ -19,11 +19,12 @@ redis_instance = redis.StrictRedis(connection_pool=pool)
 # ----------------user登录相关
 def user_set_message(phone, message):
     print(message)
-    return redis_instance.setex(name="phone_" + phone, time=5 * minute, value=message)
+    return redis_instance.setex(name="phone_" + phone, time=4 * minute, value=message)
 
 
 def user_check_message(phone):
     current = redis_instance.ttl("phone_" + phone)
+    # 大于120秒则没有失效
     if current >= 120:
         return True
     else:
@@ -35,31 +36,12 @@ def user_query_message(phone):
 
 
 def user_login_set(user: User, privilege: Privilege, token):
-    name = user.UserName
+    name = user.Name
     _id = user.UserId
     with redis_instance.pipeline(transaction=True) as pipe:
         pipe.multi()
         pipe.set(_id, token, ex=week)
         pipe.set("user_" + name, _id, ex=week)
-
-        # 基础信息 都是boolean
-        cache_info = {
-            "Is_Superuser": user.Is_Superuser,
-            "Is_Developer": user.Is_Developer,
-            "Is_Publisher": user.Is_Publisher,
-            "Is_Vip": user.Is_Vip,
-            "Is_high_vip": user.Is_high_vip,
-            "Is_Active": user.Is_Active,
-            "Is_Banned": user.Is_Banned,
-            "UserName": user.UserName.encode()
-        }
-        cache_info = {key: bytes(value) for key, value in cache_info.items()}
-        pipe.hmset("user_info_" + str(_id), cache_info)
-
-        # 加入的组
-        if user.Joint_Group:
-            pipe.hmset("join_group_" + str(_id), user.Joint_Group)
-
         # 该用户拥有的各种权限
         for field in privilege._meta.get_fields():
             if field.name != "UserId":
@@ -95,9 +77,9 @@ def user_group_privilege_info_query(_id):
     return result
 
 
-def user_query_by_name(username):
+def user_query_by_name(name):
     # todo 事务操作 level: 2
-    _id = redis_instance.get("user_" + username)
+    _id = redis_instance.get("user_" + name)
     if _id:
         token = redis_instance.get(_id)
         return _id, token
@@ -128,7 +110,7 @@ def user_query_info_by_id(_id):
 def get_user_name(user_id):
     try:
         user = User.objects.get(pk=user_id)
-        return user.UserName
+        return user.Name
     except ObjectDoesNotExist:
         return None
 

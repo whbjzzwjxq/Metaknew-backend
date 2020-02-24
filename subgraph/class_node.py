@@ -1,172 +1,89 @@
 import json
+from typing import *
 
 from django.core.exceptions import ObjectDoesNotExist
-from py2neo.data import Node as NeoNode
 
-from es_module.logic_class import bulk_add_node_index, bulk_add_text_index
-from record.logic_class import UnAuthorizationError
-from subgraph.class_base import BaseModel
-from subgraph.class_media import BaseMedia
-from subgraph.models import MediaCtrl
+from base_api.interface_frontend import NodeInfoFrontend
+from record.exception import UnAuthorizationError
+from subgraph.class_base import BaseNodeModel
+from subgraph.class_media import MediaModel
+from subgraph.models import NodeCtrl, MediaCtrl, NodeInfo, DocumentCtrl
 from tools import base_tools
-from tools.redis_process import get_user_name
 
 
-class BaseNode(BaseModel):
+class NodeModel(BaseNodeModel):
+    info_class = NodeInfo
+    ctrl_class = NodeCtrl
 
     def __init__(self, _id: int, user_id: int, _type='node', collector=base_tools.NeoSet()):
         super().__init__(_id, user_id, _type, collector)
-
-    # ----------------- query ----------------
-
-    def query_all(self):
-        """
-        查询所有内容 包括Neo4j节点 翻译 历史文件
-        :return:
-        """
-        success = self.query_base()
-        if success:
-            self.query_node()
-            self.query_history()
-        return self
-
-    def query_node(self):
-        if self.type != "link":
-            self.node = self.collector.Nmatcher.match(self.p_label, _id=self.id).first()
-            if not self.node:
-                self.error_output(ObjectDoesNotExist, 'NeoNode不存在，可能是没有保存')
-        else:
-            self.error_output(TypeError, '异常调用')
+        self._ctrl: Optional[Type[NodeCtrl]] = None
+        self._info: Optional[Type[NodeInfo]] = None
 
     # ---------------- create ----------------
-    def create(self, data):
-        """
-        别名
-        :param data: info
-        :return:
-        """
-        return self.base_node_create(data)
 
-    def base_node_create(self, data):
-        self.is_create = True
-        assert "Name" in data
-        assert "PrimaryLabel" in data
-        self.p_label = data["PrimaryLabel"]
-        self._ctrl_create()
-        self.ctrl_update_by_user(data)
-        self._info_create()
-        self.__node_create()
-        self.info_update(data)
+    def create(self, frontend_data: NodeInfoFrontend, create_type: str):
+        super().create(frontend_data, create_type)
+        self._ctrl_init(frontend_data.PrimaryLabel, create_type)
+        self._info_init(frontend_data.PrimaryLabel)
+        self._graph_node_init()
+        self.ctrl_update_by_user(frontend_data)
+        self.update_by_user(frontend_data, create_type)
+        self.graph_node_update()
         return self
-
-    def __node_create(self):
-        node = NeoNode(self.p_label)
-        node["_id"] = self.id
-        node["_type"] = self.type
-        node["_label"] = self.p_label
-        node.__primarylabel__ = self.p_label
-        node.__primarykey__ = "_id"
-        node.__primaryvalue__ = self.id
-        self.node = node
-        self.collector.tx.create(self.node)
 
     # ---------------- update ----------------
 
-    def ctrl_update_by_user(self, ctrl):
+    def ctrl_update_by_user(self, frontend_data: NodeInfoFrontend):
         """
         用户能够改变权限的信息
-        :param ctrl: ctrl
+        :param frontend_data: 前端传回的数据
         :return:
         """
-        auth_ctrl_props = ['Is_Common', 'Is_Used', 'Is_Shared', 'Is_OpenSource']
-        if self.ctrl.CreateUser == self.user_id:
-            for prop in auth_ctrl_props:
-                if '$_' + prop in ctrl:
-                    setattr(self.ctrl, prop, ctrl['$_' + prop])
-                else:
-                    pass
-            # 更新contributor
-            if self.is_create:
-                self.ctrl.Contributor = {"create": "", "update": []}
-                if self.is_user_made:
-                    self.ctrl.Contributor['create'] = get_user_name(self.user_id)
-                else:
-                    self.ctrl.Contributor['create'] = 'system'
-            else:
-                if self.is_user_made:
-                    name = get_user_name(self.user_id)
-                    if name not in self.ctrl.Contributor['update']:
-                        self.ctrl.Contributor['update'].append(name)
-                    else:
-                        pass
-                else:
-                    pass
+        super().ctrl_update_by_user(frontend_data)
+        # 更新contributor
+        if self.is_create:
+            self.ctrl.Contributor = []
         else:
-            self.error_output(UnAuthorizationError, '没有权限')
+            if self.user_id not in self.ctrl.Contributor:
+                self.ctrl.Contributor.append(self.user_id)
 
-    def info_special_update(self, data):
+    def info_special_update(self, frontend_data: NodeInfoFrontend):
         """
         特殊的更新内容
-        :param data: Info
+        :param frontend_data: 前端数据
         :return:
         """
-        if type(data["MainPic"]) == str:
-            self.main_pic_setter(data["MainPic"])
-        if data["IncludedMedia"]:
-            self.media_setter(data["IncludedMedia"])
-        self.name_checker(name=data['Name'])
-        self.name_lang_rewrite(data)
-
-    @staticmethod
-    def name_lang_rewrite(data):
-        """
-        重写一下语言配置 现在有点混乱
-        :param data:
-        :return:
-        """
-        trans = data['Translate']
-        name = data['Name']
-        lang = data['Language']
-        if not lang or lang == 'auto':
-            compute_lang = base_tools.language_detect(name)
-            data['Language'] = compute_lang
-            if compute_lang not in trans and compute_lang != 'auto':
-                trans[compute_lang] = name
-        else:
-            if lang in trans:
-                pass
-            else:
-                trans[lang] = name
+        if type(frontend_data.MainPic) == str:
+            self.main_image_setter(frontend_data.MainPic)
+        if frontend_data.IncludedMedia:
+            self.media_setter(frontend_data.IncludedMedia)
+        self.name_checker(name=frontend_data.Name)
 
     def name_checker(self, name):
         """
         查询是否有类似名字的节点
         :return:
         """
-        similar_node = base_tools.node_init(self.p_label).objects.filter(Name=name)
+        similar_node = NodeInfo.objects.filter(Name=name)
         if len(similar_node) > 0:
             name_list = json.dumps([node.ItemId for node in similar_node])
-            warn = {"field": "Name", "warn_type": "similar_node" + name_list}
-            self.warn.WarnContent.append(warn)
+            self.warn_add(field_name='Name', warn_type='similar_name: [' + name_list + ']')
+        else:
+            pass
 
-    def main_pic_setter(self, media_name):
+    def main_image_setter(self, media_name) -> bool:
         """
         设置主图片
         :param media_name: media的储存路径
         :return:
         """
-        media_manager = BaseMedia.oss_manager
-        self.query_warn()
-        if not self.is_create:
-            self.history_create()
-            self.history.Content['MainPic'] = self.info.MainPic
+        media_manager = MediaModel.oss_manager
         if media_manager.object_exists(media_name):
             self.info.MainPic = media_name
             return True
         else:
-            warn = {"field": "MainPic", "warn_type": "empty_prop"}
-            self.warn.WarnContent.append(warn)
-            self.warn_update = True
+            self.warn_add(field_name='MainPic', warn_type='empty_prop')
             return False
 
     def media_setter(self, media_list):
@@ -175,14 +92,9 @@ class BaseNode(BaseModel):
         :param media_list: list of media_id
         :return: self
         """
-        # todo 改写为add_media 所有人 和 media_setter 编辑权限
-        if self.user_id == self.ctrl.CreateUser:
+        if self.editable:
             available_media = []
             warn = []
-            self.query_warn()
-            if not self.is_create:
-                self.history_create()
-                self.history.Content['IncludedMedia'] = self.info.IncludedMedia
             for media_id in media_list:
                 _id = int(media_id)
                 if _id in self.info.IncludedMedia:
@@ -197,40 +109,13 @@ class BaseNode(BaseModel):
             self.info.IncludedMedia = available_media
 
             if warn:
-                add_warn = {"field": "IncludedMedia", "warn_type": "media_no_exist: " + str(warn)}
-                self.warn.WarnContent.append(add_warn)
-                self.warn_update = True
-                return warn
+                self.warn_add(field_name="IncludedMedia", warn_type="media_no_exist: " + str(warn))
+                return False, "media_no_exist: " + str(warn)
             else:
-                return True
+                return True, ''
         else:
-            return self.error_output(UnAuthorizationError, '没有编辑权限', strict=False)
-
-    def graph_update(self, data):
-        if not self.node:
-            self.query_node()
-
-        # 更新info
-        neo_prop = {
-            "Name": self.info.Name,
-            "Imp": self.info.BaseImp,
-            "HardLevel": self.info.BaseHardLevel
-        }
-        self.node.update(neo_prop)
-
-        # 更新ctrl
-        ctrl_list = ['Is_Used', 'Is_Common', 'Is_UserMade']
-        for label in ctrl_list:
-            ctrl_value = getattr(self.ctrl, label)
-            if ctrl_value:
-                self.node.add_label(label)
-            else:
-                if self.node.has_label(label):
-                    self.node.remove_label(label)
-
-        # 更新labels
-        self.node.update_labels(self.info.Labels)
-        self.collector.tx.push(self.node)
+            self.error_output(UnAuthorizationError, '没有编辑权限', strict=False)
+            return False
 
     # ---------------- function ----------------
 
@@ -242,28 +127,22 @@ class BaseNode(BaseModel):
         # todo 节点merge level: 2
         pass
 
-    def change_plabel(self):
-        pass
-        # todo 改变主标签 level: 2
+    def save(self, history_save=True, neo4j_save=True, es_index_text=True, es_index_node=True):
+        super().save(history_save, neo4j_save, es_index_text)
 
-    def save(self):
-        """
-        注意尽量不要使用单个Node保存
-        :return:
-        """
-        self.ctrl.save()
-        self.info.save()
-        if self.history:
-            self.history.save()
-        if self.warn.WarnContent:
-            self.warn.save()
-        self.collector.tx.commit()
-        bulk_add_text_index([self])
-        bulk_add_node_index([self])
+    @classmethod
+    def bulk_save_create(cls, model_list, collector):
+        result = super().bulk_save_create(model_list, collector)
+        return result
+
+    @classmethod
+    def bulk_save_update(cls, model_list, collector):
+        result = super().bulk_save_update(model_list, collector)
+        return result
 
     def node_index(self):
-        ctrl = self.ctrl
-        info = self.info
+        ctrl: NodeCtrl = self.ctrl
+        info: NodeInfo = self.info
         if not info.Language:
             lang = 'auto'
         else:
@@ -288,16 +167,24 @@ class BaseNode(BaseModel):
                 "Imp": ctrl.Imp,
                 "HardLevel": ctrl.HardLevel,
                 "Useful": ctrl.Useful,
-                "Star": ctrl.Star,
-                "Hot": ctrl.Hot,
                 "TotalTime": ctrl.TotalTime
             },
-            "Is_Used": ctrl.Is_Used,
-            "Is_Common": ctrl.Is_Common,
-            "Is_OpenSource": ctrl.Is_OpenSource
+            "IsUsed": ctrl.IsUsed,
+            "IsCommon": ctrl.IsCommon,
+            "IsOpenSource": ctrl.IsOpenSource
         }
         for lang in ['zh', 'en']:
             if lang in info.Translate:
                 body["Name_%s" % lang] = info.Translate[lang]
 
         return body
+
+    def handle_for_frontend(self):
+        return {
+            'Info': self.info.to_dict(exclude=None),
+            'Ctrl': self.ctrl.to_dict(exclude=None)
+        }
+
+
+class DocumentNodeModel(NodeModel):
+    ctrl_class = DocumentCtrl
