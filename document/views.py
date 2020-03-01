@@ -4,7 +4,7 @@ from datetime import datetime
 from django.http import HttpResponse
 
 from document.class_document import DocGraphModel
-from record.logic_class import History
+from record.logic_class import ItemHistory
 from subgraph.class_link import KnowledgeLinkModel
 from subgraph.class_media import MediaModel
 from subgraph.class_node import NodeModel
@@ -33,7 +33,7 @@ def bulk_handle(info_list, id_generator_method, model, user_id, collector):
     id_list = id_generator(len(new_item), method=id_generator_method)
     new_item_list = [model(_id=_id, user_id=user_id, collector=collector).create(info)
                      for _id, info in zip(id_list, info_list)]
-    remote_item_list = [model(_id=info['_id'], user_id=user_id, collector=collector).update(info) for info in info_list]
+    remote_item_list = [model(_id=info['_id'], user_id=user_id, collector=collector).ctrl_update_hook(info) for info in info_list]
     return model.bulk_save_create(new_item_list), model.bulk_save_update(remote_item_list)
 
 
@@ -102,8 +102,8 @@ class DocumentApi(UserApi):
         else:
             query_object['_id'] = frontend_data['_id']
             response = {}
-        history = History(user_id=user_model.user_id, **query_object)
-        history.add_record(
+        history = ItemHistory(user_id=user_model.user_id, **query_object)
+        history.record_update(
             content=frontend_data['Content'],
             name=frontend_data['Name'] + str(datetime.now()))
         history.save()

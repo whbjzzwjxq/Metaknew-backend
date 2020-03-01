@@ -9,14 +9,14 @@ from django.forms.models import model_to_dict
 from py2neo.data import Node as NeoNode
 from py2neo.database import TransactionError
 
+from base_api.interface_frontend import InfoFrontend, QueryObject, CommonInfoFrontend
 from es_module.logic_class import bulk_add_text_index
-from record.exception import UnAuthorizationError, RewriteMethodError, ErrorForWeb
-from record.logic_class import History
+from record.exception import UnAuthorizationError, ErrorForWeb
+from record.logic_class import ItemHistory
 from record.models import ItemVersionRecord
 from subgraph.models import BaseInfo, BaseCtrl, NodeInfo, MediaInfo, NodeCtrl, MediaCtrl, PublicItemCtrl
 from tools.base_tools import NeoSet
-from tools.global_const import item_id, item_type, type_and_label_to_ctrl_model, type_and_label_to_info_model
-from base_api.interface_frontend import InfoFrontend
+from tools.global_const import item_id, item_type
 
 
 def field_check(_func):
@@ -89,36 +89,36 @@ class BaseModel:
         self.user_id = int(user_id)  # 操作用户的id
         self.type = _type  # model type
         self.frontend_id = ''  # 前端的id
-
         self.is_create = False  # 是否是创建状态
 
     @property
-    def ctrl(self) -> Optional[Type[BaseCtrl]]:
+    def ctrl(self):
         if not self._ctrl:
             try:
                 self._ctrl = self.ctrl_class.objects.get(pk=self.id)
                 return self._ctrl
             except ObjectDoesNotExist:
-                self.error_output(ObjectDoesNotExist, 'Ctrl不存在')
-                return None
+                self._ctrl_init()
+                return self._ctrl
         else:
             return self._ctrl
 
     @property
-    def info(self) -> Optional[Type[BaseInfo]]:
+    def info(self):
         if not self._info:
             try:
                 self._info = self.info_class.objects.get(pk=self.id)
                 return self._info
             except ObjectDoesNotExist:
-                self.error_output(ObjectDoesNotExist, 'Info不存在')
+                self._info_init()
+                return self._info
         else:
             return self._info
 
     @property
     def history(self):
         if not self._history:
-            self._history = History(user_id=self.user_id, query_object=self.ctrl.to_query_object())
+            self._history = ItemHistory(user_id=self.user_id, query_object=self.query_object)
             return self._history
         else:
             return self._history
@@ -135,12 +135,26 @@ class BaseModel:
         return self.ctrl.PrimaryLabel
 
     @property
-    def query_object(self):
-        return {
-            '_id': self.id,
-            '_type': self.type,
-            '_label': self.p_label
-        }
+    def query_object(self) -> QueryObject:
+        return QueryObject(id=self.id, type=self.type, pLabel=self.p_label)
+
+    # ----------------- init ----------------
+
+    def _ctrl_init(self):
+        self._ctrl = self.ctrl_class(
+            ItemId=self.id,
+            ItemType=self.type,
+            CreateUser=self.user_id,
+            PropsWarning=[]
+        )
+
+    def _info_init(self):
+        self._info = self.info_class(
+            ItemId=self.id,
+            ItemType=self.type
+        )
+
+    # ----------------- function ----------------
 
     def warn_add(self, field_name, warn_type):
         self.ctrl.PropsWarning.append(FieldWarn(fn=field_name, wt=warn_type, ui=self.user_id).to_dict)
@@ -164,26 +178,19 @@ class BaseModel:
         if not strict:
             return error
         else:
-            raise error
+            error.raise_error()
 
-    # ----------------- create ----------------
+    @field_check
+    def __update_prop(self, field, new_prop, old_prop):
+        if new_prop != old_prop:
+            setattr(self.info, field.name, new_prop)
+        else:
+            pass
 
-    def _ctrl_init(self, primary_label, create_type):
-        self._ctrl = type_and_label_to_ctrl_model(_type=self.type, _label=primary_label)(
-            ItemId=self.id,
-            ItemType=self.type,
-            PrimaryLabel=primary_label,
-            CreateType=create_type,
-            CreateUser=self.user_id,
-            PropsWarning=[]
-        )
+    def output_table_create(self):
+        return self.ctrl, self.info, self.history
 
-    def _info_init(self, primary_label):
-        self._info = type_and_label_to_info_model(_type=self.type, _label=primary_label)(
-            ItemId=self.id,
-            ItemType=self.type,
-            PrimaryLabel=primary_label,
-        )
+    # ----------------- create&update ----------------
 
     def create(self, frontend_data: Type[InfoFrontend], create_type):
         """
@@ -193,18 +200,28 @@ class BaseModel:
         :return:
         """
         self.is_create = True
-        self.frontend_id = frontend_data._id
+        self.frontend_id = frontend_data.id
+        self.update(frontend_data, create_type)
+        return self
 
-    # ----------------- update ----------------
+    def update(self, frontend_data: Type[InfoFrontend], create_type):
+        self.ctrl_update_hook(frontend_data, create_type)
+        self.info_update_hook(frontend_data, create_type)
+        self._update_special_hook(frontend_data, create_type)
+        return self
 
-    @field_check
-    def __update_prop(self, field, new_prop, old_prop):
-        if new_prop != old_prop:
-            setattr(self.info, field.name, new_prop)
-        else:
-            pass
+    def _update_special_hook(self, frontend_data: Type[InfoFrontend], create_type):
+        pass
 
-    def update_by_user(self, frontend_data: Type[InfoFrontend], create_type: str):
+    def ctrl_update_hook(self, frontend_data: Type[InfoFrontend], create_type: str = 'USER'):
+        self.ctrl.PrimaryLabel = frontend_data.PrimaryLabel
+        self.ctrl.CreateType = create_type
+        self._ctrl_update_special_hook(frontend_data)
+
+    def _ctrl_update_special_hook(self, frontend_data: Type[InfoFrontend]):
+        pass
+
+    def info_update_hook(self, frontend_data: Type[InfoFrontend], create_type: str):
         """
         更新info的过程 special -> props -> neo object
         :param frontend_data: 前端传回的过程
@@ -213,12 +230,11 @@ class BaseModel:
         """
 
         if self.editable:
-            content = model_to_dict(self.info, exclude=self.info.prop_not_to_dict())
             if not self.is_create:
                 name = self.info.Name + str(datetime.datetime.now())
-                self.history.add_record(content=content, name=name, create_type=create_type)
+                content = model_to_dict(self.info, exclude=self.info.prop_not_to_dict())
+                self.history.record_from_item(content=content, name=name)
             # 特殊的属性update
-            self.info_special_update(frontend_data)
             fields = self.info_class._meta.fields
             fields = [field for field in fields
                       if not field.auto_created and field.name not in self.info_class.special_update()]
@@ -232,34 +248,32 @@ class BaseModel:
                     if isinstance(new_prop, type):
                         new_prop = new_prop()
                 self.__update_prop(field, new_prop, old_prop)
+            self._info_update_special_hook(frontend_data)
             return True
         else:
             return self.error_output(UnAuthorizationError, '没有权限')
 
-    def info_special_update(self, data):
-        self.error_output(RewriteMethodError, '方法需要重写', is_dev=True)
-
-    def output_table_create(self):
-        return self.ctrl, self.info, self.history
+    def _info_update_special_hook(self, data):
+        pass
 
     def save(self, history_save=True, neo4j_save=True):
         """
         整体的save过程
         :return: None
         """
-        try:
-            with transaction.atomic():
-                self.ctrl.save()
-                self.info.save()
-                if history_save:
-                    self.history.save()
-        except DatabaseError:
-            pass
+        # try:
+        with transaction.atomic():
+            self.ctrl.save()
+            self.info.save()
+            if history_save and not self.is_create:
+                self.history.current_record.save()
+        # except DatabaseError:
+        #     raise DatabaseError
         try:
             if neo4j_save:
                 self.collector.tx.commit()
         except TransactionError:
-            pass
+            raise TransactionError
 
     @classmethod
     def bulk_save_create(cls, model_list, collector):
@@ -300,6 +314,8 @@ class BaseModel:
                     cls.ctrl_class.objects.bulk_update(ctrl_model_list)
                     info_model_list = list(output_model[:, 1])
                     cls.info_class.objects.bulk_update(info_model_list)
+                    history_model_list = [his.current_record for his in output_model[:, 2]]
+                    ItemVersionRecord.objects.bulk_create(history_model_list)
                 return True
         except DatabaseError or TransactionError:
             return None
@@ -316,13 +332,12 @@ class PublicItemModel(BaseModel):
         super().__init__(_id, user_id, _type, collector)
         self._ctrl: Optional[Type[PublicItemCtrl]] = None
 
-    def ctrl_update_by_user(self, frontend_data: InfoFrontend):
+    def _ctrl_update_special_hook(self, frontend_data: CommonInfoFrontend):
         """
         用户能够改变权限的信息
         :param frontend_data: 前端传回的数据
         :return:
         """
-
         if self.editable:
             for prop in self.ctrl_class.props_update_by_user():
                 value = getattr(frontend_data, prop, None)
@@ -428,17 +443,20 @@ class BaseNodeModel(PublicItemModel):
         self._info: Optional[Type[NodeInfo], Type[MediaInfo]] = None
         self._ctrl: Optional[Type[NodeCtrl], Type[MediaCtrl]] = None
 
-    def update_by_user(self, frontend_data: Type[InfoFrontend], create_type):
-        super().update_by_user(frontend_data, create_type)
+    def info_update_hook(self, frontend_data: Type[InfoFrontend], create_type):
+        super().info_update_hook(frontend_data, create_type)
+        self.graph_node_update()
+
+    def _update_special_hook(self, frontend_data: Type[InfoFrontend], create_type):
         self.graph_node_update()
 
     @property
     def graph_node(self):
         if not self._graph_node:
             self._graph_node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
-            if not self.graph_node:
-                self.error_output(ObjectDoesNotExist, 'NeoNode不存在，可能是没有保存')
-                return None
+            if not self._graph_node:
+                self._graph_node_init()
+                return self._graph_node
             else:
                 return self._graph_node
         else:
@@ -459,8 +477,8 @@ class BaseNodeModel(PublicItemModel):
         # 更新info
         neo_prop = {
             "Name": self.info.Name,
-            "Imp": self.info.BaseImp,
-            "HardLevel": self.info.BaseHardLevel,
+            "NumGood": self.ctrl.NumGood,
+            "NumBad": self.ctrl.NumBad,
             "CreateType": self.ctrl.CreateType,
         }
         self.graph_node.update(neo_prop)

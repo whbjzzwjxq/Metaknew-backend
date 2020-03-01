@@ -20,7 +20,7 @@ class StandardResponse(JsonResponse):
         if not self.content:
             self.content = {'IsDev': is_dev}
         else:
-            self.content.update({'IsDev': is_dev})
+            self.content.ctrl_update_hook({'IsDev': is_dev})
 
 
 class UserApi:
@@ -119,7 +119,7 @@ class NodeApi(UserApi):
                 _type=node_info[node_info['type']],
                 user_id=user_model.user_id,
                 collector=collector
-            ).update_by_user(node_info) for node_info in frontend_data
+            ).info_update_hook(node_info) for node_info in frontend_data
         ]
         result = NodeModel.bulk_save_update(node_model_list, collector)
         if result is not None:
@@ -191,7 +191,7 @@ class MediaApi:
             collector = NeoSet()
             _id = id_generator(number=1, method='node', jump=2)[0]
             # 获取media label
-            _label = MediaModel.get_media_type(frontend_data['FileName'].split('.')[1])
+            _label = MediaModel.get_media_label(frontend_data['FileName'].split('.')[1])
             media_info = frontend_data['Info']
             media_info["PrimaryLabel"] = _label
             media_model = MediaModel(_id=_id, user_id=user_model.user_id, _type='media', collector=collector)

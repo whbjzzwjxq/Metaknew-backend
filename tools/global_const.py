@@ -4,8 +4,8 @@ from typing import Union, Type, Dict
 
 from py2neo import Graph
 
-from subgraph.models import NodeInfo, MediaInfo, RelationshipInfo, NodeCtrl, \
-    DocumentCtrl, MediaCtrl, FragmentCtrl, FragmentInfo, FrequencyCount, DocToNode, KnowLedge, \
+from subgraph.models import NodeInfo, MediaInfo, RelationshipInfo, NodeCtrl, MediaCtrl, FragmentCtrl, FragmentInfo, \
+    FrequencyCount, DocToNode, KnowLedge, \
     BaseInfo, BaseCtrl, RelationshipCtrl
 
 # 远端id检测
@@ -17,7 +17,7 @@ basePath = os.path.dirname(os.path.dirname(__file__))
 # InfoModel的集合
 info_models = Union[Type[NodeInfo], Type[MediaInfo], Type[RelationshipInfo]]
 # NeoNode为基础的Ctrl
-node_class_ctrl = Union[Type[NodeCtrl], Type[MediaCtrl], Type[DocumentCtrl]]
+node_class_ctrl = Union[Type[NodeCtrl], Type[MediaCtrl]]
 # NeoLink为基础的Ctrl
 link_class_ctrl = Union[Type[RelationshipCtrl], Type[FrequencyCount], Type[DocToNode], Type[KnowLedge]]
 # id的类型
@@ -27,12 +27,6 @@ item_type = Union['document', 'node', 'link', 'media', 'note', 'svg']
 # 所有的资源的类型
 source_type = Union[item_type, 'fragment', 'path']
 
-# QueryObject
-QueryObject = {
-    '_id': 0,
-    '_type': 'node',
-    '_label': ''
-}
 # type_label与ctrl模型的字典
 ctrl_dict: Dict[source_type, Dict[str, Type[BaseCtrl]]] = {
     "node": {
@@ -45,7 +39,7 @@ ctrl_dict: Dict[source_type, Dict[str, Type[BaseCtrl]]] = {
         'KnowLedge': KnowLedge
     },
     "document": {
-        'default': DocumentCtrl
+        'default': NodeCtrl
     },
     "media": {
         'default': MediaCtrl
@@ -168,6 +162,7 @@ def type_and_label_to_info_model(_type: source_type, _label: str):
             return info_dict[_type]['default']
     else:
         raise TypeError('Error Type')
+
 
 def default_translate():
     return {

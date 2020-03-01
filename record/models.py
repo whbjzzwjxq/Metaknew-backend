@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
+
+from base_api.interface_frontend import QueryObject
 from tools.models import IdField
 from document.models import DocGraph
 from tools.models import TypeField
@@ -35,61 +37,37 @@ class LocationsRecord(models.Model):
         db_table = "record_location"
 
 
-class BaseRecord(models.Model):
+class ItemVersionRecord(models.Model):
+    """
+    记录json content 但是是版本
+    """
     SourceId = models.BigIntegerField(editable=False, db_index=True)
     SourceType = TypeField(db_index=True, editable=False)
     SourceLabel = models.TextField(db_index=True, default='')
+    VersionId = models.IntegerField(default=1)
     UpdateTime = models.DateTimeField(auto_now=True, editable=False)
     CreateUser = IdField(editable=False)
     CreateType = models.TextField(default='USER')
 
     Name = models.TextField(db_column="Name", default='Draft')  # 草稿的名字
+    Content = JSONField(default=dict)  # 草稿的内容
     IsUsed = models.BooleanField(default=True)  # 是否被删除
+    IsAuto = models.BooleanField(default=False)  # 是否是自动生成的
+    IsDraft = models.BooleanField(default=True)  # 是否是草稿
     DontClear = models.BooleanField(default=False)  # 是否不要清除
-    Content = JSONField(default=dict)
 
-    class Meta:
-        abstract = True
+    def to_query_object(self) -> QueryObject:
+        return QueryObject({'id': self.SourceId, 'type': self.SourceType, 'pLabel': self.SourceLabel})
 
-
-class ItemVersionRecord(BaseRecord):
-    """
-    记录json content 但是是版本
-    """
-    VersionId = models.IntegerField(default=1)
-
-    def to_query_object(self):
-        return {
-            '_id': self.SourceId,
-            '_type': self.SourceType,
-            '_label': self.SourceLabel
-        }
+    @staticmethod
+    def update_fields():
+        return ['CreateUser', 'CreateType', 'Name', 'Content', 'IsUsed', 'IsAuto', 'IsDraft', 'DontClear']
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["SourceId", "VersionId"], name="ItemVersionControl")
         ]
         db_table = "record_item_version"
-
-
-class ItemDraft(BaseRecord):
-    """
-    草稿形式的记录
-    """
-    IsAuto = models.BooleanField(default=False)  # 是否是自动生成的
-
-    def to_query_object(self):
-        return {
-            '_id': '$_' + str(self.SourceId),
-            '_type': self.SourceType,
-            '_label': self.SourceLabel
-        }
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["SourceId", "CreateUser"], name="ItemDraftControl")
-        ]
-        db_table = "record_item_draft"
 
 
 class GraphVersionRecord(models.Model):

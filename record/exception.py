@@ -56,11 +56,13 @@ class WrongPasswordError(BaseException):
     """
     pass
 
+
 class TestApiError(BaseException):
     """
-    Api是测试Api 显示该提示表明已经resolve_hook, main_hook已经完成
+    Api是测试Api 显示该提示表明resolve_hook, main_hook已经完成
     """
     pass
+
 
 class ErrorForWeb:
     def __init__(self, error: Type[BaseException], description: Union[str, bytes] = '', content: dict = dict,

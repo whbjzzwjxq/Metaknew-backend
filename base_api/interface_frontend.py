@@ -96,21 +96,26 @@ class Interface(DataClass):
 
 @dataclass(init=False)
 class InfoFrontend(Interface):
-    _id: item_id = Interface.meta_field()
+    id: item_id = Interface.meta_field()
     type: item_type = Interface.meta_field()
     PrimaryLabel: item_type = Interface.meta_field()
     Name: str = Interface.meta_field()
-    Description: dict = Interface.meta_field(default_factory=default_translate)
     Labels: List[str] = Interface.meta_field(default_factory=list)
+    Description: dict = Interface.meta_field(default_factory=default_translate)
+    Translate: dict = Interface.meta_field(default_factory=default_translate)
     ExtraProps: dict = Interface.meta_field(default_factory=dict)
     StandardProps: dict = Interface.meta_field(default_factory=dict)
+
+
+@dataclass(init=False)
+class CommonInfoFrontend(InfoFrontend):
     IsCommon: bool = Interface.meta_field()
     IsFree: bool = Interface.meta_field()
     IsOpenSource: bool = Interface.meta_field()
 
 
 @dataclass(init=False)
-class NodeInfoFrontend(InfoFrontend):
+class NodeInfoFrontend(CommonInfoFrontend):
     Alias: List[str] = Interface.meta_field(default_factory=list)
     BaseImp: int = Interface.meta_field()
     BaseHardLevel: int = Interface.meta_field()
@@ -120,6 +125,12 @@ class NodeInfoFrontend(InfoFrontend):
     IncludedMedia: str = Interface.meta_field()
     MainPic: str = Interface.meta_field()
     Translate: str = Interface.meta_field()
+
+
+@dataclass(init=False)
+class MediaInfoFrontend(CommonInfoFrontend):
+    FileName: str = Interface.meta_field()
+    type: item_type = Interface.meta_field(default='media')
 
 
 @dataclass(init=False)
@@ -175,3 +186,38 @@ class CheckInfoDuplicateData(Interface):
 @dataclass(init=False)
 class SendCodeData(Interface):
     Phone: str = Interface.meta_field()
+
+
+@dataclass(init=False)
+class QueryObject(Interface):
+    id: item_id = Interface.meta_field()
+    type: item_type = Interface.meta_field()
+    pLabel: str = Interface.meta_field()
+
+
+@dataclass(init=False)
+class MediaUploadToNodeData(Interface):
+    MediaId: List[str] = Interface.meta_field()
+    TargetNode: QueryObject = Interface.meta_field(cls=QueryObject)
+
+
+@dataclass(init=False)
+class ItemDraftFrontend(Interface):
+    Query: QueryObject = Interface.meta_field(cls=QueryObject)
+    Name: str = Interface.meta_field()
+    Content: dict = Interface.meta_field()
+    VersionId: str = Interface.meta_field(default=None, required=False)
+
+
+@dataclass(init=False)
+class ItemDraftBulkData(Interface):
+    Data: List[ItemDraftFrontend] = Interface.meta_field(cls=ItemDraftFrontend, is_list=True)
+    IsAuto: bool = Interface.meta_field()
+    IsNode: bool = Interface.meta_field()  # 是否是Node草稿
+    CreateType: str = Interface.meta_field(default='USER')
+
+
+@dataclass(init=False)
+class MediaCreateData(Interface):
+    Info: MediaInfoFrontend = Interface.meta_field(cls=MediaInfoFrontend)
+    CreateType: str = Interface.meta_field(default='USER')

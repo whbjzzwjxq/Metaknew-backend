@@ -2,7 +2,7 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from subgraph.models import NodeInfo
-from tools.models import SettingField, IdField
+from tools.models import SettingField, IdField, LevelField
 
 
 # 设置的详情在前端查看
@@ -96,6 +96,10 @@ class DocGraph(models.Model):
     Medias = ArrayField(SettingField(), default=list)  # json里包含媒体在该专题下的设置
     Svgs = ArrayField(SettingField(), default=list)  # json里包含Svg
     Conf = JSONField(default=dict)  # json里包含专题本身的设置
+
+    Complete = LevelField()
+    MainNodes = ArrayField(IdField(), default=list)  # 主要节点
+    Size = models.IntegerField(default=0)  # 尺寸
 
     def to_dict(self):
         return {

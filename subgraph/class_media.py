@@ -4,6 +4,7 @@ from typing import Optional
 import oss2
 
 import tools.global_const
+from base_api.interface_frontend import MediaInfoFrontend
 from subgraph.class_base import BaseNodeModel
 from subgraph.models import MediaCtrl, MediaInfo
 from tools import base_tools
@@ -26,40 +27,16 @@ class MediaModel(BaseNodeModel):
         self.info_class = MediaInfo
         self.ctrl_class = MediaCtrl
 
-    # ---------------- create ----------------
-
-    def create(self, frontend_data):
-        """
-        base_media_create的别名
-        :param frontend_data: 前端的数据
-        :return:
-        """
-        return self.create(frontend_data)
-
-    def create(self, frontend_data: dict):
-        super().create(frontend_data)
-        assert "Name" in frontend_data
-        assert "PrimaryLabel" in frontend_data
-        assert "CreateType" in frontend_data
-        assert 'FileName' in frontend_data
-        self._ctrl_init(frontend_data["PrimaryLabel"], frontend_data["CreateType"])
-        self.ctrl_update_by_user(frontend_data)
-        self.history().add_record()
-        self._info_init(frontend_data["PrimaryLabel"])
-        self._graph_node_create()
-        self.update_by_user(frontend_data)
-        return self
-
     # ---------------- update ----------------
 
-    def ctrl_update_by_user(self, frontend_data):
+    def _ctrl_update_special_hook(self, frontend_data: MediaInfoFrontend):
         """
         用户能改变权限和文件位置
         :param frontend_data: 前端的数据
         :return:
         """
-        super().ctrl_update_by_user(frontend_data)
-        file_name = frontend_data['FileName']
+        super()._ctrl_update_special_hook(frontend_data)
+        file_name = frontend_data.FileName
         if self.ctrl.FileName != file_name:
             if self.oss_manager.object_exists(file_name):
                 self.ctrl.FileName = file_name
@@ -70,7 +47,7 @@ class MediaModel(BaseNodeModel):
         else:
             pass
 
-    def info_special_update(self, data):
+    def _info_update_special_hook(self, data):
         """
         特别update过程 暂时没有
         :param data:
@@ -104,20 +81,30 @@ class MediaModel(BaseNodeModel):
             raise FileNotFoundError
 
     @staticmethod
-    def get_media_type(file_format) -> str:
+    def get_media_label(file_format) -> str:
         """
-        注意返回的是完整的mime_type不是json, image之类的
+        注意返回的是json, image之类的
         :param file_format: str such as 'jpg'
-        :return: mime_type: str such as 'application/json'
+        :return: mime_type: str such as 'json'
         """
+        special_media_type = {
+            'text/markdown': 'markdown'
+        }
         mime_type_dict = mime_type_query()
         if mime_type_dict == {}:
             mime_type_dict = mimetypes.read_mime_types(tools.global_const.basePath + "/tools/mime.types")
             mime_type_set(mime_type_dict)
 
         if "." + file_format in mime_type_dict:
-            media_type = str(mime_type_dict["." + file_format])
-            return media_type
+            mime_type = str(mime_type_dict["." + file_format])
+            media_tuple = mime_type.split('/')
+            if media_tuple[0] == 'application':
+                result = media_tuple[1]
+            else:
+                result = media_tuple[0]
+            if mime_type in special_media_type:
+                result = special_media_type[mime_type]
+            return result
         else:
             return "unknown"
 

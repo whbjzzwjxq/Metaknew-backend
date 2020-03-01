@@ -112,7 +112,7 @@ class BaseLinkModel(PublicItemModel):
         # info link
         self._graph_link_create()
         self._info_init(p_label)
-        self.update_by_user(frontend_data)
+        self.info_update_hook(frontend_data)
         return self
 
     def _graph_link_create(self):
@@ -122,7 +122,7 @@ class BaseLinkModel(PublicItemModel):
         self._link = link
         self.collector.tx.create(self.link())
 
-    def info_special_update(self, data):
+    def _info_update_special_hook(self, data):
         pass
 
     def graph_link_update(self, data):
@@ -132,7 +132,7 @@ class BaseLinkModel(PublicItemModel):
             "CreateTime": datetime.now().replace(microsecond=0),
             "CreateType": self.ctrl.CreateType,
         }
-        self.link().update(neo_prop)
+        self.link().ctrl_update_hook(neo_prop)
         self.collector.tx.push(self.link)
 
     @classmethod
@@ -263,7 +263,7 @@ class SystemMadeLinkModel:
             else:
                 neo_prop[field.name] = getattr(self.ctrl, field.name)
         neo_prop['IsUsed'] = self.ctrl.IsUsed
-        self.link.update(neo_prop)
+        self.link.ctrl_update_hook(neo_prop)
         self.collector.tx.push(self.link)
 
     def save(self):

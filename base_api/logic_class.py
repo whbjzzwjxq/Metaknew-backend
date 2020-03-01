@@ -16,14 +16,14 @@ class VersionApi(Enum):
     latest = 'latest'
 
 
-class HttpRequestBoundUser(HttpRequest):
+class HttpRequestUser(HttpRequest):
     """
     绑定了user_model的请求
     """
     user: BaseUser
 
 
-def merge_request(request: HttpRequest, user_model: BaseUser) -> HttpRequestBoundUser:
+def merge_request(request: HttpRequest, user_model: BaseUser) -> HttpRequestUser:
     request.user = user_model
     return request
 
@@ -210,6 +210,14 @@ class UserApi(OpenApi):
     meta = Api.meta.rewrite(is_user=True)
     URL = ''
     abstract = True
+
+    def _main_hook(self, result: Type[Interface], request: HttpRequestUser) -> Any:
+        """
+        主执行体钩子
+        :param result:
+        :return:
+        """
+        pass
 
 
 T = TypeVar('T')

@@ -15,10 +15,12 @@ Including another URLconf
 """
 from base_api.user import login
 from base_api.subgraph import node
+from base_api.subgraph import common
+from base_api.subgraph import media
 from django.conf.urls.static import static
 from django.conf import settings
 
-all_api = login.apis + node.apis
+all_api = login.apis + node.apis + common.apis + media.apis
 urlpatterns = [
     api().url_pattern for api in all_api if api.meta.is_active and not api.abstract
 ] + static(settings.STATIC_URL)

@@ -78,7 +78,7 @@ class BaseUser:
 
             # 转为时间戳
             expire = datetime.datetime.strptime(response["Credentials"]["Expiration"], '%Y-%m-%dT%H:%M:%SZ')
-            response["Credentials"]["Expiration"] = expire.timestamp()
+            response["Credentials"]["Expiration"] = expire.timestamp() + 8 * 3600
             return response
         else:
             raise AttributeError

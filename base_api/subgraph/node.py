@@ -2,7 +2,7 @@ import json
 
 from django.http import HttpResponse
 
-from base_api.logic_class import HttpRequestBoundUser, Api
+from base_api.logic_class import HttpRequestUser, Api
 from base_api.subgraph.common import ItemApi
 from base_api.interface_frontend import NodeBulkCreateData
 from typing import List, Type
@@ -24,7 +24,7 @@ class NodeBulkCreate(NodeApi):
     frontend_data = NodeBulkCreateData
     meta = NodeApi.meta.rewrite()
 
-    def _main_hook(self, result: NodeBulkCreateData, request: HttpRequestBoundUser):
+    def _main_hook(self, result: NodeBulkCreateData, request: HttpRequestUser):
         data_list = result.Data
         collector = NeoSet()
         user_model = request.user
@@ -54,8 +54,9 @@ class NodeBulkUpdate(NodeApi):
     method = 'POST'
     URL = 'bulk_update'
     frontend_data = NodeBulkCreateData
+    meta = NodeApi.meta.rewrite(is_test=True)
 
-    def _main_hook(self, result: NodeBulkCreateData, request: HttpRequestBoundUser):
+    def _main_hook(self, result: NodeBulkCreateData, request: HttpRequestUser):
         data_list = result.Data
         collector = NeoSet()
         user_model = request.user
@@ -64,7 +65,7 @@ class NodeBulkUpdate(NodeApi):
                       user_id=user_model.user_id,
                       _type=node_info.type,
                       collector=collector
-                      ).update_by_user(node_info, create_type=result.CreateType)
+                      ).info_update_hook(node_info, create_type=result.CreateType)
             for node_info in data_list]
         return node_model_list, collector
 

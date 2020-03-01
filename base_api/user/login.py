@@ -10,7 +10,7 @@ from django.http import HttpResponse, HttpRequest
 
 from base_api.interface_frontend import LoginByPhoneData, LoginUserNameData, RegisterData, CheckInfoDuplicateData, \
     SendCodeData
-from base_api.logic_class import GuestApi, HttpRequestBoundUser, LoginResponse, Api
+from base_api.logic_class import GuestApi, HttpRequestUser, LoginResponse, Api
 from record.exception import ErrorForWeb, CodeExistError, CodeExpiredError, CodeDoesNotMatchError, ObjectAlreadyExist, \
     UnAuthorization, WrongPassword
 from tools.aliyun import authorityKeys
@@ -57,7 +57,7 @@ class LoginByCookie(LoginApi):
     frontend_data = None
     abstract = False
 
-    def _main_hook(self, result: None, request: HttpRequestBoundUser) -> LoginResponse:
+    def _main_hook(self, result: None, request: HttpRequestUser) -> LoginResponse:
         if request.user:
             result = LoginResponse(**request.user.login_success())
             return result

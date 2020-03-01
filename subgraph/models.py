@@ -49,13 +49,13 @@ class BaseInfo(models.Model):
         不自动生成的内容
         :return:
         """
-        return ['ItemId', 'ItemType', 'PrimaryLabel']
+        return ['ItemId', 'ItemType']
 
     def to_dict(self, exclude):
         if not exclude:
             exclude = BaseInfo.prop_not_to_dict()
         content = model_to_dict(self, exclude=exclude)
-        content.update({
+        content.ctrl_update_hook({
             '_id': self.ItemId,
             'type': self.ItemType,
             'PrimaryLabel': self.PrimaryLabel
@@ -100,7 +100,7 @@ class BaseCtrl(models.Model):
         if not exclude:
             exclude = BaseCtrl.prop_not_to_dict()
         content = model_to_dict(self, exclude=exclude)
-        content.update({
+        content.ctrl_update_hook({
             '_id': self.ItemId,
             'type': self.ItemType,
             'PrimaryLabel': self.PrimaryLabel,
@@ -108,13 +108,6 @@ class BaseCtrl(models.Model):
             'UpdateTime': mktime(self.UpdateTime.timetuple())
         })
         return content
-
-    def to_query_object(self):
-        return {
-            '_id': self.ItemId,
-            '_type': self.ItemType,
-            '_label': self.PrimaryLabel
-        }
 
     class Meta:
         abstract = True
@@ -241,15 +234,6 @@ class FragmentCtrl(BaseCtrl):
 
     class Meta:
         db_table = "item_fragment_ctrl"
-
-
-class DocumentCtrl(NodeCtrl):
-    Complete = LevelField()
-    MainNodes = ArrayField(IdField())
-    Size = models.IntegerField(default=0)
-
-    class Meta:
-        db_table = 'item_document_ctrl'
 
 
 # remake 2019-10-17 2019-10-20

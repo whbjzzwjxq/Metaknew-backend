@@ -7,7 +7,7 @@ from base_api.interface_frontend import NodeInfoFrontend
 from record.exception import UnAuthorizationError
 from subgraph.class_base import BaseNodeModel
 from subgraph.class_media import MediaModel
-from subgraph.models import NodeCtrl, MediaCtrl, NodeInfo, DocumentCtrl
+from subgraph.models import NodeCtrl, MediaCtrl, NodeInfo
 from tools import base_tools
 
 
@@ -20,27 +20,15 @@ class NodeModel(BaseNodeModel):
         self._ctrl: Optional[Type[NodeCtrl]] = None
         self._info: Optional[Type[NodeInfo]] = None
 
-    # ---------------- create ----------------
-
-    def create(self, frontend_data: NodeInfoFrontend, create_type: str):
-        super().create(frontend_data, create_type)
-        self._ctrl_init(frontend_data.PrimaryLabel, create_type)
-        self._info_init(frontend_data.PrimaryLabel)
-        self._graph_node_init()
-        self.ctrl_update_by_user(frontend_data)
-        self.update_by_user(frontend_data, create_type)
-        self.graph_node_update()
-        return self
-
     # ---------------- update ----------------
 
-    def ctrl_update_by_user(self, frontend_data: NodeInfoFrontend):
+    def _ctrl_update_special_hook(self, frontend_data: NodeInfoFrontend, create_type: str = 'USER'):
         """
         用户能够改变权限的信息
         :param frontend_data: 前端传回的数据
         :return:
         """
-        super().ctrl_update_by_user(frontend_data)
+        super()._ctrl_update_special_hook(frontend_data)
         # 更新contributor
         if self.is_create:
             self.ctrl.Contributor = []
@@ -48,7 +36,7 @@ class NodeModel(BaseNodeModel):
             if self.user_id not in self.ctrl.Contributor:
                 self.ctrl.Contributor.append(self.user_id)
 
-    def info_special_update(self, frontend_data: NodeInfoFrontend):
+    def _info_update_special_hook(self, frontend_data: NodeInfoFrontend):
         """
         特殊的更新内容
         :param frontend_data: 前端数据
@@ -110,9 +98,9 @@ class NodeModel(BaseNodeModel):
 
             if warn:
                 self.warn_add(field_name="IncludedMedia", warn_type="media_no_exist: " + str(warn))
-                return False, "media_no_exist: " + str(warn)
+                return warn
             else:
-                return True, ''
+                return []
         else:
             self.error_output(UnAuthorizationError, '没有编辑权限', strict=False)
             return False
@@ -140,51 +128,8 @@ class NodeModel(BaseNodeModel):
         result = super().bulk_save_update(model_list, collector)
         return result
 
-    def node_index(self):
-        ctrl: NodeCtrl = self.ctrl
-        info: NodeInfo = self.info
-        if not info.Language:
-            lang = 'auto'
-        else:
-            lang = info.Language
-        body = {
-            "id": self.id,
-            "type": self.type,
-            "PrimaryLabel": ctrl.PrimaryLabel,
-            "Language": lang,
-            "CreateUser": ctrl.CreateUser,
-            "UpdateTime": ctrl.UpdateTime,
-            "MainPic": info.MainPic,
-            "Alias": info.Alias,
-            "Name_zh": "",
-            "Name_en": "",
-            "Name_auto": info.Name,
-            "Tags": {
-                "Labels": info.Labels,
-                "Topic": info.Topic
-            },
-            "Level": {
-                "Imp": ctrl.Imp,
-                "HardLevel": ctrl.HardLevel,
-                "Useful": ctrl.Useful,
-                "TotalTime": ctrl.TotalTime
-            },
-            "IsUsed": ctrl.IsUsed,
-            "IsCommon": ctrl.IsCommon,
-            "IsOpenSource": ctrl.IsOpenSource
-        }
-        for lang in ['zh', 'en']:
-            if lang in info.Translate:
-                body["Name_%s" % lang] = info.Translate[lang]
-
-        return body
-
     def handle_for_frontend(self):
         return {
             'Info': self.info.to_dict(exclude=None),
             'Ctrl': self.ctrl.to_dict(exclude=None)
         }
-
-
-class DocumentNodeModel(NodeModel):
-    ctrl_class = DocumentCtrl
