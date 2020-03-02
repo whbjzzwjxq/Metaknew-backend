@@ -33,7 +33,7 @@ def bulk_handle(info_list, id_generator_method, model, user_id, collector):
     id_list = id_generator(len(new_item), method=id_generator_method)
     new_item_list = [model(_id=_id, user_id=user_id, collector=collector).create(info)
                      for _id, info in zip(id_list, info_list)]
-    remote_item_list = [model(_id=info['_id'], user_id=user_id, collector=collector).ctrl_update_hook(info) for info in info_list]
+    remote_item_list = [model(_id=info['_id'], user_id=user_id, collector=collector).update(info) for info in info_list]
     return model.bulk_save_create(new_item_list), model.bulk_save_update(remote_item_list)
 
 

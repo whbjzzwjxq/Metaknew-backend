@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.timezone import now
 from django.forms.models import model_to_dict
 
+from base_api.interface_frontend import QueryObject
 from tools.models import LevelField, TopicField, HotField, NameField, TranslateField, IdField, TypeField
 from users.models import User
 from typing import List
@@ -246,6 +247,12 @@ class RelationshipCtrl(BaseCtrl):
     StartPLabel = models.TextField()
     EndPLabel = models.TextField()
 
+    def query_object(self) -> List[QueryObject]:
+        return [
+            QueryObject(**{'id': self.StartId, 'type': self.StartType, 'pLabel': self.StartPLabel}),
+            QueryObject(**{'id': self.EndId, 'type': self.EndType, 'pLabel': self.EndPLabel})
+        ]
+
     class Meta:
         abstract = True
 
@@ -276,6 +283,10 @@ class DocToNode(RelationshipCtrl):
     IsMain = models.BooleanField(db_column="Main", default=False)  # 是否是Main节点
     Correlation = LevelField(db_column="Correlation")  # 相关度
     DocumentImp = LevelField(db_column="DocImp")  # 节点在该话题下的重要度
+
+    @staticmethod
+    def props_to_neo():
+        return ['CreateTime', 'IsUsed', 'IsMain', 'Correlation', 'ItemId']
 
     class Meta:
         db_table = "item_link_ctrl_doc_to_node"

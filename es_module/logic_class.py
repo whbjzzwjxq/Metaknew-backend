@@ -1,6 +1,6 @@
-from elasticsearch import Elasticsearch, helpers
 import langdetect
-from typing import List
+from elasticsearch import Elasticsearch, helpers
+from elasticsearch.helpers.errors import BulkIndexError
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
@@ -165,5 +165,8 @@ def bulk_add_text_index(nodes):
                     "_source": body
                 }
 
-    result = helpers.bulk(es, index_texts())
-    return result
+    try:
+        result = helpers.bulk(es, index_texts())
+        return result
+    except BulkIndexError or BaseException:
+        return None

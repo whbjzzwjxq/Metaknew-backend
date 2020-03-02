@@ -210,9 +210,6 @@ class BaseModel:
         self._update_special_hook(frontend_data, create_type)
         return self
 
-    def _update_special_hook(self, frontend_data: Type[InfoFrontend], create_type):
-        pass
-
     def ctrl_update_hook(self, frontend_data: Type[InfoFrontend], create_type: str = 'USER'):
         self.ctrl.PrimaryLabel = frontend_data.PrimaryLabel
         self.ctrl.CreateType = create_type
@@ -256,6 +253,9 @@ class BaseModel:
     def _info_update_special_hook(self, data):
         pass
 
+    def _update_special_hook(self, frontend_data: Type[InfoFrontend], create_type):
+        pass
+
     def save(self, history_save=True, neo4j_save=True):
         """
         整体的save过程
@@ -294,9 +294,9 @@ class BaseModel:
                     frontend_id_current_id_map = {model.frontend_id: model.id for model in model_list}
                     return frontend_id_current_id_map
             else:
-                return {}
-        except DatabaseError or TransactionError:
-            return None
+                return None
+        except DatabaseError or TransactionError as e:
+            ErrorForWeb(e, description='数据库错误').raise_error()
 
     @classmethod
     def bulk_save_update(cls, model_list, collector):
@@ -443,10 +443,6 @@ class BaseNodeModel(PublicItemModel):
         self._info: Optional[Type[NodeInfo], Type[MediaInfo]] = None
         self._ctrl: Optional[Type[NodeCtrl], Type[MediaCtrl]] = None
 
-    def info_update_hook(self, frontend_data: Type[InfoFrontend], create_type):
-        super().info_update_hook(frontend_data, create_type)
-        self.graph_node_update()
-
     def _update_special_hook(self, frontend_data: Type[InfoFrontend], create_type):
         self.graph_node_update()
 
@@ -463,7 +459,7 @@ class BaseNodeModel(PublicItemModel):
             return self._graph_node
 
     def _graph_node_init(self):
-        node = NeoNode(self.p_label)
+        node = NeoNode(self.p_label, self.type)
         node["_id"] = self.id
         node["_type"] = self.type
         node["_label"] = self.p_label

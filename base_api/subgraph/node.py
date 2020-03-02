@@ -61,11 +61,11 @@ class NodeBulkUpdate(NodeApi):
         collector = NeoSet()
         user_model = request.user
         node_model_list = [
-            NodeModel(_id=node_info._id,
+            NodeModel(_id=node_info.id,
                       user_id=user_model.user_id,
                       _type=node_info.type,
                       collector=collector
-                      ).info_update_hook(node_info, create_type=result.CreateType)
+                      ).update(node_info, create_type=result.CreateType)
             for node_info in data_list]
         return node_model_list, collector
 

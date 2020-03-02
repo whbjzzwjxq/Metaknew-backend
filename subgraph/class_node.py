@@ -9,13 +9,14 @@ from subgraph.class_base import BaseNodeModel
 from subgraph.class_media import MediaModel
 from subgraph.models import NodeCtrl, MediaCtrl, NodeInfo
 from tools import base_tools
+from tools.global_const import item_id
 
 
 class NodeModel(BaseNodeModel):
     info_class = NodeInfo
     ctrl_class = NodeCtrl
 
-    def __init__(self, _id: int, user_id: int, _type='node', collector=base_tools.NeoSet()):
+    def __init__(self, _id: item_id, user_id: int, _type='node', collector=base_tools.NeoSet()):
         super().__init__(_id, user_id, _type, collector)
         self._ctrl: Optional[Type[NodeCtrl]] = None
         self._info: Optional[Type[NodeInfo]] = None

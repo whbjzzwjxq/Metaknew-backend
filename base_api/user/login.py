@@ -170,11 +170,11 @@ class Register(RegisterApi):
         result_info = result.Info
         current_code = user_check_message(phone=result_info.Phone)
         if not current_code:
-            raise ErrorForWeb(CodeExpiredError, description=CodeExpiredError.__doc__, is_dev=False, is_error=True,
-                              status=400)
+            ErrorForWeb(CodeExpiredError, description=CodeExpiredError.__doc__, is_dev=False, is_error=True,
+                        status=400).raise_error()
         elif user_query_message(result_info.Phone) != result_info.Code:
-            raise ErrorForWeb(CodeDoesNotMatchError, description=CodeDoesNotMatchError.__doc__, is_dev=False,
-                              is_error=True, status=400)
+            ErrorForWeb(CodeDoesNotMatchError, description=CodeDoesNotMatchError.__doc__, is_dev=False, is_error=True,
+                        status=400).raise_error()
         else:
             try:
                 User.objects.get(Phone=result_info.Phone)

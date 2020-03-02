@@ -22,7 +22,7 @@ class User(models.Model):
     UserId = IdField(primary_key=True)  # 用户id
     Name = models.TextField(unique=True, db_index=True)  # 用户名
     UserPw = models.TextField()  # 用户密码
-    Email = models.TextField(unique=True, db_index=True)  # 用户邮箱
+    Email = models.TextField(unique=True, db_index=True, null=True)  # 用户邮箱
     Phone = models.CharField(max_length=11, unique=True)  # 用户手机号（用于登录的账号）
     CreateTime = models.DateTimeField(auto_now_add=True)  # 注册时间
     Setting = JSONField(default=user_setting)  # 用户设置

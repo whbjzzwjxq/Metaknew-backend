@@ -15,13 +15,13 @@ class NeoSet:
         self.Nmatcher = NodeMatcher(graph)
         self.Rmatcher = RelationshipMatcher(graph)
 
-    def match_node(self, query_object):
+    def match_node(self, _id):
         """
 
-        :param query_object: {_id, _type, _label}
+        :param _id: id
         :return:
         """
-        return self.Nmatcher.match([query_object['_type'], query_object['_label']], _id=query_object['_id'])
+        return self.Nmatcher.match(_id=_id)
 
     def match_link(self, query_object):
         return self.Rmatcher.match(r_type=query_object['_label'], _id=query_object['_id'])

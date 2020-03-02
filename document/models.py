@@ -94,22 +94,17 @@ class DocGraph(models.Model):
     Nodes = ArrayField(SettingField(), default=list)  # json里包含节点在该专题下的设置
     Links = ArrayField(SettingField(), default=list)  # json里包含关系在该专题下的设置
     Medias = ArrayField(SettingField(), default=list)  # json里包含媒体在该专题下的设置
-    Svgs = ArrayField(SettingField(), default=list)  # json里包含Svg
+    Texts = ArrayField(SettingField(), default=list)  # json里包含Svg
     Conf = JSONField(default=dict)  # json里包含专题本身的设置
 
     Complete = LevelField()
     MainNodes = ArrayField(IdField(), default=list)  # 主要节点
     Size = models.IntegerField(default=0)  # 尺寸
+    LinkFailed = models.BooleanField(default=False)  # 保存关系出错
 
-    def to_dict(self):
-        return {
-            '_id': self.DocId,
-            'nodes': self.Nodes,
-            'links': self.Links,
-            'medias': self.Medias,
-            'svgs': self.Svgs,
-            'conf': self.Conf
-        }
+    @property
+    def visual_node_setting(self):
+        return [self.Nodes + self.Medias]
 
     class Meta:
         db_table = "document_graph"

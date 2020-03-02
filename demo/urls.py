@@ -14,13 +14,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path("blog/", include("blog.urls"))
 """
 from base_api.user import login
-from base_api.subgraph import node
-from base_api.subgraph import common
-from base_api.subgraph import media
+from base_api.subgraph import node, common, media, document, link
 from django.conf.urls.static import static
 from django.conf import settings
 
-all_api = login.apis + node.apis + common.apis + media.apis
+all_api = login.apis + node.apis + common.apis + media.apis + document.apis + link.apis
 urlpatterns = [
     api().url_pattern for api in all_api if api.meta.is_active and not api.abstract
 ] + static(settings.STATIC_URL)

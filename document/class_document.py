@@ -1,104 +1,19 @@
 from time import time
-from typing import Optional, Union, Type
+from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import DatabaseError
 from django.db.models import Avg
+from py2neo.database import TransactionError
 
+from base_api.interface_setting import GraphInfoFrontend
 from document.models import DocGraph, Comment
+from subgraph.class_link import SysLinkModel
 from subgraph.class_node import BaseNodeModel, NodeModel
 from tools import base_tools
 from tools.id_generator import id_generator
 from users.models import UserConcern
-from tools.global_const import item_id, source_type
-from typing import List
-from subgraph.class_link import SystemMadeLinkModel
-
-
-class Graph:
-
-    def __init__(self, nodes, links, medias, svgs):
-        self.nodes: List[NodeSetting] = nodes
-        self.links: List[LinkSetting] = links
-        self.medias: List[MediaSetting] = medias
-        self.svgs: List[SvgSetting] = svgs
-
-    @staticmethod
-    def dict_to_graph(graph: dict):
-        nodes = [NodeSetting(**node, setting=node) for node in graph['nodes']]
-        links = [LinkSetting(**link, setting=link) for link in graph['links']]
-        medias = [MediaSetting(**media, setting=media) for media in graph['medias']]
-        svgs = [SvgSetting(**svg, setting=svg) for svg in graph['svgs']]
-        return Graph(nodes, links, medias, svgs)
-
-    @staticmethod
-    def empty_graph():
-        return Graph([], [], [], [])
-
-    def visual_node_setting(self):
-        result = []
-        result.extend(self.nodes)
-        result.extend(self.medias)
-        return result
-
-
-class BaseSetting:
-
-    def __init__(self, _id: item_id, _type: source_type, _label: str, setting: dict):
-        self._id = _id
-        self._type = _type
-        self._label = _label
-        self.setting = setting
-
-    def get_query_object(self):
-        result = self.setting
-        result.update({
-            '_id': self._id,
-            '_type': self._type,
-            '_label': self._label
-        })
-        return result
-
-    def setting_checker(self):
-        pass
-
-    @property
-    def id(self):
-        return self._id
-
-
-class NodeSetting(BaseSetting):
-
-    def __init__(self, _id: item_id, _type: source_type, _label: str, _name: str, _image: str, setting: dict):
-        super().__init__(_id, _type, _label, setting)
-        self._name = _name
-        self._image = _image
-
-
-class MediaSetting(BaseSetting):
-
-    def __init__(self, _id: item_id, _label: str, _name: str, _src: str, setting: dict):
-        super().__init__(_id, 'media', _label, setting)
-        self._name = _name
-        self._src = _src
-
-
-VisualNode = Union[Type[NodeSetting], Type[MediaSetting]]
-
-
-class LinkSetting(BaseSetting):
-
-    def __init__(self, _id: item_id, _label: str, _start: VisualNode, _end: VisualNode, setting: dict):
-        super().__init__(_id, 'link', _label, setting)
-        self._start = _start
-        self._end = _end
-
-
-class SvgSetting(BaseSetting):
-
-    def __init__(self, _id: item_id, _label: str, _points: [], _text: str, setting: dict):
-        super().__init__(_id, 'svg', _label, setting)
-        self._points = _points
-        self._text = _text
+from tools.global_const import re_for_frontend_id
 
 
 # todo node link 改写为类 level: 2 NeoNode还没同步
@@ -107,11 +22,11 @@ class DocGraphModel:
     def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
         self.user_id = int(user_id)
         self.id = int(_id)
+        assert not re_for_frontend_id.match(str(_id))
         self.collector = collector
         self.is_create = False  # 是否创建状态
         self._base_node: Optional[BaseNodeModel] = None  # DocumentNode模型
         self._graph: Optional[DocGraph] = None  # DocumentGraph模型
-        self.container = Graph.empty_graph()  # 将要更新Graph的内容
 
     @property
     def base_node(self):
@@ -126,38 +41,37 @@ class DocGraphModel:
                 self._graph = DocGraph.objects.get(DocId=self.id)
                 return self._graph
             except ObjectDoesNotExist:
-                return None
+                self._graph_item_init()
+                return self._graph
         else:
             return self._graph
 
     def branch(self):
         pass
 
-    def graph_item_init(self, data):
-        self.container = Graph.dict_to_graph(data)
+    def _graph_item_init(self):
+        self._graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Medias=[], Texts=[], Conf={})
 
-    def base_create(self, frontend_data):
+    def create(self, frontend_data: GraphInfoFrontend):
         self.is_create = True
-        self._graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Medias=[], Svgs=[], Conf={})
-        self.graph_item_init(frontend_data['Graph'])
-        self.graph_update(frontend_data)
+        self.update(frontend_data)
         return self
 
-    def graph_update(self, data):
-        pass
+    def update(self, data: GraphInfoFrontend):
+        self.update_node_to_doc_relationship(data)
+        self.update_content(data)
+        self.ctrl_update()
+        return self
 
-    def update_node_to_doc_relationship(self):
+    def update_node_to_doc_relationship(self, data: GraphInfoFrontend):
         """
         生成专题和节点的关系
         :return:
         """
         # Doc2graph关系生成
-        # 添加的节点
-        add_node_list = []
-        # 移除的节点
-        remove_node_list = []
+        content = data.Content
         # 待更新列表的id_list
-        current_node_id_list = [node.id for node in self.container.visual_node_setting()]
+        current_node_id_list = [item.id for item in content.vis_node]
         # 数据库列表的id_list
         remote_node_id_list = [node['_id'] for node in self.graph.Nodes + self.graph.Medias]
         # 需要生成的link
@@ -166,43 +80,37 @@ class DocGraphModel:
         update_link = []
 
         # 如果节点不在现有列表中
-        for node in self.container.visual_node_setting():
-            if int(node.id) not in remote_node_id_list:
-                neo_node = self.collector.match_node(node.get_query_object())
-                add_node_list.append([neo_node, node.get_query_object()])
+        add_node_list = [node for node in content.vis_node if int(node.id) not in remote_node_id_list]
         # 如果现有节点不在列表中
-        for node in self.graph.Nodes:
-            if int(node["_id"]) not in current_node_id_list:
-                neo_node = self.collector.match_node(node)
-                remove_node_list.append([neo_node, node])
+        remove_node_list = [node for node in self.graph.Nodes if int(node["_id"]) not in current_node_id_list]
 
         # 已经存在(有记录)的link
         for node in add_node_list:
             # 这是RelationshipCtrl
-            exist_link = SystemMadeLinkModel.query_by_node('DocToNode', start=self.base_node.query_object, end=node[1])
+            exist_link = SysLinkModel.query_by_node('DocToNode', start=self.base_node.id, end=node.id)
             if exist_link:
-                link = SystemMadeLinkModel(_id=exist_link.ItemId, user_id=self.user_id, _type='link', _label='DocToNode'
-                                           , collector=self.collector)
+                link = SysLinkModel(_id=exist_link.ItemId, user_id=self.user_id, _label='DocToNode',
+                                    collector=self.collector)
                 link._ctrl = exist_link
-                link.graph_link_update({
-                    'IsMain': node[1]['View']['isMain'],
+                link.update({
+                    'IsMain': node.View['isMain'],
                     'IsUsed': True,
                     'Correlation': 50,
                     'DocumentImp': 50
                 })
                 update_link.append(link)
             else:
-                create_link.append([self.base_node.graph_node, node[0]])
+                create_link.append(
+                    [self.base_node.graph_node, self.collector.match_node(node.id).first(), node.View['isMain']])
 
         for node in remove_node_list:
-            remove_link = SystemMadeLinkModel.query_by_node('DocToNode', start=self.base_node.query_object, end=node[1])
+            remove_link = SysLinkModel.query_by_node('DocToNode', start=self.base_node.id, end=node.id)
             if remove_link:
                 if not remove_link.IsUsed:
                     pass  # 不需要做事情
                 else:
-                    link = SystemMadeLinkModel(_id=remove_link.ItemId, user_id=self.user_id, _type='link',
-                                               _label='DocToNode'
-                                               , collector=self.collector)
+                    link = SysLinkModel(_id=remove_link.ItemId, user_id=self.user_id, _label='DocToNode',
+                                        collector=self.collector)
                     link._ctrl = remove_link
                     link.delete()
                     update_link.append(link)
@@ -210,48 +118,53 @@ class DocGraphModel:
                 pass  # 不需要做事情
 
         link_id_list = id_generator(len(create_link), method='link')
-        data = {
-            'Start': create_link[0],
-            'End': create_link[1],
-            'CreateType': 'SystemAuto'
-        }
-        model_list = [SystemMadeLinkModel(_id=_id, user_id=self.user_id, _label='DocToNode',
-                                          collector=self.collector).base_create(data)
-                      for _id, link in zip(link_id_list, create_link)]
-        SystemMadeLinkModel.bulk_save_update(update_link, collector=self.collector)
-        SystemMadeLinkModel.bulk_save_create(model_list, collector=self.collector)
+        model_list = [SysLinkModel(_id=_id, user_id=self.user_id, _label='DocToNode', collector=self.collector).create({
+            'Start': link[0],
+            'End': link[1],
+            'CreateType': 'SystemAuto',
+            'IsMain': link[2],
+            'IsUsed': True,
+            'Correlation': 50,
+            'DocumentImp': 50
+        })
+            for _id, link in zip(link_id_list, create_link)]
+        try:
+            if len(update_link) > 0:
+                SysLinkModel.bulk_save_update(update_link, collector=self.collector)
+            if len(model_list) > 0:
+                SysLinkModel.bulk_save_create(model_list, collector=self.collector)
+            self.graph.LinkFailed = True
+        except TransactionError or DatabaseError or BaseException as e:
+            self.graph.LinkFailed = False
+
+    def update_content(self, data: GraphInfoFrontend):
+        self.graph.Nodes = [node.to_dict for node in data.Content.nodes]
+        self.graph.Links = [link.to_dict for link in data.Content.links]
+        self.graph.Medias = [media.to_dict for media in data.Content.medias]
+        self.graph.Texts = [text.to_dict for text in data.Content.texts]
 
     def ctrl_update(self):
         """
-        更新Info部分
+        更新ctrl部分
         :return:
         """
-        ctrl = self.base_node.ctrl
-        ctrl.Size = len(self.graph.Nodes) + len(self.graph.Medias)
-        ctrl.Complete = 50
-        ctrl.MainNodes = [node["_id"] for node in self.graph().Nodes
-                          if node["View"]["isMain"] and node["_id"] != self.id]
+        self.graph.Size = len(self.graph.Nodes) + len(self.graph.Medias)
+        self.graph.Complete = 50
+        self.graph.MainNodes = [node["_id"] for node in self.graph.Nodes
+                                if node["View"]["isMain"] and node["_id"] != self.id]
 
     def get_item_list(self, _type):
         if _type == 'link':
-            return self.graph().Links
+            return self.graph.Links
         elif _type == 'node':
-            return self.graph().Nodes
+            return self.graph.Nodes
         elif _type == 'media':
-            return self.graph().Medias
+            return self.graph.Medias
         else:
-            return self.graph().Svgs
-
-    def bound_node(self, node_setting: NodeSetting):
-        """
-
-        :param node_setting: nodeSetting 包含_id, _type, _label
-        :return: NeoNode
-        """
-        node = self.collector.match_node(node_setting.get_query_object())
+            return self.graph.Texts
 
     @staticmethod
-    def check_reference(doc_id):
+    def check_reference():
         pass
         return True
 
@@ -293,12 +206,12 @@ class DocGraphModel:
         result = {
             "Base": self.base_node.handle_for_frontend(),
             "Graph": {
-                "nodes": self.graph().Nodes,
-                "links": self.graph().Links,
-                "medias": self.graph().Medias,
-                "svgs": self.graph().Svgs
+                "nodes": self.graph.Nodes,
+                "links": self.graph.Links,
+                "medias": self.graph.Medias,
+                "texts": self.graph.Texts
             },
-            "Conf": self.graph().Conf,
+            "Conf": self.graph.Conf,
         }
         return result
 
@@ -310,8 +223,20 @@ class DocGraphModel:
         return self.base_node.handle_for_frontend()
 
     @classmethod
-    def bulk_save_create(cls, graph_model_list):
-        return []
+    def bulk_save_create(cls, graph_list):
+        if len(graph_list) > 0:
+            DocGraph.objects.bulk_create([model.graph for model in graph_list])
+            return [graph.id for graph in graph_list]
+        else:
+            return []
+
+    @classmethod
+    def bulk_save_update(cls, graph_list):
+        if len(graph_list) > 0:
+            DocGraph.objects.bulk_update([model.graph for model in graph_list])
+            return [graph.id for graph in graph_list]
+        else:
+            return []
 
 
 class BaseComment:

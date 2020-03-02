@@ -2,7 +2,11 @@ import random
 from dataclasses import dataclass, is_dataclass, MISSING, field, asdict, astuple, fields
 from typing import List, Type
 
-from tools.global_const import item_id, item_type, default_translate
+
+def default_translate():
+    return {
+        'auto': ''
+    }
 
 
 @dataclass(init=False)
@@ -95,10 +99,20 @@ class Interface(DataClass):
 
 
 @dataclass(init=False)
+class QueryObject(Interface):
+    id: str = Interface.meta_field()
+    type: str = Interface.meta_field()
+    pLabel: str = Interface.meta_field()
+
+    def to_dict(self):
+        return {'_id': self.id, '_type': self.type, '_label': self.pLabel}
+
+
+@dataclass(init=False)
 class InfoFrontend(Interface):
-    id: item_id = Interface.meta_field()
-    type: item_type = Interface.meta_field()
-    PrimaryLabel: item_type = Interface.meta_field()
+    id: str = Interface.meta_field()
+    type: str = Interface.meta_field()
+    PrimaryLabel: str = Interface.meta_field()
     Name: str = Interface.meta_field()
     Labels: List[str] = Interface.meta_field(default_factory=list)
     Description: dict = Interface.meta_field(default_factory=default_translate)
@@ -130,7 +144,13 @@ class NodeInfoFrontend(CommonInfoFrontend):
 @dataclass(init=False)
 class MediaInfoFrontend(CommonInfoFrontend):
     FileName: str = Interface.meta_field()
-    type: item_type = Interface.meta_field(default='media')
+    type: str = Interface.meta_field(default='media')
+
+
+@dataclass(init=False)
+class LinkInfoFrontend(CommonInfoFrontend):
+    Start: QueryObject = Interface.meta_field(cls=QueryObject)
+    End: QueryObject = Interface.meta_field(cls=QueryObject)
 
 
 @dataclass(init=False)
@@ -158,7 +178,7 @@ class RegisterBaseInfo(Interface):
     Code: str = Interface.meta_field()
     Name: str = Interface.meta_field(required=False, default='')
     Password: str = Interface.meta_field(required=False, default='')
-    Email: str = Interface.meta_field(required=False, default='')
+    Email: str = Interface.meta_field(required=False, default=None)
 
     def __after_init__(self):
         if not self.Name:
@@ -189,13 +209,6 @@ class SendCodeData(Interface):
 
 
 @dataclass(init=False)
-class QueryObject(Interface):
-    id: item_id = Interface.meta_field()
-    type: item_type = Interface.meta_field()
-    pLabel: str = Interface.meta_field()
-
-
-@dataclass(init=False)
 class MediaUploadToNodeData(Interface):
     MediaId: List[str] = Interface.meta_field()
     TargetNode: QueryObject = Interface.meta_field(cls=QueryObject)
@@ -220,4 +233,22 @@ class ItemDraftBulkData(Interface):
 @dataclass(init=False)
 class MediaCreateData(Interface):
     Info: MediaInfoFrontend = Interface.meta_field(cls=MediaInfoFrontend)
+    CreateType: str = Interface.meta_field(default='USER')
+
+
+@dataclass(init=False)
+class DocumentFrontendData(Interface):
+    Conf: dict = Interface.meta_field()
+
+
+@dataclass(init=False)
+class VisNodeBulkCreateData(Interface):
+    Nodes: List[NodeInfoFrontend] = Interface.meta_field(cls=NodeInfoFrontend, is_list=True)
+    Medias: List[MediaInfoFrontend] = Interface.meta_field(cls=MediaInfoFrontend, is_list=True)
+    CreateType: str = Interface.meta_field(default='USER')
+
+
+@dataclass(init=False)
+class LinkBulkCreateData(Interface):
+    Links: List[LinkInfoFrontend] = Interface.meta_field(cls=LinkInfoFrontend, is_list=True)
     CreateType: str = Interface.meta_field(default='USER')

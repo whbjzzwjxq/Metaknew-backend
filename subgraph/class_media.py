@@ -10,6 +10,7 @@ from subgraph.models import MediaCtrl, MediaInfo
 from tools import base_tools
 from tools.aliyun import authorityKeys
 from tools.redis_process import mime_type_query, mime_type_set
+from tools.global_const import item_id
 
 
 class MediaModel(BaseNodeModel):
@@ -20,7 +21,7 @@ class MediaModel(BaseNodeModel):
     auth = oss2.Auth(access_key_id, access_key_secret)
     oss_manager = oss2.Bucket(auth, endpoint, bucket_name=bucket_name, connect_timeout=10000)
 
-    def __init__(self, _id: int, user_id: int, _type="media", collector=base_tools.NeoSet()):
+    def __init__(self, _id: item_id, user_id: int, _type="media", collector=base_tools.NeoSet()):
         super().__init__(_id, user_id, _type, collector)
         self._ctrl: Optional[MediaCtrl] = None
         self._info: Optional[MediaInfo] = None
@@ -49,7 +50,7 @@ class MediaModel(BaseNodeModel):
 
     def _info_update_special_hook(self, data):
         """
-        特别update过程 暂时没有
+        特别update过程 暂时没有将来把缩略图加入
         :param data:
         :return:
         """
