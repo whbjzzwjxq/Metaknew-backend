@@ -37,7 +37,7 @@ class ApiMeta:
     is_dev: bool = False  # 是否是开发级别的API
     is_record: bool = False  # 是否需要记录
     is_active: bool = True  # 是否正在使用
-    is_test: bool = True  # 是否是测试逻辑 不保存模型
+    is_test: bool = False  # 是否是测试逻辑 不保存模型
     version: str = 'latest'  # 版本
 
     @property
@@ -152,7 +152,7 @@ class Api(__ApiBase):
         """
         pass
 
-    def _main_hook(self, result: Type[Interface], request: HttpRequest) -> Any:
+    def _main_hook(self, result: Type[Interface], request: HttpRequest):
         """
         主执行体钩子
         :param result:

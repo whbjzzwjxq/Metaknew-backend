@@ -1,17 +1,16 @@
 import json
-from dataclasses import dataclass
 from typing import List, Dict
 
 from django.http import HttpResponse
 
-from base_api.interface_frontend import VisNodeBulkCreateData, InfoFrontend
+from base_api.interface_frontend import VisNodeBulkCreateData, InfoFrontend, DocumentQueryData
 from base_api.interface_setting import GraphBulkCreateData
 from base_api.logic_class import HttpRequestUser, UserApi
 from base_api.subgraph.common import ItemApi
 from document.class_document import DocGraphModel
 from subgraph.class_media import MediaModel
 from subgraph.class_node import NodeModel
-from tools.base_tools import NeoSet
+from tools.base_tools import NeoSet, DateTimeEncoder
 from tools.global_const import re_for_frontend_id
 from tools.id_generator import id_generator
 
@@ -31,7 +30,7 @@ def bulk_handle(info_list, id_generator_method, model, user_id, create_type, col
     :return:
     """
     id_list = id_generator(len(info_list), method=id_generator_method)
-    return [model(_id=_id, user_id=user_id, collector=collector).create(info, create_type)
+    return [model(_id=_id, user_id=user_id, _type=info.type, collector=collector).create(info, create_type)
             for _id, info in zip(id_list, info_list)]
 
 
@@ -123,4 +122,22 @@ class DocumentBulkUpdate(DocumentApi):
         return HttpResponse(status=200, content=json.dumps(result))
 
 
-apis = [VisNodeBulkCreate, DocumentBulkCreate, DocumentBulkUpdate]
+class DocumentQuery(DocumentApi):
+    """
+    查询专题
+    """
+    URL = 'query/graph'
+    abstract = False
+    method = 'GET'
+    frontend_data = DocumentQueryData
+    meta = DocumentApi.meta.rewrite(is_user=False)
+
+    def _main_hook(self, result: DocumentQueryData, request: HttpRequestUser):
+        user_id = getattr(request.user, 'user_id', 0)
+        return DocGraphModel(_id=result.id, user_id=user_id).handle_for_frontend_as_graph()
+
+    def _response_hook(self, result) -> HttpResponse:
+        return HttpResponse(status=200, content=json.dumps(result, cls=DateTimeEncoder))
+
+
+apis = [VisNodeBulkCreate, DocumentBulkCreate, DocumentBulkUpdate, DocumentQuery]

@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass, is_dataclass, MISSING, field, asdict, astuple, fields
-from typing import List, Type
+from typing import List, Type, Dict
 
 
 def default_translate():
@@ -252,3 +252,27 @@ class VisNodeBulkCreateData(Interface):
 class LinkBulkCreateData(Interface):
     Links: List[LinkInfoFrontend] = Interface.meta_field(cls=LinkInfoFrontend, is_list=True)
     CreateType: str = Interface.meta_field(default='USER')
+
+
+@dataclass(init=False)
+class EsQueryData(Interface):
+    language: str = Interface.meta_field(default='auto')
+    labels: List[str] = Interface.meta_field(default_factory=list, required=False)
+    props: Dict[str, str] = Interface.meta_field(default_factory=dict, required=False)
+    type: List[str] = Interface.meta_field(default_factory=list, required=False)
+    keyword: str = Interface.meta_field(required=True)
+
+
+@dataclass(init=False)
+class DocumentQueryData(Interface):
+    id: int = Interface.meta_field()
+
+
+@dataclass(init=False)
+class QueryData(Interface):
+    DataList: List[QueryObject] = Interface.meta_field(cls=QueryObject, is_list=True)
+
+
+@dataclass(init=False)
+class MediaQueryData(Interface):
+    DataList: List[str] = Interface.meta_field(default_factory=list)

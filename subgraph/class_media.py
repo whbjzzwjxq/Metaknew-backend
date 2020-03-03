@@ -108,9 +108,3 @@ class MediaModel(BaseNodeModel):
             return result
         else:
             return "unknown"
-
-    def handle_for_frontend(self):
-        return {
-            'Info': self.info.to_dict(exclude=None),
-            'Ctrl': self.ctrl.to_dict(exclude=None)
-        }

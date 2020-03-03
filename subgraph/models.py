@@ -56,8 +56,8 @@ class BaseInfo(models.Model):
         if not exclude:
             exclude = BaseInfo.prop_not_to_dict()
         content = model_to_dict(self, exclude=exclude)
-        content.ctrl_update_hook({
-            '_id': self.ItemId,
+        content.update({
+            'id': self.ItemId,
             'type': self.ItemType,
             'PrimaryLabel': self.PrimaryLabel
         })
@@ -94,19 +94,16 @@ class BaseCtrl(models.Model):
     @staticmethod
     def prop_not_to_dict():
         # 从BaseInfo中去除的Field
-        return ['ItemId', 'ItemType', 'PrimaryLabel', 'CreateUser', 'CreateTime', 'UpdateTime', 'IsUsed',
+        return ['ItemId', 'ItemType', 'PrimaryLabel', 'CreateTime', 'UpdateTime', 'IsUsed',
                 'PropsWarning']
 
     def to_dict(self, exclude: List[str] = None):
         if not exclude:
             exclude = BaseCtrl.prop_not_to_dict()
         content = model_to_dict(self, exclude=exclude)
-        content.ctrl_update_hook({
-            '_id': self.ItemId,
-            'type': self.ItemType,
-            'PrimaryLabel': self.PrimaryLabel,
-            'CreateUser': self.CreateUser,
-            'UpdateTime': mktime(self.UpdateTime.timetuple())
+        content.update({
+            'UpdateTime': mktime(self.UpdateTime.timetuple()),
+            'CreateUser': self.CreateUser
         })
         return content
 
@@ -119,7 +116,7 @@ class PublicItem(models.Model):
     IsShared = models.BooleanField(default=False, db_index=True)  # 是否分享
     IsOpenSource = models.BooleanField(default=False, db_index=True)  # 是否公开编辑
     Hot = HotField()  # 热度
-    Labels = models.TextField(default=list)  # 统计的用户标签
+    Labels = ArrayField(models.TextField(), default=list)  # 统计的用户标签
     NumStar = models.IntegerField(default=0)  # 收藏数量
     NumShared = models.IntegerField(default=0)  # 分享数量
     NumGood = models.IntegerField(default=0)  # 点赞数量
@@ -152,6 +149,10 @@ class NodeCtrl(PublicItemCtrl):
     Structure = LevelField()  # 数据完整的程度
     FeatureVec = JSONField(default=feature_vector)  # 特征值
     TotalTime = models.IntegerField(db_column="TotalTime", default=50)  # 需要的时间
+
+    @staticmethod
+    def prop_not_to_dict():
+        return PublicItemCtrl.prop_not_to_dict() + ['CountCacheTime', 'FeatureVec', 'Structure']
 
     class Meta:
         db_table = "item_node_ctrl"
@@ -252,6 +253,29 @@ class RelationshipCtrl(BaseCtrl):
             QueryObject(**{'id': self.StartId, 'type': self.StartType, 'pLabel': self.StartPLabel}),
             QueryObject(**{'id': self.EndId, 'type': self.EndType, 'pLabel': self.EndPLabel})
         ]
+
+    @staticmethod
+    def prop_not_to_dict():
+        return BaseCtrl.prop_not_to_dict() + ['StartId', 'StartType', 'StartPLabel', 'EndId', 'EndType', 'EndPLabel']
+
+    def to_dict(self, exclude: List[str] = None):
+        if not exclude:
+            exclude = RelationshipCtrl.prop_not_to_dict()
+        content = model_to_dict(self, exclude=exclude)
+        content.update({
+            'Start': {
+                'id': self.StartId,
+                'type': self.StartType,
+                'PrimaryLabel': self.StartPLabel
+            },
+            'End': {
+                'id': self.EndId,
+                'type': self.EndType,
+                'PrimaryLabel': self.EndPLabel
+            },
+            'CreateUser': self.CreateUser
+        })
+        return content
 
     class Meta:
         abstract = True

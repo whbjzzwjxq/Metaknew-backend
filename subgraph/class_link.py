@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from typing import Type
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -24,7 +24,7 @@ class LinkModel(PublicItemModel):
     ctrl_class = KnowLedge
     info_class = RelationshipInfo
 
-    def __init__(self, _id: int, user_id: int, _type='link', collector=NeoSet()):
+    def __init__(self, _id: Union[int, str], user_id: int, _type='link', collector=NeoSet()):
         """
         :param user_id:用户/设备id
         :param _id: link id
@@ -277,7 +277,7 @@ class SysLinkModel:
     def bulk_save_update(cls, model_list, collector: NeoSet):
         ctrl_list = [link.ctrl for link in model_list]
         cls.ctrl_class.objects.bulk_update(ctrl_list, [field.name for field in cls.ctrl_class._meta.fields
-                                                       if not field.auto_created])
+                                                       if not field.auto_created and not field.name == 'ItemId'])
         collector.tx.commit()
         return True
 

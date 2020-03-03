@@ -1,13 +1,14 @@
 import json
 from typing import List, Tuple
+
 from django.http import HttpResponse
 
-from base_api.interface_frontend import MediaUploadToNodeData, MediaCreateData
+from base_api.interface_frontend import MediaUploadToNodeData, MediaCreateData, MediaQueryData
 from base_api.logic_class import HttpRequestUser
 from base_api.subgraph.common import ItemApi
 from subgraph.class_media import MediaModel
 from subgraph.class_node import NodeModel
-from tools.base_tools import NeoSet
+from tools.base_tools import NeoSet, DateTimeEncoder
 from tools.id_generator import id_generator
 
 
@@ -83,4 +84,23 @@ class MediaCreate(MediaApi):
         return HttpResponse(status=200, content=json.dumps({result.frontend_id: result.id}))
 
 
-apis = [MediaUploadToNode, MediaCreate]
+class MediaQuery(MediaApi):
+    """
+    Media Query
+    """
+    abstract = False
+    URL = 'query'
+    method = 'POST'
+    frontend_data = MediaQueryData
+    meta = MediaApi.meta.rewrite(is_user=False)
+
+    def _main_hook(self, result: MediaQueryData, request: HttpRequestUser):
+        user_id = getattr(request.user, 'user_id', 0)
+        return [MediaModel(_id=query, user_id=user_id, _type='media').handle_for_frontend()
+                for query in result.DataList]
+
+    def _response_hook(self, result) -> HttpResponse:
+        return HttpResponse(status=200, content=json.dumps(result, cls=DateTimeEncoder))
+
+
+apis = [MediaUploadToNode, MediaCreate, MediaQuery]

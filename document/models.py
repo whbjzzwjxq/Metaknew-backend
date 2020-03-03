@@ -106,6 +106,10 @@ class DocGraph(models.Model):
     def visual_node_setting(self):
         return [self.Nodes + self.Medias]
 
+    @classmethod
+    def all_fields(cls):
+        return [field.name for field in cls._meta.fields if not field.name == 'DocId']
+
     class Meta:
         db_table = "document_graph"
 

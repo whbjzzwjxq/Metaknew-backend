@@ -320,6 +320,14 @@ class BaseModel:
         except DatabaseError or TransactionError:
             return None
 
+    def handle_for_frontend(self):
+        result = {
+            'Info': self.info.to_dict(exclude=None),
+            'Ctrl': self.ctrl.to_dict(exclude=None)
+        }
+        result['Info']['IsUsed'] = self.ctrl.IsUsed
+        return result
+
 
 class PublicItemModel(BaseModel):
     """
@@ -429,6 +437,12 @@ class PublicItemModel(BaseModel):
         result = super().bulk_save_update(model_list, collector)
         if result:
             bulk_add_text_index(model_list)
+        return result
+
+    def handle_for_frontend(self):
+        result = super().handle_for_frontend()
+        result['Info']['IsCommon'] = self.ctrl.IsCommon
+        result['Info']['IsOpenSource'] = self.ctrl.IsOpenSource
         return result
 
 

@@ -1,14 +1,15 @@
 import json
-from typing import List, Dict
-from django.http import HttpResponse
-from base_api.interface_frontend import Interface, LinkBulkCreateData
 from dataclasses import dataclass
+from typing import List, Dict
 
+from django.http import HttpResponse
+
+from base_api.interface_frontend import LinkBulkCreateData, QueryData
 from base_api.logic_class import HttpRequestUser
 from base_api.subgraph.common import ItemApi
-from tools.base_tools import NeoSet
-from tools.id_generator import id_generator
 from subgraph.class_link import LinkModel
+from tools.base_tools import NeoSet, DateTimeEncoder
+from tools.id_generator import id_generator
 
 
 class LinkApi(ItemApi):
@@ -41,4 +42,24 @@ class LinkBulkCreate(LinkApi):
         return HttpResponse(status=200, content=json.dumps(result))
 
 
-apis = [LinkBulkCreate]
+@dataclass(init=False)
+class LinkQuery(LinkApi):
+    """
+    link Query
+    """
+    URL = 'query'
+    abstract = False
+    method = 'POST'
+    frontend_data = QueryData
+    meta = LinkApi.meta.rewrite(is_user=False)
+
+    def _main_hook(self, result: QueryData, request: HttpRequestUser):
+        user_id = getattr(request.user, 'user_id', 0)
+        return [LinkModel(_id=query.id, user_id=user_id, _type=query.type).handle_for_frontend()
+                for query in result.DataList]
+
+    def _response_hook(self, result) -> HttpResponse:
+        return HttpResponse(status=200, content=json.dumps(result, cls=DateTimeEncoder))
+
+
+apis = [LinkBulkCreate, LinkQuery]

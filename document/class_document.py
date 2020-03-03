@@ -142,6 +142,7 @@ class DocGraphModel:
         self.graph.Links = [link.to_dict for link in data.Content.links]
         self.graph.Medias = [media.to_dict for media in data.Content.medias]
         self.graph.Texts = [text.to_dict for text in data.Content.texts]
+        self.graph.Conf = data.Conf.to_dict
 
     def ctrl_update(self):
         """
@@ -205,7 +206,7 @@ class DocGraphModel:
         """
         result = {
             "Base": self.base_node.handle_for_frontend(),
-            "Graph": {
+            "Content": {
                 "nodes": self.graph.Nodes,
                 "links": self.graph.Links,
                 "medias": self.graph.Medias,
@@ -213,6 +214,8 @@ class DocGraphModel:
             },
             "Conf": self.graph.Conf,
         }
+        if result['Conf'] == {}:
+            result['Conf'] = {'_id': self.id, '_type': 'document', '_label': 'DocGraph'}
         return result
 
     def handle_for_frontend(self):
@@ -233,7 +236,7 @@ class DocGraphModel:
     @classmethod
     def bulk_save_update(cls, graph_list):
         if len(graph_list) > 0:
-            DocGraph.objects.bulk_update([model.graph for model in graph_list])
+            DocGraph.objects.bulk_update([model.graph for model in graph_list], fields=DocGraph.all_fields())
             return [graph.id for graph in graph_list]
         else:
             return []

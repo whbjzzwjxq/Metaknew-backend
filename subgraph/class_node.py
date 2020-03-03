@@ -128,9 +128,3 @@ class NodeModel(BaseNodeModel):
     def bulk_save_update(cls, model_list, collector):
         result = super().bulk_save_update(model_list, collector)
         return result
-
-    def handle_for_frontend(self):
-        return {
-            'Info': self.info.to_dict(exclude=None),
-            'Ctrl': self.ctrl.to_dict(exclude=None)
-        }

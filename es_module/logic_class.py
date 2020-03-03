@@ -2,6 +2,8 @@ import langdetect
 from elasticsearch import Elasticsearch, helpers
 from elasticsearch.helpers.errors import BulkIndexError
 
+from base_api.interface_frontend import EsQueryData
+
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
 
@@ -18,10 +20,8 @@ def language_detect(text):
 
 #  todo 加入评分 level: 3
 class EsQuery:
-    _types = ['node', 'media', 'document', 'fragment']
-
-    def __init__(self):
-        self.es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
+    _types = ['node', 'media', 'document', 'link']
+    es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
     def query(self, body, index):
         query_body = {
@@ -29,28 +29,22 @@ class EsQuery:
         }
         return self.es.search(index=index, body=query_body)
 
-    def main(self, query_object):
+    def main(self, query_object: EsQueryData):
         body_list = []
-        labels = [label.lower() for label in query_object["labels"]]
-        props = query_object["props"]
-        keyword = query_object["keyword"]
+        labels = [label.lower() for label in query_object.labels]
+        props = query_object.props
+        keyword = query_object.keyword
 
         # name-alias
-        if 'language' in query_object:
-            language = query_object["language"]
+        if query_object.language:
+            language = query_object.language
         else:
             language = language_detect(keyword)
 
         body_list.append(self.name_match_body(keyword, language))
 
-        # type
-        active_types = []
-        for _type in self._types:
-            if _type in labels:
-                active_types.append(_type)
-                labels.remove(_type)
-        if active_types:
-            body_list.append(self.type_match_body(active_types))
+        if query_object.type:
+            body_list.append(self.type_match_body(query_object.type))
 
         # label topic
         if labels:
@@ -62,7 +56,7 @@ class EsQuery:
                 "tie_breaker": 0.7
             }
         }
-        result = self.query(body=dis_max_body, index="nodes")
+        result = self.query(body=dis_max_body, index="texts")
         return self.get_info_from_result(result)
 
     @staticmethod
@@ -76,11 +70,11 @@ class EsQuery:
     @staticmethod
     def name_match_body(keyword, language):
         if language == 'auto':
-            fields = ["Name_auto", "Name_auto.total",
+            fields = ["Name.auto", "Name.auto.total",
                       "Alias"]
         else:
-            fields = ["Name_auto", "Name_auto.total",
-                      'Name_%s' % language, 'Name_%s.total' % language,
+            fields = ["Name.auto", "Name.auto.total",
+                      'Name.%s' % language, 'Name.%s.total' % language,
                       "Alias"]
         body = {
             "multi_match": {
@@ -169,4 +163,4 @@ def bulk_add_text_index(nodes):
         result = helpers.bulk(es, index_texts())
         return result
     except BulkIndexError or BaseException:
-        return None
+        print('Bad!!!')
