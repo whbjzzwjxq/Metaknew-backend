@@ -58,7 +58,10 @@ class DocGraphModel:
         return self
 
     def update(self, data: GraphInfoFrontend):
-        self.update_node_to_doc_relationship(data)
+        try:
+            self.update_node_to_doc_relationship(data)
+        except TransactionError or DatabaseError or BaseException as e:
+            self.graph.LinkFailed = False
         self.update_content(data)
         self.ctrl_update()
         return self
@@ -104,7 +107,7 @@ class DocGraphModel:
                     [self.base_node.graph_node, self.collector.match_node(node.id).first(), node.View['isMain']])
 
         for node in remove_node_list:
-            remove_link = SysLinkModel.query_by_node('DocToNode', start=self.base_node.id, end=node.id)
+            remove_link = SysLinkModel.query_by_node('DocToNode', start=self.base_node.id, end=node['_id'])
             if remove_link:
                 if not remove_link.IsUsed:
                     pass  # 不需要做事情
@@ -128,14 +131,11 @@ class DocGraphModel:
             'DocumentImp': 50
         })
             for _id, link in zip(link_id_list, create_link)]
-        try:
-            if len(update_link) > 0:
-                SysLinkModel.bulk_save_update(update_link, collector=self.collector)
-            if len(model_list) > 0:
-                SysLinkModel.bulk_save_create(model_list, collector=self.collector)
-            self.graph.LinkFailed = True
-        except TransactionError or DatabaseError or BaseException as e:
-            self.graph.LinkFailed = False
+        if len(update_link) > 0:
+            SysLinkModel.bulk_save_update(update_link, collector=self.collector)
+        if len(model_list) > 0:
+            SysLinkModel.bulk_save_create(model_list, collector=self.collector)
+        self.graph.LinkFailed = True
 
     def update_content(self, data: GraphInfoFrontend):
         self.graph.Nodes = [node.to_dict for node in data.Content.nodes]

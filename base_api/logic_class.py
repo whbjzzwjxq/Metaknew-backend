@@ -218,15 +218,3 @@ class UserApi(OpenApi):
         :return:
         """
         pass
-
-
-T = TypeVar('T')
-all_subclasses = {}
-
-
-def get_all_subclass(model: T) -> Dict[str, T]:
-    for sub in model.__subclasses__():
-        if sub.__name__ not in all_subclasses:
-            all_subclasses.update({sub.__name__: sub})
-        get_all_subclass(sub)
-    return all_subclasses

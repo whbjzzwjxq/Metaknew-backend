@@ -124,7 +124,6 @@ class InfoFrontend(Interface):
 @dataclass(init=False)
 class CommonInfoFrontend(InfoFrontend):
     IsCommon: bool = Interface.meta_field()
-    IsFree: bool = Interface.meta_field()
     IsOpenSource: bool = Interface.meta_field()
 
 

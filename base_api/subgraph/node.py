@@ -54,7 +54,7 @@ class NodeBulkUpdate(NodeApi):
     method = 'POST'
     URL = 'bulk_update'
     frontend_data = NodeBulkCreateData
-    meta = NodeApi.meta.rewrite(is_test=True)
+    meta = NodeApi.meta.rewrite()
 
     def _main_hook(self, result: NodeBulkCreateData, request: HttpRequestUser):
         data_list = result.Data

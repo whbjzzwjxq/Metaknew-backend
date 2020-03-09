@@ -311,11 +311,11 @@ class BaseModel:
             if len(output_model) > 0:
                 with transaction.atomic():
                     ctrl_model_list = list(output_model[:, 0])
-                    cls.ctrl_class.objects.bulk_update(ctrl_model_list)
+                    cls.ctrl_class.objects.bulk_update(ctrl_model_list, ctrl_model_list[0].saved_fields())
                     info_model_list = list(output_model[:, 1])
-                    cls.info_class.objects.bulk_update(info_model_list)
-                    history_model_list = [his.current_record for his in output_model[:, 2]]
-                    ItemVersionRecord.objects.bulk_create(history_model_list)
+                    cls.info_class.objects.bulk_update(info_model_list, info_model_list[0].saved_fields())
+                    history_model_list = [his for his in output_model[:, 2]]
+                    ItemHistory.bulk_save(history_model_list)
                 return True
         except DatabaseError or TransactionError:
             return None
@@ -518,8 +518,5 @@ class BaseNodeModel(PublicItemModel):
     def bulk_save_update(cls, model_list, collector):
         result = super().bulk_save_update(model_list, collector)
         if result:
-            # history
-            history_model_list = [model.history.current_record for model in model_list]
-            ItemVersionRecord.objects.bulk_create(history_model_list)
             collector.tx.commit()
         return result

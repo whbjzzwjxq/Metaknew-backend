@@ -42,7 +42,7 @@ class BaseInfo(models.Model):
     @staticmethod
     def prop_not_to_dict():
         # 从BaseInfo中去除的Field
-        return ['ItemId', 'ItemType', 'PrimaryLabel']
+        return ['ItemId', 'ItemType']
 
     @staticmethod
     def special_update() -> List[str]:
@@ -51,6 +51,11 @@ class BaseInfo(models.Model):
         :return:
         """
         return ['ItemId', 'ItemType']
+
+    @classmethod
+    def saved_fields(cls):
+        return [field.name for field in cls._meta.fields
+                if field.name not in cls.prop_not_to_dict() and not field.auto_created]
 
     def to_dict(self, exclude):
         if not exclude:
@@ -96,6 +101,11 @@ class BaseCtrl(models.Model):
         # 从BaseInfo中去除的Field
         return ['ItemId', 'ItemType', 'PrimaryLabel', 'CreateTime', 'UpdateTime', 'IsUsed',
                 'PropsWarning']
+
+    @classmethod
+    def saved_fields(cls):
+        return [field.name for field in cls._meta.fields
+                if field.name not in cls.prop_not_to_dict() and not field.auto_created]
 
     def to_dict(self, exclude: List[str] = None):
         if not exclude:
@@ -173,12 +183,6 @@ class NodeInfo(BaseInfo):
     IncludedMedia = ArrayField(IdField(), db_column="IncludedMedia", default=list)  # 包含的多媒体文件id
 
     @staticmethod
-    def prop_not_to_dict():
-        # 从BaseInfo中去除的Field
-        parent_list = BaseInfo.prop_not_to_dict()
-        return parent_list.extend([])
-
-    @staticmethod
     def special_update() -> List[str]:
         field_list = BaseInfo.special_update()
         field_list.extend(['Alias', 'Topic', 'BaseImp', 'BaseHardLevel', 'BaseUseful', 'Language', 'Translate'])
@@ -208,7 +212,8 @@ class MediaInfo(BaseInfo):
     def prop_not_to_dict():
         # 从BaseInfo中去除的Field
         parent_list = BaseInfo.prop_not_to_dict()
-        return parent_list.extend([])
+        parent_list.extend(['PrimaryLabel'])
+        return parent_list
 
     class Meta:
         db_table = 'item_media_info'
@@ -217,12 +222,6 @@ class MediaInfo(BaseInfo):
 class FragmentInfo(BaseInfo):
     ItemType = TypeField(default='fragment')  # Item的Type
     Src = models.URLField(default='')  # 如果是图片, 那么有来源
-
-    @staticmethod
-    def prop_not_to_dict():
-        # 从BaseInfo中去除的Field
-        parent_list = BaseInfo.prop_not_to_dict()
-        return parent_list.extend([])
 
     class Meta:
         db_table = "item_fragment_info"
@@ -282,12 +281,6 @@ class RelationshipCtrl(BaseCtrl):
 
 
 class RelationshipInfo(BaseInfo):
-
-    @staticmethod
-    def prop_not_to_dict():
-        # 从BaseInfo中去除的Field
-        parent_list = BaseInfo.prop_not_to_dict()
-        return parent_list.extend([])
 
     class Meta:
         db_table = "item_link_info"
