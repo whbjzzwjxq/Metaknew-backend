@@ -12,14 +12,6 @@ from tools.base_tools import NeoSet
 from tools.global_const import type_and_label_to_ctrl_model
 
 
-def query_object_to_link_ctrl(query_object: dict, prefix: str) -> dict:
-    return {
-        prefix + 'Id': query_object['_id'],
-        prefix + 'Type': query_object['_type'],
-        prefix + 'PLabel': query_object['_label']
-    }
-
-
 class LinkModel(PublicItemModel):
     ctrl_class = KnowLedge
     info_class = RelationshipInfo
@@ -46,35 +38,36 @@ class LinkModel(PublicItemModel):
     def graph_link(self):
         if not self._graph_link:
             self._graph_link = self.collector.Rmatcher.match(r_type=self.p_label, _id=self.id).first()
-            if not self._graph_link:
-                self._graph_link_init()
-                return self._graph_link
-            return self._graph_link
-        else:
-            return self._graph_link
+            if self._graph_link is None:
+                raise ObjectDoesNotExist()
+        return self._graph_link
 
     @property
     def start(self):
         if not self._start:
-            self._start = self.collector.match_node(self.ctrl.StartId)
+            self._start = self.collector.match_node(self.ctrl.StartId).first()
+            if self._start is None:
+                raise ObjectDoesNotExist()
         return self._start
 
     @property
     def end(self):
         if not self._end:
-            self._end = self.collector.match_node(self.ctrl.EndId)
+            self._end = self.collector.match_node(self.ctrl.EndId).first()
+            if self._end is None:
+                raise ObjectDoesNotExist()
         return self._end
 
     @property
     def walk(self):
         if not self._walk:
-            self._walk = walk(self.graph_link())
+            self._walk = walk(self.graph_link)
             return self._walk
         else:
             return self._walk
 
     @staticmethod
-    def query_by_node(p_label: str, start=None, end=None):
+    def query_by_node(p_label: str, start: QueryObject = None, end: QueryObject = None):
         """
         使用起始和终止节点查询
         :param p_label: 主标签
@@ -86,9 +79,9 @@ class LinkModel(PublicItemModel):
             'PrimaryLabel': p_label
         }
         if start:
-            query_dict.update(query_object_to_link_ctrl(start, 'Start'))
+            query_dict.update({'StartId': start.id})
         if end:
-            query_dict.update(query_object_to_link_ctrl(end, 'End'))
+            query_dict.update({'EndId': end.id})
         try:
             ctrl_set = RelationshipCtrl.objects.filter(**query_dict)
             return ctrl_set
@@ -96,19 +89,17 @@ class LinkModel(PublicItemModel):
         except ObjectDoesNotExist:
             return None
 
-    def create(self, frontend_data: LinkInfoFrontend, create_type: str = 'USER'):
-        """
-        收集基础信息
-        :param create_type: 创建
-        :param frontend_data: 前端传回的数据
-        :return:
-        """
-        self.is_create = True
-        self.frontend_id = frontend_data.id
+    def _graph_link_init(self):
+        link = Relationship(self.start, self.p_label, self.end)
+        link['_id'] = self.id
+        link['_label'] = self.p_label
+        self._graph_link = link
+        self.collector.tx.create(self.graph_link)
+
+    def _special_init(self, frontend_data: LinkInfoFrontend, create_type: str):
         self._start = self.collector.match_node(frontend_data.Start.id).first()
         self._end = self.collector.match_node(frontend_data.End.id).first()
-        self.update(frontend_data, create_type)
-        return self
+        self._graph_link_init()
 
     def _ctrl_update_special_hook(self, frontend_data: LinkInfoFrontend):
         self.ctrl.StartId = frontend_data.Start.id
@@ -120,13 +111,6 @@ class LinkModel(PublicItemModel):
 
     def _update_special_hook(self, frontend_data: LinkInfoFrontend, create_type):
         self.graph_link_update()
-
-    def _graph_link_init(self):
-        link = Relationship(self.start, self.p_label, self.end)
-        link['_id'] = self.id
-        link['_label'] = self.p_label
-        self._graph_link = link
-        self.collector.tx.create(self.graph_link)
 
     def graph_link_update(self):
         neo_prop = {

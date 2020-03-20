@@ -1,15 +1,17 @@
 import datetime
 import json
-from typing import Union, Optional
+from typing import Union, Optional, Type, List
 
 from aliyunsdkcore import client
 from aliyunsdkcore.profile import region_provider
 from aliyunsdksts.request.v20150401 import AssumeRoleRequest
 from django.contrib.auth.hashers import make_password
+from django.db.models import QuerySet
 
+from record.exception import RewriteMethodError
 from tools.encrypt import make_user_token
 from tools.redis_process import *
-from users.models import GroupCtrl
+from users.models import GroupCtrl, UserPropResolve, UserPLabelExtraProps, UserEditDataBase
 
 salt = "al76vdj895as12cq"
 
@@ -21,16 +23,17 @@ class BaseUser:
         self.is_login = False
         self._user: Optional[User] = None
         self._privilege: Optional[Privilege] = None
+        self._prop_resolve: Optional[Type[QuerySet]] = None
 
     @property
     def user_info(self):
-        if not self._user:
+        if self._user is None:
             self._user = User.objects.get(pk=self.user_id)
         return self._user
 
     @property
     def privilege(self):
-        if not self._privilege:
+        if self._privilege is None:
             self._privilege = Privilege.objects.get(pk=self.user_id)
         return self._privilege
 
@@ -129,7 +132,46 @@ class BaseGroup:
         # return output
 
 
-class UserItem:
+M = Union[Type[UserEditDataBase], UserEditDataBase]
 
-    def __init__(self, user_id: str):
-        pass
+
+class _UserEditDataModel:
+    model: M = UserEditDataBase
+
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.model_set: QuerySet = self.model.objects.filter(UserId=user_id)
+        self.update_list: List[M] = []
+        self.create_list: List[M] = []
+
+    def update_create(self, data_list):
+        for data in data_list:
+            try:
+                result: M = self.model_set.get(Key=data.Key)
+                self.update_list.append(result)
+            except ObjectDoesNotExist:
+                result: M = self.model(
+                    Key=data.Key,
+                    UserId=self.user_id
+                )
+                self.create_list.append(result)
+            for field in self.model.update_fields():
+                setattr(result, field, getattr(data, field))
+        return self
+
+    def frontend_dict(self):
+        raise RewriteMethodError
+
+
+class UserPropResolveModel(_UserEditDataModel):
+    model = UserPropResolve
+
+    def frontend_dict(self):
+        return {data.Key: {'type': data.FieldType, 'resolve': data.ResolveType} for data in self.model_set}
+
+
+class UserPLabelExtraPropsModel(_UserEditDataModel):
+    model = UserPLabelExtraProps
+
+    def frontend_dict(self):
+        return {data.Key: data.PropNames for data in self.model_set}

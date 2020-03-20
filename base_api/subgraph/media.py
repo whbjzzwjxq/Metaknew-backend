@@ -63,7 +63,7 @@ class MediaCreate(MediaApi):
         data = result
         user_model = request.user
         collector = NeoSet()
-        _id = id_generator(number=1, method='node', jump=2)[0]
+        _id = id_generator(number=1, method='item', jump=2)[0]
         # 获取media label
         _label = MediaModel.get_media_label(data.Info.FileName.split('.')[1])
         media_info = result.Info

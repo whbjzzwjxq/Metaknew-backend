@@ -211,10 +211,3 @@ class UserApi(OpenApi):
     URL = ''
     abstract = True
 
-    def _main_hook(self, result: Type[Interface], request: HttpRequestUser) -> Any:
-        """
-        主执行体钩子
-        :param result:
-        :return:
-        """
-        pass

@@ -11,15 +11,10 @@ device_id = 0
 base_time = datetime.date(year=2020, month=1, day=1)
 
 methods = {
-    # node取号
-    "node": {
+    # item取号
+    "item": {
         "manager": NodeBlockManager,
         "record": NodeBlockIdRecord
-    },
-    # link取号
-    "link": {
-        "manager": LinkBlockManager,
-        "record": LinkBlockIdRecord
     },
     # 按照设备取号
     "device": {
@@ -36,7 +31,7 @@ methods = {
 
 # todo 把这个服务配置成主-从模式 level: 2
 def id_generator(number, method, jump=3) -> typing.List[int]:
-    assert method in ['node', 'link', 'device', 'time']
+    assert method in ['item', 'device', 'time']
     if number <= 0:
         return []
     else:
@@ -124,5 +119,5 @@ def commit(id_list, block_id, record):
 def new_id_list(request):
     num = request.GET.get("num")
     jump = request.GET.get("jump")
-    result = id_generator(number=int(num), method="node", jump=int(jump))
+    result = id_generator(number=int(num), method="item", jump=int(jump))
     return HttpResponse(json.dumps(result))

@@ -220,8 +220,8 @@ class MediaInfo(BaseInfo):
 
 
 class FragmentInfo(BaseInfo):
-    ItemType = TypeField(default='fragment')  # Item的Type
-    Src = models.URLField(default='')  # 如果是图片, 那么有来源
+    Src = models.TextField(default='')  # 如果是图片, 那么有来源
+    # PrimaryLabel = 'text' | 'image'
 
     class Meta:
         db_table = "item_fragment_info"

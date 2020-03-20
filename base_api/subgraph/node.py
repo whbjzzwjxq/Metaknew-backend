@@ -28,7 +28,7 @@ class NodeBulkCreate(NodeApi):
         data_list = result.Data
         collector = NeoSet()
         user_model = request.user
-        id_list = id_generator(number=len(data_list), method='node', jump=3)
+        id_list = id_generator(number=len(data_list), method='item', jump=3)
         node_model_list = [
             NodeModel(_id=_id,
                       user_id=user_model.user_id,

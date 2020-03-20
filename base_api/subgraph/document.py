@@ -57,8 +57,8 @@ class VisNodeBulkCreate(ItemApi):
         user_model = request.user
         user_id = user_model.user_id
         model_dict = {
-            'Node': bulk_handle(result.Nodes, 'node', NodeModel, user_id, result.CreateType, collector),
-            'Media': bulk_handle(result.Medias, 'node', MediaModel, user_id, result.CreateType, collector)
+            'Node': bulk_handle(result.Nodes, 'item', NodeModel, user_id, result.CreateType, collector),
+            'Media': bulk_handle(result.Medias, 'item', MediaModel, user_id, result.CreateType, collector)
         }
         return model_dict, collector
 

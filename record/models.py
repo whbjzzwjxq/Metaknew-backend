@@ -12,7 +12,7 @@ def default_graph():
         'Nodes': [],
         'Links': [],
         'Medias': [],
-        'Svgs': [],
+        'Texts': [],
         'Conf': {}
     }
 
@@ -21,9 +21,8 @@ class TransRecord(models.Model):
     RecordId = models.AutoField(db_column="Trans", primary_key=True)
     Lang = models.TextField(db_column="TYPE", db_index=True)  # 语言类型
     Name = models.TextField(db_column="NAME")  # 基础内容 Name
-    Is_Done = models.BooleanField(db_column="DONE")  # 是否完成
+    IsDone = models.BooleanField(db_column="DONE")  # 是否完成
 
-    # 是指从Name翻译到Lang的情况失败了
     class Meta:
         db_table = "record_translation"
 
@@ -31,7 +30,7 @@ class TransRecord(models.Model):
 class LocationsRecord(models.Model):
     RecordId = models.AutoField(db_column="Locations", primary_key=True)
     Location = models.TextField(db_column="NAME")  # 基础内容 Name
-    Is_Done = models.BooleanField(db_column="DONE", default=False)  # 是否完成
+    IsDone = models.BooleanField(db_column="DONE", default=False)  # 是否完成
 
     class Meta:
         db_table = "record_location"
@@ -70,11 +69,11 @@ class ItemVersionRecord(models.Model):
         db_table = "record_item_version"
 
 
-class GraphVersionRecord(models.Model):
-    DocId = IdField(primary_key=True)  # 专题ID
+class DocumentVersionRecord(models.Model):
+    DocId = IdField()  # 专题Id
     CreateUser = models.BigIntegerField(db_column="User", editable=False, db_index=True)
     CreateTime = models.DateTimeField(auto_now=True, editable=False)
-    BranchId = models.IntegerField(db_column="VersionId", default=0)  # 分支的Id
+    BranchId = IdField()  # 分支的Id
     BranchName = models.TextField(default='NewBranch')  # 分支的名字
     BranchDescription = models.TextField(default='')  # 分支描述
     IsUsed = models.BooleanField(default=True)  # 是否正在使用
@@ -86,4 +85,4 @@ class GraphVersionRecord(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["DocId", "BranchId"], name="GraphVersionControl")
         ]
-        db_table = "record_document_graph_branch"
+        db_table = "record_document_document_branch"

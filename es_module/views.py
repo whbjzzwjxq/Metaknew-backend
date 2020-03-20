@@ -15,16 +15,6 @@ hits_format = {"took": 1,
                         "hits": []}}
 
 
-def home_page_search(request):
-    query_object = json.loads(request.body.decode())
-    result = {
-        'recent': [],
-        'info': EsQuery().main(query_object),
-        'text': []
-    }
-    return HttpResponse(json.dumps(result), status=200)
-
-
 def query_name_similarity(request):
     def make_pattern(name_lang):
         name = name_lang[0]

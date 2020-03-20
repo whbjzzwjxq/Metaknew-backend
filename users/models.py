@@ -5,7 +5,12 @@ from tools.models import TopicField, LevelField, IdField, TypeField, SettingFiel
 
 def user_setting():
     return {
-        'fragmentCollect': {},
+        'FragmentCollect': {
+            'ByGood': True,
+            'ByShare': True,
+            'AutoCollect': True
+        },
+        'HelperOn': True,
     }
 
 
@@ -135,3 +140,60 @@ class NoteBook(UserItem):
 
     class Meta:
         db_table = "user_item_notebook"
+
+
+class UserEditDataBase(models.Model):
+    """
+    用来储存类似dict的结构 但是展开了key 用于严格约束其中的值
+    """
+    UserId = IdField(db_index=True, editable=False)
+    Key = models.TextField(unique=True, db_index=True, editable=False)
+    UpdateTime = models.DateField(auto_now=True)
+
+    @classmethod
+    def update_fields(cls):
+        return []
+
+    class Meta:
+        abstract = True
+
+
+class UserPropResolve(UserEditDataBase):
+    FIELD_TYPE_CHOICES = [
+        ('TEXT', 'TextField'),
+        ('ARRAY', 'ArrayField'),
+        ('NUM', 'NumberField'),
+        ('STR', 'StringField'),
+        ('JSON', 'JsonField'),
+        ('FILE', 'FileField'),
+        ('BOOL', 'BooleanField'),
+        ('IMA', 'ImageField')
+    ]
+
+    RESOLVE_TYPE_CHOICES = [
+        ('NO', 'normal'),
+        ('NM', 'name'),
+        ('LO', 'location'),
+        ('TI', 'time'),
+        ('EV', 'event')
+    ]
+    FieldType = models.TextField(choices=FIELD_TYPE_CHOICES)
+    ResolveType = models.TextField(choices=RESOLVE_TYPE_CHOICES, default='NO')
+
+    @classmethod
+    def update_fields(cls):
+        return ['FieldType', 'ResolveType']
+
+    class Meta:
+        db_table = 'user_record_prop_resolve'
+
+
+class UserPLabelExtraProps(UserEditDataBase):
+    PropNames = ArrayField(models.TextField())
+
+    @classmethod
+    def update_fields(cls):
+        return ['PropNames']
+
+    class Meta:
+        db_table = 'user_record_plabel_props'

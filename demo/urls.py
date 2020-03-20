@@ -18,10 +18,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from base_api.subgraph import node, common, media, document, link
-from base_api.user import login
+from base_api.user import login, edit_item
 from base_api.elaticsearch_api import query
 
-all_api = login.apis + node.apis + common.apis + media.apis + document.apis + link.apis + query.apis
+all_api = login.apis + node.apis + common.apis + media.apis + document.apis + link.apis + query.apis + edit_item.apis
 urlpatterns = [
     api().url_pattern for api in all_api if api.meta.is_active and not api.abstract
 ] + static(settings.STATIC_URL)

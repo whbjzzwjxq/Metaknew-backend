@@ -31,7 +31,7 @@ class LinkBulkCreate(LinkApi):
     def _main_hook(self, result: LinkBulkCreateData, request: HttpRequestUser) -> List[LinkModel]:
         collector = NeoSet()
         user_model = request.user
-        id_list = id_generator(len(result.Links), 'link')
+        id_list = id_generator(len(result.Links), 'item')
         return [LinkModel(_id, user_model.user_id, 'link', collector).create(info, result.CreateType)
                 for info, _id in zip(result.Links, id_list)]
 

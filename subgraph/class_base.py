@@ -13,8 +13,8 @@ from base_api.interface_frontend import InfoFrontend, QueryObject, CommonInfoFro
 from es_module.logic_class import bulk_add_text_index
 from record.exception import UnAuthorizationError, ErrorForWeb
 from record.logic_class import ItemHistory
-from record.models import ItemVersionRecord
-from subgraph.models import BaseInfo, BaseCtrl, NodeInfo, MediaInfo, NodeCtrl, MediaCtrl, PublicItemCtrl
+from subgraph.models import BaseInfo, BaseCtrl, NodeInfo, MediaInfo, NodeCtrl, MediaCtrl, PublicItemCtrl, FragmentInfo, \
+    FragmentCtrl
 from tools.base_tools import NeoSet
 from tools.global_const import item_id, item_type
 
@@ -81,7 +81,7 @@ class BaseModel:
     def __init__(self, _id: item_id, user_id: item_id, _type: item_type, collector=NeoSet()):
         self._info: Optional[Type[BaseInfo]] = None
         self._ctrl: Optional[Type[BaseCtrl]] = None
-        self._history = None
+        self._history: Optional[ItemHistory] = None
 
         # 以下是值
         self.collector = collector  # neo4j连接池
@@ -93,35 +93,27 @@ class BaseModel:
 
     @property
     def ctrl(self):
-        if not self._ctrl:
+        if self._ctrl is None:
             try:
                 self._ctrl = self.ctrl_class.objects.get(pk=self.id)
-                return self._ctrl
             except ObjectDoesNotExist:
-                self._ctrl_init()
-                return self._ctrl
-        else:
-            return self._ctrl
+                raise ObjectDoesNotExist()
+        return self._ctrl
 
     @property
     def info(self):
-        if not self._info:
+        if self._info is None:
             try:
                 self._info = self.info_class.objects.get(pk=self.id)
-                return self._info
             except ObjectDoesNotExist:
-                self._info_init()
-                return self._info
-        else:
-            return self._info
+                raise ObjectDoesNotExist()
+        return self._info
 
     @property
     def history(self):
-        if not self._history:
+        if self._history is None:
             self._history = ItemHistory(user_id=self.user_id, query_object=self.query_object)
-            return self._history
-        else:
-            return self._history
+        return self._history
 
     @property
     def editable(self):
@@ -140,11 +132,13 @@ class BaseModel:
 
     # ----------------- init ----------------
 
-    def _ctrl_init(self):
+    def _ctrl_init(self, p_label: str, create_type: str):
         self._ctrl = self.ctrl_class(
             ItemId=self.id,
             ItemType=self.type,
             CreateUser=self.user_id,
+            CreateType=create_type,
+            PrimaryLabel=p_label,
             PropsWarning=[]
         )
 
@@ -153,6 +147,9 @@ class BaseModel:
             ItemId=self.id,
             ItemType=self.type
         )
+
+    def _special_init(self, *args, **kwargs):
+        pass
 
     # ----------------- function ----------------
 
@@ -194,28 +191,47 @@ class BaseModel:
 
     def create(self, frontend_data: Type[InfoFrontend], create_type):
         """
-        把前端id记录下来
         :param frontend_data:
         :param create_type: 创建方式
         :return:
         """
         self.is_create = True
         self.frontend_id = frontend_data.id
+        self._ctrl_init(frontend_data.PrimaryLabel, create_type)
+        self._info_init()
+        self._special_init(frontend_data, create_type)
         self.update(frontend_data, create_type)
         return self
 
     def update(self, frontend_data: Type[InfoFrontend], create_type):
+        """
+        三个过程 ctrl_update info_update special_update
+        :param frontend_data:
+        :param create_type:
+        :return:
+        """
         self.ctrl_update_hook(frontend_data, create_type)
         self.info_update_hook(frontend_data, create_type)
         self._update_special_hook(frontend_data, create_type)
         return self
 
     def ctrl_update_hook(self, frontend_data: Type[InfoFrontend], create_type: str = 'USER'):
+        """
+        model通用过程
+        :param frontend_data:
+        :param create_type:
+        :return:
+        """
         self.ctrl.PrimaryLabel = frontend_data.PrimaryLabel
         self.ctrl.CreateType = create_type
         self._ctrl_update_special_hook(frontend_data)
 
     def _ctrl_update_special_hook(self, frontend_data: Type[InfoFrontend]):
+        """
+        子类单独过程
+        :param frontend_data:
+        :return:
+        """
         pass
 
     def info_update_hook(self, frontend_data: Type[InfoFrontend], create_type: str):
@@ -457,6 +473,9 @@ class BaseNodeModel(PublicItemModel):
         self._info: Optional[Type[NodeInfo], Type[MediaInfo]] = None
         self._ctrl: Optional[Type[NodeCtrl], Type[MediaCtrl]] = None
 
+    def _special_init(self, frontend_data: Type[InfoFrontend], create_type):
+        self._graph_node_init()
+
     def _update_special_hook(self, frontend_data: Type[InfoFrontend], create_type):
         self.graph_node_update()
 
@@ -465,12 +484,8 @@ class BaseNodeModel(PublicItemModel):
         if not self._graph_node:
             self._graph_node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
             if not self._graph_node:
-                self._graph_node_init()
-                return self._graph_node
-            else:
-                return self._graph_node
-        else:
-            return self._graph_node
+                raise ObjectDoesNotExist()
+        return self._graph_node
 
     def _graph_node_init(self):
         node = NeoNode(self.p_label, self.type)
@@ -520,3 +535,8 @@ class BaseNodeModel(PublicItemModel):
         if result:
             collector.tx.commit()
         return result
+
+
+class FragmentModel(BaseModel):
+    info_class = FragmentInfo
+    ctrl_class = FragmentCtrl

@@ -3,6 +3,8 @@ from elasticsearch import Elasticsearch, helpers
 from elasticsearch.helpers.errors import BulkIndexError
 
 from base_api.interface_frontend import EsQueryData
+from tools.base_tools import filter_to_two_part
+from django.core.exceptions import ObjectDoesNotExist
 
 es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
 
@@ -56,8 +58,7 @@ class EsQuery:
                 "tie_breaker": 0.7
             }
         }
-        result = self.query(body=dis_max_body, index="texts")
-        return self.get_info_from_result(result)
+        return self.get_info_from_result(self.query(body=dis_max_body, index="texts"))
 
     @staticmethod
     def type_match_body(_types):

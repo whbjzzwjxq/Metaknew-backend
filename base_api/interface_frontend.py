@@ -53,7 +53,7 @@ class Interface(DataClass):
                     setattr(self, prop, kwargs[prop])
                 # 如果没有该字段 报错
                 elif k.metadata['required']:
-                    raise AttributeError('需要的字段' + k.name + '没有传回')
+                    raise AttributeError(self.__class__.__name__ + '需要的字段' + k.name + '没有传回')
                 # 如果不是必须 使用API构造时的默认值
                 else:
                     if not k.default == MISSING:
@@ -143,7 +143,6 @@ class NodeInfoFrontend(CommonInfoFrontend):
 @dataclass(init=False)
 class MediaInfoFrontend(CommonInfoFrontend):
     FileName: str = Interface.meta_field()
-    type: str = Interface.meta_field(default='media')
 
 
 @dataclass(init=False)
@@ -225,7 +224,6 @@ class ItemDraftFrontend(Interface):
 class ItemDraftBulkData(Interface):
     Data: List[ItemDraftFrontend] = Interface.meta_field(cls=ItemDraftFrontend, is_list=True)
     IsAuto: bool = Interface.meta_field()
-    IsNode: bool = Interface.meta_field()  # 是否是Node草稿
     CreateType: str = Interface.meta_field(default='USER')
 
 
@@ -275,3 +273,14 @@ class QueryData(Interface):
 @dataclass(init=False)
 class MediaQueryData(Interface):
     DataList: List[str] = Interface.meta_field(default_factory=list)
+
+
+@dataclass(init=False)
+class FragmentInfoFrontend(InfoFrontend):
+    pass
+
+
+@dataclass(init=False)
+class UserPropResolveData(Interface):
+    type: str = Interface.meta_field()
+    resolve: str = Interface.meta_field()

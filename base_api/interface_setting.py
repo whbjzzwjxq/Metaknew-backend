@@ -31,6 +31,7 @@ class BaseSetting(Interface):
 class NodeSetting(BaseSetting):
     _name: str = Interface.meta_field()
     _label: str = Interface.meta_field()
+    _image: str = Interface.meta_field(default='', required=False)
     Base: dict = Interface.meta_field()
     Border: dict = Interface.meta_field()
     Show: dict = Interface.meta_field()

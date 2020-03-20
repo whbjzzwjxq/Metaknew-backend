@@ -39,12 +39,9 @@ class DocGraphModel:
         if not self._graph:
             try:
                 self._graph = DocGraph.objects.get(DocId=self.id)
-                return self._graph
             except ObjectDoesNotExist:
-                self._graph_item_init()
-                return self._graph
-        else:
-            return self._graph
+                raise ObjectDoesNotExist('专题不存在')
+        return self._graph
 
     def branch(self):
         pass
@@ -54,12 +51,14 @@ class DocGraphModel:
 
     def create(self, frontend_data: GraphInfoFrontend):
         self.is_create = True
+        self._graph_item_init()
         self.update(frontend_data)
         return self
 
     def update(self, data: GraphInfoFrontend):
         try:
-            self.update_node_to_doc_relationship(data)
+            # self.update_node_to_doc_relationship(data)
+            pass
         except TransactionError or DatabaseError or BaseException as e:
             self.graph.LinkFailed = False
         self.update_content(data)
@@ -120,7 +119,7 @@ class DocGraphModel:
             else:
                 pass  # 不需要做事情
 
-        link_id_list = id_generator(len(create_link), method='link')
+        link_id_list = id_generator(len(create_link), method='item')
         model_list = [SysLinkModel(_id=_id, user_id=self.user_id, _label='DocToNode', collector=self.collector).create({
             'Start': link[0],
             'End': link[1],
@@ -179,25 +178,12 @@ class DocGraphModel:
         except ValueError:
             return -1
 
-    def save(self):
-        pass
-
     def re_count(self):
         result = UserConcern.objects.filter(SourceId=self.id)
         self.base_node.ctrl.Useful = result.filter(Useful__gte=0).aggregate(Avg("Useful"))
         self.base_node.ctrl.HardLevel = result.filter(HardLevel__gte=0).aggregate(Avg("HardLevel"))
         self.base_node.ctrl.Imp = result.filter(Imp__gte=0).aggregate(Avg("Imp"))
         self.base_node.ctrl.CountCacheTime = time()
-        # todo hot_count level : 1
-
-    def node_index(self):
-        pass
-
-    def save_cache(self):
-        pass
-
-    def clear_cache(self):
-        pass
 
     def handle_for_frontend_as_graph(self):
         """
@@ -240,6 +226,10 @@ class DocGraphModel:
             return [graph.id for graph in graph_list]
         else:
             return []
+
+    def queryable(self):
+        graph = self.graph
+        return True
 
 
 class BaseComment:
