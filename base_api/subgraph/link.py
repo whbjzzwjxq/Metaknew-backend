@@ -17,7 +17,6 @@ class LinkApi(ItemApi):
     URL = 'link/'
 
 
-@dataclass(init=False)
 class LinkBulkCreate(LinkApi):
     """
     link bulk 创建
@@ -42,7 +41,13 @@ class LinkBulkCreate(LinkApi):
         return HttpResponse(status=200, content=json.dumps(result))
 
 
-@dataclass(init=False)
+class LinkBulkUpdate(LinkApi):
+    """
+    link update
+    """
+    URL = 'bulk_update'
+
+
 class LinkQuery(LinkApi):
     """
     link Query

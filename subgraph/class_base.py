@@ -124,7 +124,11 @@ class BaseModel:
 
     @property
     def p_label(self):
-        return self.ctrl.PrimaryLabel
+        label = self.ctrl.PrimaryLabel
+        if label is not '':
+            return label
+        else:
+            return 'default'
 
     @property
     def query_object(self) -> QueryObject:
@@ -516,7 +520,8 @@ class BaseNodeModel(PublicItemModel):
                 if self.graph_node.has_label(label):
                     self.graph_node.remove_label(label)
         # 更新labels
-        self.graph_node.update_labels(self.info.Labels)
+        no_empty_labels = [label for label in self.info.Labels if label is not '']
+        self.graph_node.update_labels(no_empty_labels)
         self.collector.tx.push(self.graph_node)
 
     def save(self, history_save=True, neo4j_save=True, es_index_text=True):

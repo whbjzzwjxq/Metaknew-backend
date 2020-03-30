@@ -36,6 +36,7 @@ class NodeModel(BaseNodeModel):
         else:
             if self.user_id not in self.ctrl.Contributor:
                 self.ctrl.Contributor.append(self.user_id)
+        self.re_count()
 
     def _info_update_special_hook(self, frontend_data: NodeInfoFrontend):
         """
@@ -105,6 +106,14 @@ class NodeModel(BaseNodeModel):
         else:
             self.error_output(UnAuthorizationError, '没有编辑权限', strict=False)
             return False
+
+    def handle_for_frontend(self):
+        result = super().handle_for_frontend()
+        info: NodeInfo = self.info
+        result['Ctrl']['Imp'] = info.BaseImp
+        result['Ctrl']['HardLevel'] = info.BaseHardLevel
+        result['Ctrl']['Useful'] = info.BaseUseful
+        return result
 
     # ---------------- function ----------------
 
