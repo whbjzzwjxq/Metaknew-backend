@@ -486,8 +486,8 @@ class BaseNodeModel(PublicItemModel):
     @property
     def graph_node(self):
         if not self._graph_node:
-            self._graph_node = self.collector.Nmatcher.match(self.type, self.p_label, _id=self.id).first()
-            if not self._graph_node:
+            self._graph_node = self.collector.Nmatcher.match(_id=self.id).first()
+            if self._graph_node is None:
                 raise ObjectDoesNotExist()
         return self._graph_node
 

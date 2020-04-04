@@ -91,7 +91,7 @@ class BaseCtrl(models.Model):
     PrimaryLabel = models.TextField(db_index=True, editable=False)  # 主标签
     CreateType = models.TextField(default='USER', choices=CREATE_TYPE_CHOICES, editable=False)  # 新建方式
     CreateUser = models.BigIntegerField(default=1, editable=False)  # 创建用户
-    CreateTime = models.DateField(auto_now_add=True, editable=False)  # 创建时间
+    CreateTime = models.DateTimeField(auto_now_add=True, editable=False)  # 创建时间
     UpdateTime = models.DateField(auto_now=True, editable=False)  # 更新时间
     PropsWarning = JSONField(default=list)  # 属性更新警告
     IsUsed = models.BooleanField(default=True)  # 是否在使用
@@ -185,7 +185,6 @@ class NodeInfo(BaseInfo):
     @staticmethod
     def special_update() -> List[str]:
         field_list = BaseInfo.special_update()
-        field_list.extend(['Alias', 'Topic', 'BaseImp', 'BaseHardLevel', 'BaseUseful', 'Language', 'Translate'])
         return field_list
 
     class Meta:
@@ -265,12 +264,12 @@ class RelationshipCtrl(BaseCtrl):
             'Start': {
                 'id': self.StartId,
                 'type': self.StartType,
-                'PrimaryLabel': self.StartPLabel
+                'pLabel': self.StartPLabel
             },
             'End': {
                 'id': self.EndId,
                 'type': self.EndType,
-                'PrimaryLabel': self.EndPLabel
+                'pLabel': self.EndPLabel
             },
             'CreateUser': self.CreateUser
         })

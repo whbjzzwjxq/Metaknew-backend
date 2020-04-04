@@ -36,7 +36,6 @@ class NodeModel(BaseNodeModel):
         else:
             if self.user_id not in self.ctrl.Contributor:
                 self.ctrl.Contributor.append(self.user_id)
-        self.re_count()
 
     def _info_update_special_hook(self, frontend_data: NodeInfoFrontend):
         """

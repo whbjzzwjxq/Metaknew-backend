@@ -39,8 +39,10 @@ class NodeBulkCreate(NodeApi):
         return node_model_list, collector
 
     def _save_hook(self, result: (List[NodeModel], NeoSet)):
-        result = NodeModel.bulk_save_create(*result)
-        return result
+        if len(result[0]) > 0:
+            return NodeModel.bulk_save_create(*result)
+        else:
+            return {}
 
     def _response_hook(self, result):
         if result is not None:

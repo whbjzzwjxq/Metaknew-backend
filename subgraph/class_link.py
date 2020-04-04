@@ -35,9 +35,9 @@ class LinkModel(PublicItemModel):
         return self.collector.Nmatcher.match(_type, _label, _id=_id).first()
 
     @property
-    def graph_link(self):
+    def graph_link(self) -> Relationship:
         if not self._graph_link:
-            self._graph_link = self.collector.Rmatcher.match(r_type=self.p_label, _id=self.id).first()
+            self._graph_link = self.collector.Rmatcher.match(_id=self.id).first()
             if self._graph_link is None:
                 raise ObjectDoesNotExist()
         return self._graph_link
@@ -90,6 +90,7 @@ class LinkModel(PublicItemModel):
             return None
 
     def _graph_link_init(self):
+        # 关系的标签不能够直接使用 应该调用'_label'属性
         link = Relationship(self.start, self.p_label, self.end)
         link['_id'] = self.id
         link['_label'] = self.p_label

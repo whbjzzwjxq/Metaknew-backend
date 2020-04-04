@@ -1,5 +1,4 @@
 import json
-from dataclasses import dataclass
 from typing import List, Dict
 
 from django.http import HttpResponse
@@ -35,7 +34,10 @@ class LinkBulkCreate(LinkApi):
                 for info, _id in zip(result.Links, id_list)]
 
     def _save_hook(self, result: List[LinkModel]) -> Dict[str, str]:
-        return LinkModel.bulk_save_create(result, collector=result[0].collector)
+        if result is not []:
+            return LinkModel.bulk_save_create(result, collector=result[0].collector)
+        else:
+            return {}
 
     def _response_hook(self, result) -> HttpResponse:
         return HttpResponse(status=200, content=json.dumps(result))
@@ -46,6 +48,28 @@ class LinkBulkUpdate(LinkApi):
     link update
     """
     URL = 'bulk_update'
+    abstract = False
+    method = 'POST'
+    meta = LinkApi.meta.rewrite()
+    frontend_data = LinkBulkCreateData
+
+    def _main_hook(self, result: LinkBulkCreateData, request: HttpRequestUser):
+        collector = NeoSet()
+        user_model = request.user
+        return [LinkModel(link.id, user_model.user_id, 'link', collector).update(link, result.CreateType)
+                for link in result.Links]
+
+    def _save_hook(self, result):
+        if len(result) > 0:
+            return LinkModel.bulk_save_update(result, collector=result[0].collector)
+        else:
+            return True
+
+    def _response_hook(self, result) -> HttpResponse:
+        if result is not None:
+            return HttpResponse(status=200)
+        else:
+            return HttpResponse(status=400)
 
 
 class LinkQuery(LinkApi):
@@ -67,4 +91,4 @@ class LinkQuery(LinkApi):
         return HttpResponse(status=200, content=json.dumps(result, cls=DateTimeEncoder))
 
 
-apis = [LinkBulkCreate, LinkQuery]
+apis = [LinkBulkCreate, LinkBulkUpdate, LinkQuery]
