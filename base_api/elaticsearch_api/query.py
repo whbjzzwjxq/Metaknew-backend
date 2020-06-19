@@ -5,7 +5,7 @@ from django.http import HttpRequest, HttpResponse
 
 from base_api.interface_frontend import EsQueryData
 from base_api.logic_class import OpenApi, ApiMeta
-from document.class_document import DocGraphModel
+from document.class_document import DocumentModel
 from es_module.logic_class import EsQuery
 from tools.base_tools import filter_to_two_part
 
@@ -34,7 +34,7 @@ class HomePageQuery(EsApi):
         active_document = []
         for doc in documents:
             try:
-                if DocGraphModel(_id=doc['id'], user_id=0).queryable():
+                if DocumentModel(_id=doc['id'], user_id=0).queryable:
                     active_document.append(doc)
                 else:
                     pass

@@ -3,7 +3,7 @@ import json
 from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import HttpResponse
 
-from es_module.logic_class import es, EsQuery, bulk_add_text_index
+from es_module.logic_class import EsQuery, bulk_add_text_index
 from subgraph.class_node import NodeModel
 from subgraph.models import NodeCtrl
 
@@ -37,9 +37,9 @@ def query_name_similarity(request):
         query_str = [make_pattern(name_lang) for name_lang in name_lang_list]
         query_str = "".join(query_str)
 
-        results = es.msearch_template(body=query_str,
-                                      index="nodes",
-                                      search_type="query_then_fetch")
+        results = EsQuery.es.msearch_template(body=query_str,
+                                              index="nodes",
+                                              search_type="query_then_fetch")
         response = [handle_hit(result) for result in results["responses"]]
         return HttpResponse(json.dumps(response))
 
@@ -58,6 +58,7 @@ def reindex_nodes(request):
     :param request:
     :return:
     """
+
     def node_ctrl_to_node_model(ctrl):
         _id = ctrl.ItemId
         base_node = NodeModel(_id=_id, user_id=user_id)

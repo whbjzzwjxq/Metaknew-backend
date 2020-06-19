@@ -17,7 +17,7 @@ def setting_check(value):
 
 
 def type_check(value):
-    available_type = ['node', 'media', 'link', 'svg', 'document', 'fragment', 'note']
+    available_type = ['node', 'media', 'link', 'text', 'document', 'fragment', 'note']
     if value not in available_type:
         raise ValidationError('_type %(value) is not available', params={'value': value})
 

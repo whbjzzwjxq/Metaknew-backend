@@ -1,12 +1,9 @@
 import langdetect
-from elasticsearch import Elasticsearch, helpers
+from elasticsearch import helpers
 from elasticsearch.helpers.errors import BulkIndexError
 
 from base_api.interface_frontend import EsQueryData
-from tools.base_tools import filter_to_two_part
-from django.core.exceptions import ObjectDoesNotExist
-
-es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
+from tools.connection import es_connection
 
 
 def language_detect(text):
@@ -23,7 +20,7 @@ def language_detect(text):
 #  todo 加入评分 level: 3
 class EsQuery:
     _types = ['node', 'media', 'document', 'link']
-    es = Elasticsearch([{"host": "39.96.10.154", "port": 7000}])
+    es = es_connection
 
     def query(self, body, index):
         query_body = {
@@ -161,7 +158,7 @@ def bulk_add_text_index(nodes):
                 }
 
     try:
-        result = helpers.bulk(es, index_texts())
+        result = helpers.bulk(EsQuery.es, index_texts())
         return result
     except BulkIndexError or BaseException:
         print('Bad!!!')

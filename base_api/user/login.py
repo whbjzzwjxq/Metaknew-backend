@@ -82,9 +82,9 @@ class LoginByPhone(LoginApi):
         code = result.Code
         current_code = user_query_message(phone)
         if not current_code:
-            raise ErrorForWeb(CodeExpiredError, is_dev=False, is_error=True)
+            ErrorForWeb(CodeExpiredError, is_dev=False, is_error=True).raise_error()
         if code != current_code:
-            raise ErrorForWeb(CodeDoesNotMatchError, is_dev=False, is_error=True)
+            ErrorForWeb(CodeDoesNotMatchError, is_dev=False, is_error=True).raise_error()
         else:
             try:
                 user = User.objects.get(Phone=phone)

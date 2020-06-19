@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import tools.connection
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
@@ -119,16 +120,7 @@ WSGI_APPLICATION = "demo.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "Metaknew",
-        "USER": "postgres",
-        "PASSWORD": "ay67cla910",
-        "HOST": "39.96.10.154",
-        "PORT": "7011",
-    }
-}
+DATABASES = tools.connection.DATABASES
 
 REDIS_TIMEOUT = 1 * 60
 CUBES_REDIS_TIMEOUT = 60 * 60

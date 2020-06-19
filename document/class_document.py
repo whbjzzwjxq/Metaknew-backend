@@ -6,8 +6,8 @@ from django.db import DatabaseError
 from django.db.models import Avg
 from py2neo.database import TransactionError
 
-from base_api.interface_setting import GraphInfoFrontend
-from document.models import DocGraph, Comment
+from base_api.interface_setting import DocumentFrontend
+from document.models import Document, Comment
 from subgraph.class_link import SysLinkModel
 from subgraph.class_node import BaseNodeModel, NodeModel
 from tools import base_tools
@@ -16,8 +16,7 @@ from users.models import UserConcern
 from tools.global_const import re_for_frontend_id
 
 
-# todo node link 改写为类 level: 2 NeoNode还没同步
-class DocGraphModel:
+class DocumentModel:
 
     def __init__(self, _id: int, user_id: int, collector=base_tools.NeoSet()):
         self.user_id = int(user_id)
@@ -26,7 +25,7 @@ class DocGraphModel:
         self.collector = collector
         self.is_create = False  # 是否创建状态
         self._base_node: Optional[BaseNodeModel] = None  # DocumentNode模型
-        self._graph: Optional[DocGraph] = None  # DocumentGraph模型
+        self._graph: Optional[Document] = None  # DocumentGraph模型
 
     @property
     def base_node(self):
@@ -38,7 +37,7 @@ class DocGraphModel:
     def graph(self):
         if not self._graph:
             try:
-                self._graph = DocGraph.objects.get(DocId=self.id)
+                self._graph = Document.objects.get(ItemId=self.id)
             except ObjectDoesNotExist:
                 raise ObjectDoesNotExist('专题不存在')
         return self._graph
@@ -47,15 +46,15 @@ class DocGraphModel:
         pass
 
     def _graph_item_init(self):
-        self._graph = DocGraph(DocId=self.id, Nodes=[], Links=[], Medias=[], Texts=[], Conf={})
+        self._graph = Document(ItemId=self.id)
 
-    def create(self, frontend_data: GraphInfoFrontend):
+    def create(self, frontend_data: DocumentFrontend):
         self.is_create = True
         self._graph_item_init()
         self.update(frontend_data)
         return self
 
-    def update(self, data: GraphInfoFrontend):
+    def update(self, data: DocumentFrontend):
         try:
             # self.update_node_to_doc_relationship(data)
             pass
@@ -65,7 +64,7 @@ class DocGraphModel:
         self.ctrl_update()
         return self
 
-    def update_node_to_doc_relationship(self, data: GraphInfoFrontend):
+    def update_node_to_doc_relationship(self, data: DocumentFrontend):
         """
         生成专题和节点的关系
         :return:
@@ -95,7 +94,7 @@ class DocGraphModel:
                                     collector=self.collector)
                 link._ctrl = exist_link
                 link.update({
-                    'IsMain': node.View['isMain'],
+                    'IsMain': node.is_main,
                     'IsUsed': True,
                     'Correlation': 50,
                     'DocumentImp': 50
@@ -103,7 +102,7 @@ class DocGraphModel:
                 update_link.append(link)
             else:
                 create_link.append(
-                    [self.base_node.graph_node, self.collector.match_node(node.id).first(), node.View['isMain']])
+                    [self.base_node.graph_node, self.collector.match_node(node.id).first(), node.is_main])
 
         for node in remove_node_list:
             remove_link = SysLinkModel.query_by_node('DocToNode', start=self.base_node.id, end=node['_id'])
@@ -136,12 +135,13 @@ class DocGraphModel:
             SysLinkModel.bulk_save_create(model_list, collector=self.collector)
         self.graph.LinkFailed = True
 
-    def update_content(self, data: GraphInfoFrontend):
+    def update_content(self, data: DocumentFrontend):
         self.graph.Nodes = [node.to_dict for node in data.Content.nodes]
         self.graph.Links = [link.to_dict for link in data.Content.links]
         self.graph.Medias = [media.to_dict for media in data.Content.medias]
         self.graph.Texts = [text.to_dict for text in data.Content.texts]
-        self.graph.Conf = data.Conf.to_dict
+        self.graph.Components = data.Components.to_dict
+        self.graph.PrimaryLabel = data.Setting.label
 
     def ctrl_update(self):
         """
@@ -151,7 +151,7 @@ class DocGraphModel:
         self.graph.Size = len(self.graph.Nodes) + len(self.graph.Medias)
         self.graph.Complete = 50
         self.graph.MainNodes = [node["_id"] for node in self.graph.Nodes
-                                if node["View"]["isMain"] and node["_id"] != self.id]
+                                if node["_isMain"] and node["_id"] != self.id]
 
     def get_item_list(self, _type):
         if _type == 'link':
@@ -198,10 +198,10 @@ class DocGraphModel:
                 "medias": self.graph.Medias,
                 "texts": self.graph.Texts
             },
-            "Conf": self.graph.Conf,
+            "Setting": {'_id': self.id, '_type': self.graph.ItemType, '_label': self.graph.PrimaryLabel},
+            'MetaData': {'isTemporary': False, 'isRemoteModel': True, 'isMergeTo': False},
+            'Components': self.graph.Components,
         }
-        if result['Conf'] == {}:
-            result['Conf'] = {'_id': self.id, '_type': 'document', '_label': 'DocGraph'}
         return result
 
     def handle_for_frontend(self):
@@ -214,7 +214,7 @@ class DocGraphModel:
     @classmethod
     def bulk_save_create(cls, graph_list):
         if len(graph_list) > 0:
-            DocGraph.objects.bulk_create([model.graph for model in graph_list])
+            Document.objects.bulk_create([model.graph for model in graph_list])
             return [graph.id for graph in graph_list]
         else:
             return []
@@ -222,13 +222,13 @@ class DocGraphModel:
     @classmethod
     def bulk_save_update(cls, graph_list):
         if len(graph_list) > 0:
-            DocGraph.objects.bulk_update([model.graph for model in graph_list], fields=DocGraph.all_fields())
+            Document.objects.bulk_update([model.graph for model in graph_list], fields=Document.all_fields())
             return [graph.id for graph in graph_list]
         else:
             return []
 
+    @property
     def queryable(self):
-        graph = self.graph
         return True
 
 

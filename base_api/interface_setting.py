@@ -28,55 +28,48 @@ class BaseSetting(Interface):
 
 
 @dataclass(init=False)
-class NodeSetting(BaseSetting):
+class DocumentItemSetting(BaseSetting):
+    _isMain: bool = Interface.meta_field()
+
+    @property
+    def is_main(self):
+        return self._isMain
+
+
+@dataclass(init=False)
+class NodeSetting(DocumentItemSetting):
     _name: str = Interface.meta_field()
     _label: str = Interface.meta_field()
     _image: str = Interface.meta_field(default='', required=False)
-    Base: dict = Interface.meta_field()
-    Border: dict = Interface.meta_field()
-    Show: dict = Interface.meta_field()
-    Text: dict = Interface.meta_field()
-    View: dict = Interface.meta_field()
+    InGraph: dict = Interface.meta_field()
+    InPaper: dict = Interface.meta_field()
 
 
 @dataclass(init=False)
-class LinkSetting(BaseSetting):
+class LinkSetting(DocumentItemSetting):
     _start: QueryObject = Interface.meta_field(cls=QueryObject)
     _end: QueryObject = Interface.meta_field(cls=QueryObject)
-    Arrow: dict = Interface.meta_field()
-    Text: dict = Interface.meta_field()
-    View: dict = Interface.meta_field()
+    InGraph: dict = Interface.meta_field()
+    InPaper: dict = Interface.meta_field()
 
 
 @dataclass(init=False)
-class MediaSetting(BaseSetting):
+class MediaSetting(DocumentItemSetting):
     _name: str = Interface.meta_field()
     _src: str = Interface.meta_field()
-    Base: dict = Interface.meta_field()
-    Border: dict = Interface.meta_field()
-    Show: dict = Interface.meta_field()
-    Text: dict = Interface.meta_field()
-    View: dict = Interface.meta_field()
+    InGraph: dict = Interface.meta_field()
+    InPaper: dict = Interface.meta_field()
 
 
 @dataclass(init=False)
-class TextSetting(BaseSetting):
-    _points: list = Interface.meta_field()
+class TextSetting(DocumentItemSetting):
     _text: str = Interface.meta_field()
-    Base: dict = Interface.meta_field()
-    Border: dict = Interface.meta_field()
-    Transition: dict = Interface.meta_field()
-    Background: dict = Interface.meta_field()
-    Show: dict = Interface.meta_field()
+    InGraph: dict = Interface.meta_field()
+    InPaper: dict = Interface.meta_field()
 
 
 @dataclass(init=False)
-class GraphConf(BaseSetting):
-    Base: dict = Interface.meta_field()
-
-
-@dataclass(init=False)
-class GraphContent(Interface):
+class DocumentContent(Interface):
     nodes: List[NodeSetting] = Interface.meta_field(cls=NodeSetting, is_list=True)
     links: List[LinkSetting] = Interface.meta_field(cls=LinkSetting, is_list=True)
     medias: List[MediaSetting] = Interface.meta_field(cls=MediaSetting, is_list=True)
@@ -91,12 +84,24 @@ class GraphContent(Interface):
 
 
 @dataclass(init=False)
-class GraphInfoFrontend(Interface):
-    Conf: GraphConf = Interface.meta_field(cls=GraphConf)
-    Content: GraphContent = Interface.meta_field(cls=GraphContent)
+class DocumentSetting(BaseSetting):
+    pass
+
+
+@dataclass(init=False)
+class DocumentComponents(Interface):
+    InGraph: dict = Interface.meta_field()
+    InPaper: dict = Interface.meta_field()
+
+
+@dataclass(init=False)
+class DocumentFrontend(Interface):
+    Setting: DocumentSetting = Interface.meta_field(cls=DocumentSetting)
+    Components: DocumentComponents = Interface.meta_field(cls=DocumentComponents)
+    Content: DocumentContent = Interface.meta_field(cls=DocumentContent)
 
 
 @dataclass(init=False)
 class GraphBulkCreateData(Interface):
-    GraphList: List[GraphInfoFrontend] = Interface.meta_field(cls=GraphInfoFrontend, is_list=True)
+    GraphList: List[DocumentFrontend] = Interface.meta_field(cls=DocumentFrontend, is_list=True)
     CreateType: str = Interface.meta_field(default='USER')

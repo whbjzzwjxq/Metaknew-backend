@@ -1,0 +1,110 @@
+version: '3.2'
+services:
+  elasticsearch-main-01:
+    image: registry-vpc.cn-beijing.aliyuncs.com/metaknew/docker-es:v1
+    build: .
+    ports:
+      - 9200:9200
+      - 9300:9300
+    volumes:
+      - type: volume
+        source: vo-elasticsearch-01
+        target: /usr/share/elasticsearch/data
+    networks:
+      - backend
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - "node.role == manager"
+
+    environment:
+      # base
+      - cluster.name=production
+      - node.name=main-01
+      - node.master=true
+      - node.data=true
+
+      #http
+      - http.cors.enabled=true
+      - http.cors.allow-origin="*"
+
+      #memory
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms2G -Xmx2G"
+
+      #cluster
+      - discovery.seed_hosts=elasticsearch-main-01
+      - cluster.initial_master_nodes=["main-01"]
+
+      # x-pack
+      - xpack.security.enabled=false
+
+  elasticsearch-vote:
+    image: registry-vpc.cn-beijing.aliyuncs.com/metaknew/docker-es:v1
+    build: .
+    networks:
+      - backend
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    deploy:
+      mode: replicated
+      replicas: 4
+      placement:
+        constraints:
+          - "node.role == worker"
+
+    depends_on:
+      - elasticsearch-main-01
+
+    environment:
+      # base
+      - cluster.name=production
+      - node.name=vote
+      - node.master=true
+      - node.data=false
+      - node.ingest=false
+      - node.voting_only=true
+
+      #http
+      - http.cors.enabled=true
+      - http.cors.allow-origin="*"
+
+      #memory
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512M -Xmx512M"
+
+      #cluster
+      - discovery.seed_hosts=elasticsearch-main-01
+      - cluster.initial_master_nodes=["main-01"]
+      - cluster.remote.connect=false
+
+      # x-pack
+      - xpack.security.enabled=false
+
+
+volumes:
+  vo-elasticsearch-01:
+    external:
+      name: data-es-01
+
+  vo-elasticsearch-02:
+    external:
+      name: data-es-02
+
+  vo-elasticsearch-03:
+    external:
+      name: data-es-03
+
+networks:
+  backend:
+    external:
+      name: backend

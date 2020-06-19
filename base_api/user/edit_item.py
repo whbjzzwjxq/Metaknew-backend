@@ -81,7 +81,7 @@ class UserEditDataQuery(UserDataApi):
             pass
 
         try:
-                res['PLabelExtraProps'] = UserPLabelExtraPropsModel(user_model.user_id).frontend_dict()
+            res['PLabelExtraProps'] = UserPLabelExtraPropsModel(user_model.user_id).frontend_dict()
         except BaseException as e:
             pass
         return res

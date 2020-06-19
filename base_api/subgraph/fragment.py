@@ -1,12 +1,9 @@
-import json
 from typing import List
 
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest
 
-from base_api.interface_frontend import ItemDraftBulkData, FragmentInfoFrontend
-from base_api.logic_class import UserApi, HttpRequestUser
+from base_api.interface_frontend import FragmentInfoFrontend
 from base_api.subgraph.common import ItemApi
-from record.logic_class import ItemHistory
 from subgraph.class_base import FragmentModel
 
 

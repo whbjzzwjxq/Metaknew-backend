@@ -2,101 +2,47 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField, JSONField
 from subgraph.models import NodeInfo
-from tools.models import SettingField, IdField, LevelField
+from tools.models import SettingField, IdField, LevelField, TypeField
 
 
-# 设置的详情在前端查看
-# done 08-16 remake 2019-10-17
-
-def node_setting():
-    setting = {
-        "_id": 0,
-        "_type": "node",  # "node" "media" "link"
-        "_label": "DocGraph",
-        "Base": {},
-        "Border": {},
-        "Show": {},
-        "Text": {},
+def node_setting_default():
+    return {
+        '_id': '-1',
+        '_type': 'node',
+        '_label': 'BaseNode',
+        'InGraph': {
+            'Base': {},
+        },
+        'InPaper': {}
     }
-    return [setting]
 
 
-# done 08-16 remake 2019-10-17
-def link_setting():
-    setting = {
-        "_id": 0,
-        "_type": "link",
-        "_label": "",
-        "Base": {},
-        "Arrow": {},
-        "Text": {}
-    }
-    return [setting]
-
-
-def note_content():
-    setting = {
-        "_title": "",
-        "_content": ""
-    }
-    return setting
-
-
-# remake 2019-10-17
-def card_setting():
-    setting = {
-        "_id": 0,
-        "_type": "node",  # "node" "media" "link"
-        "_label": "",
-        "Base": {},
-        "Border": {},
-        "Show": {},
-        "Text": {}
-    }
-    return [setting]
-
-
-# remake 2019-10-17
-def graph_setting():
-    setting = {
-        "Base": {
-
+def document_components_default():
+    return {
+        'InPaper': {
+            'Section': {
+                '_children': []
+            }
+        },
+        'InGraph': {
+            'SubGraph': []
         }
     }
-    return setting
 
 
-# todo Paper设置细化 level : 1
-def paper_setting():
-    setting = {
-        "Base": {
-            "theme": 0,
-            "background": "",
-            "color": "#000000",
-            "opacity": 1
-        },
-        "Show": {
-            "heightLock": True,  # 纵向锁定
-            "widthLock": False,  # 横向锁定
-            "percentage": False  # 使用百分比还是绝对数值
-        },
-        "Group": [
-            {"height": 330, "width": 580, "isMain": True},
-            {"height": 330, "width": 580, "isMain": True},
-            {"height": 330, "width": 580, "isMain": True},
-        ]
-    }
-    return setting
+class Document(models.Model):
+    ItemId = IdField(primary_key=True)  # 专题ID
+    ItemType = TypeField(default='document')  # 不需要管理
+    PrimaryLabel = models.TextField(default='_DocGraph', db_index=True)  # 专题类型
+    # Content
+    Nodes = ArrayField(SettingField(), default=list)  # 节点设置
+    Links = ArrayField(SettingField(), default=list)  # 关系设置
+    Medias = ArrayField(SettingField(), default=list)  # 媒体设置
+    Texts = ArrayField(SettingField(), default=list)  # 文字设置
 
-
-class DocGraph(models.Model):
-    DocId = IdField(primary_key=True)  # 专题ID
-    Nodes = ArrayField(SettingField(), default=list)  # json里包含节点在该专题下的设置
-    Links = ArrayField(SettingField(), default=list)  # json里包含关系在该专题下的设置
-    Medias = ArrayField(SettingField(), default=list)  # json里包含媒体在该专题下的设置
-    Texts = ArrayField(SettingField(), default=list)  # json里包含Svg
-    Conf = JSONField(default=dict)  # json里包含专题本身的设置
-
+    # Components
+    Components = JSONField(default=document_components_default)  # 组件与插件
+    # Ctrl
     Complete = LevelField()
     MainNodes = ArrayField(IdField(), default=list)  # 主要节点
     Size = models.IntegerField(default=0)  # 尺寸
@@ -108,22 +54,10 @@ class DocGraph(models.Model):
 
     @classmethod
     def all_fields(cls):
-        return [field.name for field in cls._meta.fields if not field.name == 'DocId']
+        return [field.name for field in cls._meta.fields if not field.name == 'ItemId']
 
     class Meta:
         db_table = "document_graph"
-
-
-# todo paper具体的产品形式 level: 1
-# class DocPaper(models.Model):
-#     DocId = models.BigIntegerField(primary_key=True, editable=False)
-#     Nodes = ArrayField(SettingField(), default=card_setting)
-#     Links = ArrayField(SettingField(), default=link_setting)
-#     Path = ArrayField(JSONField(default=dict))
-#     Conf = JSONField(default=paper_setting)  # 设置
-#
-#     class Meta:
-#         db_table = "document_paper"
 
 
 # 专题评论 done in 07-22

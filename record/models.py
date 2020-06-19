@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import JSONField
 
 from base_api.interface_frontend import QueryObject
 from tools.models import IdField
-from document.models import DocGraph
+from document.models import Document
 from tools.models import TypeField
 
 
@@ -70,7 +70,7 @@ class ItemVersionRecord(models.Model):
 
 
 class DocumentVersionRecord(models.Model):
-    DocId = IdField()  # 专题Id
+    ItemId = IdField()  # 专题Id
     CreateUser = models.BigIntegerField(db_column="User", editable=False, db_index=True)
     CreateTime = models.DateTimeField(auto_now=True, editable=False)
     BranchId = IdField()  # 分支的Id

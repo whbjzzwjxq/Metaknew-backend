@@ -82,12 +82,13 @@ class MediaModel(BaseNodeModel):
             raise FileNotFoundError
 
     @staticmethod
-    def get_media_label(file_format) -> str:
+    def get_media_label(file_format: str) -> str:
         """
         注意返回的是json, image之类的
         :param file_format: str such as 'jpg'
         :return: mime_type: str such as 'json'
         """
+        file_format = file_format.lower()
         special_media_type = {
             'text/markdown': 'markdown'
         }

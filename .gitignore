@@ -4,7 +4,6 @@
 *.xml
 *\__pycache__\*
 venv
-Dockerfile
 useful-tips.txt
 .idea/
 __pycache__/
@@ -26,5 +25,4 @@ subgraph/script/__pycache__/
 tools/__pycache__/
 tools/migrations/__pycache__/
 users/__pycache__/
-users/migrations/0006_auto_20200403_0321.py
 users/migrations/__pycache__/

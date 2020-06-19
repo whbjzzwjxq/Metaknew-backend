@@ -2,8 +2,6 @@ import os
 import re
 from typing import Union, Type, Dict
 
-from py2neo import Graph
-
 from subgraph.models import NodeInfo, MediaInfo, RelationshipInfo, NodeCtrl, MediaCtrl, FragmentCtrl, FragmentInfo, \
     FrequencyCount, DocToNode, KnowLedge, \
     BaseInfo, BaseCtrl, RelationshipCtrl
@@ -11,7 +9,6 @@ from subgraph.models import NodeInfo, MediaInfo, RelationshipInfo, NodeCtrl, Med
 # 远端id检测
 re_for_frontend_id = re.compile('\\$_.*')
 # neo4j连接池
-graph = Graph("bolt://39.96.10.154:7687", Name="neo4j", password="12345678")
 # 项目路径
 basePath = os.path.dirname(os.path.dirname(__file__))
 # InfoModel的集合
@@ -23,7 +20,7 @@ link_class_ctrl = Union[Type[RelationshipCtrl], Type[FrequencyCount], Type[DocTo
 # id的类型
 item_id = Union[str, int]
 # document中Item的类型
-item_type = Union['document', 'node', 'link', 'media', 'note', 'svg']
+item_type = Union['document', 'node', 'link', 'media', 'note', 'text']
 # 所有的资源的类型
 source_type = Union[item_type, 'fragment', 'path']
 

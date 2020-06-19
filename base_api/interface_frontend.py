@@ -284,3 +284,8 @@ class FragmentInfoFrontend(InfoFrontend):
 class UserPropResolveData(Interface):
     type: str = Interface.meta_field()
     resolve: str = Interface.meta_field()
+
+
+@dataclass(init=False)
+class TextBulkCreateData(Interface):
+    Texts: List[str] = Interface.meta_field(default_factory=list)

@@ -53,4 +53,4 @@ class VersionQuery(ItemApi):
     URL = ''
 
 
-apis = [DraftBulkUpdate]
+apis = []

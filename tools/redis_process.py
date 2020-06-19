@@ -1,4 +1,4 @@
-import redis
+from tools.connection import redis_instance
 from users.models import User, Privilege
 from django.core.exceptions import ObjectDoesNotExist
 second = 1
@@ -7,9 +7,6 @@ hour = 3600
 day = 24 * 3600
 week = 7 * 24 * 3600
 month = 30 * 24 * 3600
-
-pool = redis.ConnectionPool(host="39.96.10.154", port=6379, db=1, decode_responses=True)
-redis_instance = redis.StrictRedis(connection_pool=pool)
 
 
 # 集中redis的原因是防止误设置键值

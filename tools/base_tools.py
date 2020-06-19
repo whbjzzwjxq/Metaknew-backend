@@ -6,7 +6,7 @@ from functools import reduce
 import langdetect
 from py2neo import NodeMatcher, RelationshipMatcher
 
-from tools.global_const import graph
+from tools.connection import graph
 
 
 class NeoSet:

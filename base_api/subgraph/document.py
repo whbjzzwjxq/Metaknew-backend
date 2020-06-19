@@ -7,7 +7,7 @@ from base_api.interface_frontend import VisNodeBulkCreateData, InfoFrontend, Doc
 from base_api.interface_setting import GraphBulkCreateData
 from base_api.logic_class import HttpRequestUser, UserApi
 from base_api.subgraph.common import ItemApi
-from document.class_document import DocGraphModel
+from document.class_document import DocumentModel
 from subgraph.class_media import MediaModel
 from subgraph.class_node import NodeModel
 from tools.base_tools import NeoSet, DateTimeEncoder
@@ -88,11 +88,11 @@ class DocumentBulkCreate(DocumentApi):
         user_model = request.user
         collector = NeoSet()
         return [
-            DocGraphModel(graph.Conf.id, user_model.user_id, collector).create(graph) for graph in result.GraphList
+            DocumentModel(graph.Setting.id, user_model.user_id, collector).create(graph) for graph in result.GraphList
         ]
 
-    def _save_hook(self, result: List[DocGraphModel]) -> List[int]:
-        return DocGraphModel.bulk_save_create(result)
+    def _save_hook(self, result: List[DocumentModel]) -> List[int]:
+        return DocumentModel.bulk_save_create(result)
 
     def _response_hook(self, result) -> HttpResponse:
         return HttpResponse(status=200, content=json.dumps(result))
@@ -112,11 +112,11 @@ class DocumentBulkUpdate(DocumentApi):
         user_model = request.user
         collector = NeoSet()
         return [
-            DocGraphModel(graph.Conf.id, user_model.user_id, collector).update(graph) for graph in result.GraphList
+            DocumentModel(graph.Setting.id, user_model.user_id, collector).update(graph) for graph in result.GraphList
         ]
 
-    def _save_hook(self, result: List[DocGraphModel]) -> List[int]:
-        return DocGraphModel.bulk_save_update(result)
+    def _save_hook(self, result: List[DocumentModel]) -> List[int]:
+        return DocumentModel.bulk_save_update(result)
 
     def _response_hook(self, result) -> HttpResponse:
         return HttpResponse(status=200, content=json.dumps(result))
@@ -134,7 +134,7 @@ class DocumentQuery(DocumentApi):
 
     def _main_hook(self, result: DocumentQueryData, request: HttpRequestUser):
         user_id = getattr(request.user, 'user_id', 0)
-        return DocGraphModel(_id=result.id, user_id=user_id).handle_for_frontend_as_graph()
+        return DocumentModel(_id=result.id, user_id=user_id).handle_for_frontend_as_graph()
 
     def _response_hook(self, result) -> HttpResponse:
         return HttpResponse(status=200, content=json.dumps(result, cls=DateTimeEncoder))
