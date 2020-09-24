@@ -1,0 +1,178 @@
+PUT texts
+{
+    "settings": {
+        "index": {
+            "number_of_shards": 1,
+            "number_of_replicas": 1
+        },
+        "analysis": {
+            "filter": {
+                "english_stop": {
+                    "type": "stop",
+                    "stopwords": "_english_"
+                },
+                "english_stemmer": {
+                    "type": "stemmer",
+                    "language": "english"
+                },
+                "english_possessive_stemmer": {
+                    "type": "stemmer",
+                    "language": "possessive_english"
+                }
+            },
+            "normalizer": {
+                "label_normalizer": {
+                  "type": "custom",
+                  "char_filter": [],
+                  "filter": ["lowercase", "asciifolding"]
+                }
+            },
+            "analyzer": {
+                "en_analyzer": {
+                    "tokenizer": "standard",
+                    "filter": [
+                        "english_possessive_stemmer",
+                        "english_stemmer",
+                        "english_stop"
+                    ]
+                },
+                "auto_analyzer": {
+                    "tokenizer": "standard"
+                }
+            }
+        }
+    },
+    "mappings": {
+        "dynamic": false,
+        "properties": {
+            "id": {
+                "type": "long",
+                "index": false,
+                "doc_values": false
+            },
+            "type": {
+                "type": "keyword",
+                "index": false
+
+            },
+            "PrimaryLabel":{
+                "type": "keyword",
+                "normalizer": "label_normalizer"
+            },
+            "Language": {
+                "type": "keyword"
+            },
+            "CreateUser":{
+                "type": "long"
+            },
+            "UpdateTime":{
+                "type": "date"
+            },
+            "Hot":{
+                "type": "integer",
+                "index": false
+            },
+            "MainPic":{
+                "type": "keyword",
+                "index": false
+            },
+            "Alias": {
+                "type": "keyword"
+            },
+            "Name": {
+                "properties":{
+                    "zh": {
+                        "type": "text",
+                        "fields": {
+                            "full_name": {
+                                "type": "keyword"
+                            }
+                        },
+                        "analyzer": "ik_max_word",
+                        "search_analyzer": "ik_smart"
+                    },
+                    "en": {
+                        "type": "text",
+                        "fields": {
+                            "full_name": {
+                                "type": "keyword"
+                            }
+                        },
+                        "analyzer": "en_analyzer"
+                    },
+                    "auto": {
+                        "type": "text",
+                        "fields": {
+                            "full_name": {
+                                "type": "keyword"
+                            }
+                        },
+                        "analyzer": "auto_analyzer"
+                    }
+                }
+            },
+            "Description": {
+                "properties":{
+                    "zh": {
+                        "type": "text",
+                        "analyzer": "ik_max_word",
+                        "search_analyzer": "ik_smart"
+                    },
+                    "en": {
+                        "type": "text",
+                        "analyzer": "en_analyzer"
+                    },
+                    "auto": {
+                        "type": "text",
+                        "analyzer":"auto_analyzer"
+                    }
+                }
+            },
+            "Tags":{
+                "properties": {
+                    "UserLabels":{
+                        "type": "keyword",
+                        "normalizer": "label_normalizer"
+                    },
+                    "Labels":{
+                        "type": "keyword",
+                        "normalizer": "label_normalizer"
+                    },
+                    "Topic":{
+                        "type": "keyword",
+                        "normalizer": "label_normalizer"
+                    }
+                }
+            },
+            "Num": {
+                "properties": {
+                    "NumStar": {
+                        "type": "integer"
+                    },
+                    "NumShared": {
+                        "type": "integer"
+                    },
+                    "NumGood": {
+                        "type": "integer"
+                    },
+                    "NumBad": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "Auth": {
+                "properties": {
+                    "IsUsed": {
+                        "type": "boolean"
+                    },
+                    "IsCommon": {
+                        "type": "boolean"
+                    },
+                    "IsOpenSource": {
+                        "type": "boolean"
+                    }
+                }
+            }
+        }
+    }
+}
