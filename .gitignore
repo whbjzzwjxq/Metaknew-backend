@@ -4,7 +4,7 @@
 *.xml
 *\__pycache__\*
 venv
-useful-tips.txt
+tips
 .idea/
 __pycache__/
 base_api/__pycache__/

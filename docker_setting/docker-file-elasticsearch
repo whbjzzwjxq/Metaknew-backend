@@ -1,4 +1,0 @@
-FROM elasticsearch:7.6.2
-MAINTAINER whb whbjzzwjxq@gmail.com
-WORKDIR /home/metaknew/Elasticsearch/image
-COPY es-plugins /usr/share/elasticsearch/plugins/
