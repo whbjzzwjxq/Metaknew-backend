@@ -1,0 +1,9 @@
+Watching for file changes with StatReloader
+[15/Oct/2020 03:46:02] "GET /apis/user/login/cookie HTTP/1.0" 200 934
+[15/Oct/2020 03:46:02] "GET /apis/document/query/graph?id=3 HTTP/1.0" 200 4094
+[15/Oct/2020 03:46:02] "GET /apis/user/data/query HTTP/1.0" 200 47
+[15/Oct/2020 03:46:02] "GET /apis/user/data/query HTTP/1.0" 200 47
+[15/Oct/2020 03:46:02] "POST /apis/item/node/query HTTP/1.0" 200 798
+[15/Oct/2020 03:46:02] "POST /apis/item/link/query HTTP/1.0" 200 548
+Not Found: /apis
+[15/Oct/2020 03:46:03] "GET /apis HTTP/1.0" 404 5120

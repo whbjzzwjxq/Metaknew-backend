@@ -23,7 +23,7 @@ def make_user_token(user_name, user_id):
         "name": user_name,
         "_id": user_id
     }
-    token = jwt.JWT.encode(content, secret, algorithm="HS256")
+    token = jwt.encode(content, secret, algorithm="HS256")
     token = str(token)
     return token
 

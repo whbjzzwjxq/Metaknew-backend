@@ -110,7 +110,6 @@ class Api(__ApiBase):
         url = ''
         for cls in self.__class__.__mro__:
             url = getattr(cls, 'URL', '') + url
-        print(self.__class__.__name__ + ' url: ' + url)
         return url
 
     def __call__(self, request):
