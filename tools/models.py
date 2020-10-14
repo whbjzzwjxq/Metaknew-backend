@@ -125,21 +125,25 @@ class BaseBlockManager(models.Model):
 
 class NodeBlockManager(BaseBlockManager):
     class Meta:
+        app_label = "tools"
         db_table = "block_manager_node"
 
 
 class LinkBlockManager(BaseBlockManager):
     class Meta:
+        app_label = "tools"
         db_table = "block_manager_link"
 
 
 class DeviceBlockManager(BaseBlockManager):
     class Meta:
+        app_label = "tools"
         db_table = "block_manager_device"
 
 
 class TimeBlockManager(BaseBlockManager):
     class Meta:
+        app_label = "tools"
         db_table = "block_manager_time"
 
 
@@ -155,21 +159,25 @@ class BlockIdRecord(models.Model):
 
 class NodeBlockIdRecord(BlockIdRecord):
     class Meta:
+        app_label = "tools"
         db_table = "block_record_node"
 
 
 class LinkBlockIdRecord(BlockIdRecord):
     class Meta:
+        app_label = "tools"
         db_table = "block_record_link"
 
 
 class DeviceBlockIdRecord(BlockIdRecord):
     class Meta:
+        app_label = "tools"
         db_table = "block_record_device"
 
 
 class TimeBlockIdRecord(BlockIdRecord):
     class Meta:
+        app_label = "tools"
         db_table = "block_record_time"
 
 
@@ -179,6 +187,7 @@ class GlobalWordIndex(models.Model):
     Word = models.TextField(db_column="Word", db_index=True, unique=True, editable=False)
 
     class Meta:
+        app_label = "tools"
         db_table = "source_global_word_index"
 
 
@@ -192,6 +201,7 @@ class LocationDoc(models.Model):
     Doc = JSONField(db_column="Content", default=dict)
 
     class Meta:
+        app_label = "tools"
         db_table = "source_location_doc"
 
 
@@ -202,4 +212,5 @@ class Chronology(models.Model):
     Content = models.TextField(db_column="Content")
 
     class Meta:
+        app_label = "tools"
         db_table = "source_chronology"

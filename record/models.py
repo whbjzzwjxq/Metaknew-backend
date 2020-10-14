@@ -69,20 +69,20 @@ class ItemVersionRecord(models.Model):
         db_table = "record_item_version"
 
 
-class DocumentVersionRecord(models.Model):
-    ItemId = IdField()  # 专题Id
-    CreateUser = models.BigIntegerField(db_column="User", editable=False, db_index=True)
-    CreateTime = models.DateTimeField(auto_now=True, editable=False)
-    BranchId = IdField()  # 分支的Id
-    BranchName = models.TextField(default='NewBranch')  # 分支的名字
-    BranchDescription = models.TextField(default='')  # 分支描述
-    IsUsed = models.BooleanField(default=True)  # 是否正在使用
-    IsMerged = models.BooleanField(default=False)  # 是否合并
-    IsCurrent = models.BooleanField(default=False)  # 是否是当前的内容
-    Content = JSONField(default=default_graph)  # Content
+# class DocumentVersionRecord(models.Model):
+#     ItemId = IdField()  # 专题Id
+#     CreateUser = models.BigIntegerField(db_column="User", editable=False, db_index=True)
+#     CreateTime = models.DateTimeField(auto_now=True, editable=False)
+#     BranchId = IdField()  # 分支的Id
+#     BranchName = models.TextField(default='NewBranch')  # 分支的名字
+#     BranchDescription = models.TextField(default='')  # 分支描述
+#     IsUsed = models.BooleanField(default=True)  # 是否正在使用
+#     IsMerged = models.BooleanField(default=False)  # 是否合并
+#     IsCurrent = models.BooleanField(default=False)  # 是否是当前的内容
+#     Content = JSONField(default=default_graph)  # Content
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["DocId", "BranchId"], name="GraphVersionControl")
-        ]
-        db_table = "record_document_document_branch"
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(fields=["DocId", "BranchId"], name="GraphVersionControl")
+#         ]
+#         db_table = "record_document_document_branch"

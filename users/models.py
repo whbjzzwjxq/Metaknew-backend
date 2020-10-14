@@ -47,6 +47,7 @@ class User(models.Model):
     JointGroup = HStoreField(default=dict)
 
     class Meta:
+        app_label = "users"
         db_table = "user_info_base_user"
 
 
@@ -64,6 +65,7 @@ class GroupCtrl(models.Model):
     IsOpen = models.BooleanField(db_column="Open", default=True)
 
     class Meta:
+        app_label = "users"
         db_table = "user_info_base_group"
 
 
