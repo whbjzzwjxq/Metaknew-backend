@@ -59,12 +59,12 @@ class BaseUser:
         endpoint = 'sts-vpc.cn-beijing.aliyuncs.com'
         authority_keys = {
             "guest": {
-                "id": 'LTAI4FwvcibXwt11sCCiDUQB',
-                "secret": '26TNuCRT22WXjUOUnrNH8oQFgakxf1',
+                "id": '000000',
+                "secret": '000000',
             },
             "developer": {
-                "id": 'LTAI4Fm4oYhKEjpDmSArRY7q',
-                "secret": "bZRE9nIm7W20YxEXGlkui9Pyq6UAoc"
+                "id": '000000',
+                "secret": "000000"
             }
         }
         if self.is_login:
